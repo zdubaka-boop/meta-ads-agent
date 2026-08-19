@@ -183,6 +183,8 @@ def create_campaign(acct, name, objective, budget_minor=None, special_ad_categor
 
 
 def create_adset(acct, campaign_id, name, targeting, *, budget_minor=None,
+                 lifetime_budget_minor=None, bid_strategy="LOWEST_COST_WITHOUT_CAP",
+                 bid_amount_minor=None,
                  optimization_goal="LINK_CLICKS", billing_event="IMPRESSIONS",
                  promoted_object=None, dsa_beneficiary=None, dsa_payor=None,
                  start_time=None, end_time=None):
@@ -193,11 +195,15 @@ def create_adset(acct, campaign_id, name, targeting, *, budget_minor=None,
         "status": "PAUSED",
         "optimization_goal": optimization_goal,
         "billing_event": billing_event,
-        "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+        "bid_strategy": bid_strategy,
         "targeting": json.dumps(targeting),
     }
     if budget_minor is not None:
         p["daily_budget"] = str(int(budget_minor))
+    if lifetime_budget_minor is not None:
+        p["lifetime_budget"] = str(int(lifetime_budget_minor))
+    if bid_amount_minor is not None:
+        p["bid_amount"] = str(int(bid_amount_minor))
     if promoted_object:
         p["promoted_object"] = json.dumps(promoted_object)
     # Required whenever the ad set can reach the EU.
@@ -325,3 +331,39 @@ def copy_object(object_id, kind, **params):
 
 def rename(object_id, name):
     return post(object_id, {"name": name}, "rename")
+
+
+# ------------------------------------------------------- targeting lookups
+# Meta wants numeric IDs for cities, regions, interests and audiences. Buyers
+# write names. These resolve names -> IDs and report exactly what matched, so
+# a wrong match shows up in the preview rather than silently in a live ad.
+
+def load_locales():
+    import json as _j
+    p = Path(__file__).resolve().parents[2] / "reference" / "data" / "locales.json"
+    return _j.loads(p.read_text()) if p.exists() else {}
+
+
+def search_geo(query, kind="city"):
+    """kind: city | region. Returns the best match dict, or None."""
+    r = get("search", None, type="adgeolocation", location_types=json.dumps([kind]),
+            q=query, limit=10)
+    for row in r.get("data", []):
+        if (row.get("name") or "").lower() == query.lower():
+            return row
+    return (r.get("data") or [None])[0]
+
+
+def search_interest(query):
+    r = get("search", None, type="adinterest", q=query, limit=10)
+    for row in r.get("data", []):
+        if (row.get("name") or "").lower() == query.lower():
+            return row
+    return (r.get("data") or [None])[0]
+
+
+def find_custom_audience(acct, name):
+    for a in get_all(f"{account(acct)}/customaudiences", "id,name", cap=1000):
+        if (a.get("name") or "").lower() == name.lower():
+            return a
+    return None

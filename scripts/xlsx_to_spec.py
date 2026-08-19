@@ -13,6 +13,9 @@ import argparse, csv, json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import xlsx
+import meta
+
+meta.load_env()
 
 EXAMPLE_MARKERS = ("Q3 — UK", "Q3 - UK", "act_1234567890", "example.com", "Example Ltd")
 
@@ -47,6 +50,7 @@ def main():
         if not g(req):
             problems.append(f"Campaign tab: '{req}' is empty and is required")
 
+    spec_account = g("account_id")
     mode = g("budget_mode").upper()
     if mode not in ("CBO", "ABO"):
         problems.append("Campaign tab: budget_mode must be CBO or ABO")
@@ -67,45 +71,185 @@ def main():
         problems.append("Campaign tab: daily_budget_minor is required for CBO (e.g. 20000 = 200.00)")
 
     defaults = {k: g(k) for k in ("page_id", "instagram_user_id", "pixel_id", "link", "cta",
-                                  "url_tags", "dsa_beneficiary", "dsa_payor") if g(k)}
+                                  "url_tags", "dsa_beneficiary", "dsa_payor", "display_link",
+                                  "custom_event_type") if g(k)}
 
     # ---- Ad Sets tab ----
     adset_rows = xlsx.table(sh["Ad Sets"])
     if not args.keep_examples:
         adset_rows = [r for r in adset_rows if not is_example(r)]
-    adset_rows = [r for r in adset_rows if str(r.get("adset_name", "")).strip()
-                  and not str(r.get("adset_name", "")).startswith("↑")
-                  and "countries:" not in str(r.get("adset_name", ""))
-                  and "start_time" not in str(r.get("adset_name", ""))]
+    # A real ad set row has a name AND at least one other populated field. The
+    # help notes under the table occupy column A only, so they drop out here
+    # without any fragile string matching.
+    adset_rows = [r for r in adset_rows
+                  if str(r.get("adset_name", "")).strip()
+                  and (str(r.get("countries", "")).strip()
+                       or str(r.get("optimization_goal", "")).strip())]
     if not adset_rows:
         problems.append("Ad Sets tab: no ad sets found (did you delete the example rows and add your own?)")
 
+    LOCALES = meta.load_locales()
+    resolved_log = []
+
+    def csv_list(v):
+        return [x.strip() for x in str(v or "").split(",") if x.strip()]
+
     adsets, by_name = [], {}
-    for i, r in enumerate(adset_rows, start=2):
+    for r in adset_rows:
         name = str(r["adset_name"]).strip()
         if name in by_name:
             problems.append(f"Ad Sets tab: duplicate adset_name '{name}'")
-        countries = [c.strip().upper() for c in str(r.get("countries", "")).split(",") if c.strip()]
+
+        # ---------------- geography ----------------
+        countries = [c.upper() for c in csv_list(r.get("countries"))]
         if not countries:
-            problems.append(f"Ad Sets tab '{name}': countries is required")
+            problems.append(f"Ad Sets '{name}': countries is required")
+        geo = {"countries": countries}
+
+        loc_types = str(r.get("location_types") or "home+recent").strip()
+        geo["location_types"] = ["home", "recent"] if loc_types == "home+recent" else [loc_types]
+
+        for col, kind, key in (("cities", "city", "cities"), ("regions", "region", "regions")):
+            names = csv_list(r.get(col))
+            if not names:
+                continue
+            out = []
+            for nm in names:
+                try:
+                    hit = meta.search_geo(nm, kind)
+                except Exception as e:
+                    problems.append(f"Ad Sets '{name}': could not look up {kind} '{nm}' ({e})"); continue
+                if not hit:
+                    problems.append(f"Ad Sets '{name}': no Meta {kind} matches '{nm}'"); continue
+                entry = {"key": hit["key"]}
+                if kind == "city":
+                    entry["radius"] = 10; entry["distance_unit"] = "mile"
+                out.append(entry)
+                resolved_log.append(f"{kind} '{nm}' -> {hit.get('name')}, "
+                                    f"{hit.get('region') or ''} {hit.get('country_code') or ''} (key {hit['key']})")
+            if out:
+                geo[key] = out
+
+        targeting = {"geo_locations": geo}
+
+        excl = [c.upper() for c in csv_list(r.get("excluded_countries"))]
+        if excl:
+            targeting["excluded_geo_locations"] = {"countries": excl}
+
+        # ---------------- demographics ----------------
+        targeting["age_min"] = int(r["age_min"]) if str(r.get("age_min", "")).strip() else 18
+        targeting["age_max"] = int(r["age_max"]) if str(r.get("age_max", "")).strip() else 65
+        gender = str(r.get("genders") or "All").strip().lower()
+        if gender == "men":
+            targeting["genders"] = [1]
+        elif gender == "women":
+            targeting["genders"] = [2]
+
+        # ---------------- languages ----------------
+        langs = csv_list(r.get("languages"))
+        if langs:
+            ids = []
+            for L in langs:
+                if L in LOCALES:
+                    ids.append(LOCALES[L])
+                else:
+                    near = [k for k in LOCALES if k.lower().startswith(L.lower()[:4])][:3]
+                    problems.append(f"Ad Sets '{name}': language '{L}' is not a Meta language. "
+                                    f"Use a name from the Languages tab"
+                                    + (f" (did you mean: {', '.join(near)}?)" if near else ""))
+            if ids:
+                targeting["locales"] = ids
+
+        # ---------------- interests ----------------
+        for col, key in (("interests", "interests"), ("excluded_interests", "exclusions")):
+            names = csv_list(r.get(col))
+            if not names:
+                continue
+            found = []
+            for nm in names:
+                try:
+                    hit = meta.search_interest(nm)
+                except Exception as e:
+                    problems.append(f"Ad Sets '{name}': could not look up interest '{nm}' ({e})"); continue
+                if not hit:
+                    problems.append(f"Ad Sets '{name}': no Meta interest matches '{nm}'"); continue
+                found.append({"id": hit["id"], "name": hit["name"]})
+                resolved_log.append(f"interest '{nm}' -> {hit['name']} (id {hit['id']}, "
+                                    f"reach ~{hit.get('audience_size_lower_bound', '?')})")
+            if found and key == "interests":
+                targeting.setdefault("flexible_spec", [{}])[0]["interests"] = found
+            elif found:
+                targeting["exclusions"] = {"interests": found}
+
+        # ---------------- custom audiences ----------------
+        for col, key in (("custom_audiences", "custom_audiences"),
+                         ("excluded_custom_audiences", "excluded_custom_audiences")):
+            names = csv_list(r.get(col))
+            if not names:
+                continue
+            found = []
+            for nm in names:
+                try:
+                    hit = meta.find_custom_audience(spec_account, nm)
+                except Exception as e:
+                    problems.append(f"Ad Sets '{name}': could not look up audience '{nm}' ({e})"); continue
+                if not hit:
+                    problems.append(f"Ad Sets '{name}': no custom audience named '{nm}' in this ad account")
+                    continue
+                found.append({"id": hit["id"], "name": hit["name"]})
+                resolved_log.append(f"audience '{nm}' -> {hit['name']} (id {hit['id']})")
+            if found:
+                targeting[key] = found
+
+        # ---------------- placements ----------------
+        dev = str(r.get("device_platforms") or "All").strip().lower()
+        if dev and dev != "all":
+            targeting["device_platforms"] = csv_list(dev)
+        pubs = csv_list(r.get("publisher_platforms"))
+        if pubs:
+            targeting["publisher_platforms"] = pubs
+        fbp = csv_list(r.get("facebook_positions"))
+        if fbp:
+            targeting["facebook_positions"] = fbp
+        igp = csv_list(r.get("instagram_positions"))
+        if igp:
+            targeting["instagram_positions"] = igp
+        if (fbp or igp) and not pubs:
+            problems.append(f"Ad Sets '{name}': positions are set but publisher_platforms is blank — "
+                            f"name the platforms too, or clear the positions")
+
+        if str(r.get("advantage_audience") or "").strip().lower() == "yes":
+            targeting["targeting_automation"] = {"advantage_audience": 1}
+
+        # ---------------- assemble ----------------
         a = {
             "name": name,
             "optimization_goal": str(r.get("optimization_goal") or "LINK_CLICKS").strip(),
             "billing_event": str(r.get("billing_event") or "IMPRESSIONS").strip(),
-            "targeting": {"geo_locations": {"countries": countries},
-                          "age_min": int(r["age_min"]) if str(r.get("age_min", "")).strip() else 18,
-                          "age_max": int(r["age_max"]) if str(r.get("age_max", "")).strip() else 65},
+            "targeting": targeting,
             "ads": [],
         }
-        b = minor(r.get("daily_budget_minor"), f"Ad Sets tab '{name}' daily_budget_minor")
+        if str(r.get("bid_strategy") or "").strip():
+            a["bid_strategy"] = str(r["bid_strategy"]).strip()
+        ba = minor(r.get("bid_amount_minor"), f"Ad Sets '{name}' bid_amount_minor")
+        if ba:
+            a["bid_amount_minor"] = ba
+
+        daily = minor(r.get("daily_budget_minor"), f"Ad Sets '{name}' daily_budget_minor")
+        life = minor(r.get("lifetime_budget_minor"), f"Ad Sets '{name}' lifetime_budget_minor")
+        if daily and life:
+            problems.append(f"Ad Sets '{name}': set daily OR lifetime budget, not both")
         if mode == "ABO":
-            if not b:
-                problems.append(f"Ad Sets tab '{name}': daily_budget_minor is required for ABO "
-                                f"— budgets are never defaulted")
-            a["daily_budget_minor"] = b
-        elif b:
-            problems.append(f"Ad Sets tab '{name}': has a budget but the campaign is CBO — "
+            if not (daily or life):
+                problems.append(f"Ad Sets '{name}': a budget is required for ABO — never defaulted")
+            if daily:
+                a["daily_budget_minor"] = daily
+            if life:
+                a["lifetime_budget_minor"] = life
+        elif daily or life:
+            problems.append(f"Ad Sets '{name}': has a budget but the campaign is CBO — "
                             f"clear it, or switch budget_mode to ABO")
+
         ev = str(r.get("custom_event_type", "")).strip()
         if ev and defaults.get("pixel_id"):
             a["promoted_object"] = {"pixel_id": defaults["pixel_id"], "custom_event_type": ev}
@@ -118,8 +262,10 @@ def main():
     ad_rows = xlsx.table(sh["Ads"])
     if not args.keep_examples:
         ad_rows = [r for r in ad_rows if not is_example(r)]
-    ad_rows = [r for r in ad_rows if str(r.get("ad_name", "")).strip()
-               and not str(r.get("adset_name", "")).startswith("↑")]
+    # Same structural filter: a real ad row names an ad set AND an ad.
+    ad_rows = [r for r in ad_rows
+               if str(r.get("ad_name", "")).strip()
+               and str(r.get("adset_name", "")).strip()]
     if not ad_rows:
         problems.append("Ads tab: no ads found")
 
@@ -138,7 +284,8 @@ def main():
         ad = {"name": adn, "creative": f"creatives/{cre}" if cre and "/" not in cre else cre}
         for src, dst in [("body", "body"), ("headline", "headline"), ("description", "description"),
                          ("cta", "cta"), ("link", "link"), ("url_tags", "url_tags"),
-                         ("page_id", "page_id")]:
+                         ("page_id", "page_id"), ("display_link", "display_link"),
+                         ("instagram_user_id", "instagram_user_id")]:
             v = str(r.get(src, "")).strip()
             if v:
                 ad[dst] = v
@@ -174,6 +321,11 @@ def main():
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(csv_rows[0].keys())); w.writeheader(); w.writerows(csv_rows)
 
+    if resolved_log:
+        print("Resolved to Meta IDs (check these are right):")
+        for line in resolved_log:
+            print("   " + line)
+        print()
     print(f"OK — {len(adsets)} ad set(s), {len(csv_rows)} ad(s)")
     print(f"  spec : {out}")
     print(f"  ads  : {csv_path}  (reference copy; ads are already inline in the spec)")

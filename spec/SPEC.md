@@ -99,3 +99,60 @@ Every created object is written to `outputs/<campaign>-state.json` immediately.
 Re-running `--execute` skips anything already in that file, so a run that dies
 half way through resumes instead of duplicating. The builder also refuses to
 start if a campaign of the same name already exists and no state file is given.
+
+
+---
+
+# Workbook column reference
+
+`spec/CAMPAIGN-TEMPLATE.xlsx` has seven tabs. Yellow cells and dark-blue column
+headers are required; everything else is optional and falls back to the Campaign
+tab default, or to Meta's own default when left blank.
+
+## Ad Sets tab
+
+| Column | Meaning |
+|---|---|
+| `adset_name` | Unique within the spec. The join key used by the Ads tab. |
+| `daily_budget_minor` / `lifetime_budget_minor` | ABO only. One or the other, never both. Minor units. |
+| `optimization_goal` · `billing_event` · `bid_strategy` · `bid_amount_minor` | Delivery and bidding. |
+| `countries` | ISO codes, comma separated: `GB,IE`. **Required.** |
+| `excluded_countries` | ISO codes to exclude. |
+| `cities` · `regions` | Plain names: `London,Manchester`. Resolved to Meta IDs and echoed back so you can check the match. Cities get a 10-mile radius. |
+| `location_types` | `home+recent` (default) · `home` · `recent` · `travel_in` |
+| `languages` | Names exactly as on the **Languages** tab: `English (UK),Polish`. Blank targets all languages. |
+| `genders` | `All` · `Men` · `Women` |
+| `age_min` · `age_max` | Defaults 18 and 65. |
+| `interests` · `excluded_interests` | Plain names. Resolved to IDs, with audience reach printed for each. |
+| `custom_audiences` · `excluded_custom_audiences` | Names of audiences that already exist in the ad account. |
+| `advantage_audience` | `yes` lets Meta expand beyond your targeting. |
+| `device_platforms` | `All` · `mobile` · `desktop` |
+| `publisher_platforms` | `facebook,instagram,audience_network,messenger,threads`. Blank = Advantage+ placements. |
+| `facebook_positions` · `instagram_positions` | Only valid alongside `publisher_platforms`. |
+| `custom_event_type` | Conversion event, e.g. `PURCHASE`. |
+| `start_time` · `end_time` | `2026-09-01T00:00:00+0300` |
+| `dsa_beneficiary` | **Required for EU targeting.** Legal advertiser name. |
+
+## Ads tab
+
+`adset_name` · `ad_name` · `creative_file` · `body` · `headline` · `description` ·
+`cta` · `link` · `display_link` · `url_tags` · `page_id` · `instagram_user_id`
+
+The last six inherit from the Campaign tab when blank.
+
+## Name resolution
+
+Cities, regions, interests, and custom audiences are written as names and
+resolved against Meta at conversion time. Every match is printed:
+
+```
+interest 'Skin care' -> Skin care (id 664130153728886, reach ~257137942)
+city 'London'        -> London, England GB (key 812057)
+```
+
+**Read those lines.** A name that matches the wrong thing is the one failure
+mode this design has — "Cosmetics" is unambiguous, "Apple" is not. A name that
+matches nothing stops the run rather than being silently dropped.
+
+Languages resolve offline from `reference/data/locales.json` (92 locales pulled
+from Meta), so a typo is caught instantly with a "did you mean" suggestion.
