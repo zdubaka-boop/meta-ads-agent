@@ -13,23 +13,28 @@ import meta
 
 
 TOKEN_TUTORIAL = """
-  You need a Meta access token. About 5 minutes, one time.
+  You need a Meta access token. ~5 minutes, one time. Every link you need:
 
-  STEP 1 — Open or create an app
-    Go to  https://developers.facebook.com/apps
-    Use an existing app, or click "Create app" and choose type "Business".
-    (An "app" here is just a container for API access. You are not building
-     anything or submitting it for review.)
+  STEP 1 — Create or open an app
+    Your apps:    https://developers.facebook.com/apps
+    Create one:   https://developers.facebook.com/apps/create/
+    Choose type "Business". An "app" here is just a container for API access -
+    it stays in Development mode, is never submitted for review, and is never
+    seen by the public.
 
-  STEP 2 — Add a Privacy Policy URL          <-- the step everyone misses
-    In your app:  App settings  ->  Basic
-    Fill in "Privacy Policy URL", then click "Save changes" at the bottom.
-    Meta will NOT grant ads permissions to an app without one. Any publicly
-    reachable page works - your company's existing privacy policy is fine.
+  STEP 2 — Fill in the Privacy Policy URL
+    App settings -> Basic:
+      https://developers.facebook.com/apps/  ->  your app  ->  Settings  ->  Basic
+    Paste ANY working privacy policy URL and click "Save changes".
+    It genuinely does not matter which - the app never goes public and nobody
+    reviews it. This field just has to be non-empty before Meta will hand out
+    ads permissions. Your company's policy page, or any public one, is fine:
+      https://www.iubenda.com/privacy-policy/7787549
+    (If you have your own, use it - takes two seconds and is tidier.)
 
   STEP 3 — Open the Graph API Explorer
-    Go to  https://developers.facebook.com/tools/explorer/
-    Top right: pick your app in the "Meta App" dropdown.
+    https://developers.facebook.com/tools/explorer/
+    Top right: choose your app in the "Meta App" dropdown.
 
   STEP 4 — Tick all five permissions
     In the "Permissions" box on the left, add each of these:
@@ -38,34 +43,36 @@ TOKEN_TUTORIAL = """
         business_management
         pages_read_engagement
         pages_show_list
-    All five. Miss one and the tools will fail later with a confusing error.
+    All five. Miss one and the tools fail later with a confusing error.
 
   STEP 5 — Generate the token
-    Click "Generate Access Token". Approve the Facebook login prompt.
+    Click "Generate Access Token" and approve the Facebook login prompt.
     A long string starting with "EAA..." appears. Copy it.
 
   STEP 6 — Hand it to this repo
     Run:   bash scripts/setup.sh
-    Paste the token when it asks. Nothing is shown on screen as you type -
-    that is deliberate. The other four questions are optional; press Enter to
-    skip them, they can be discovered automatically later.
+    Paste the token when asked. NOTHING APPEARS ON SCREEN as you paste - that
+    is deliberate, not a bug. Press Enter. The next four questions are
+    optional; press Enter to skip them.
 
     >>> Do NOT paste the token into the Claude chat window. <<<
-    Anything typed in chat is saved in the conversation transcript. The setup
-    script keeps it in a local .env file that only you can read.
+    Chat is saved in the transcript. setup.sh keeps it in a local .env only
+    you can read. Pasted one by accident? Revoke it here:
+      https://www.facebook.com/settings?tab=business_tools
 
   STEP 7 — Confirm
     Run:   python3 scripts/preflight.py
-    You should see READY, and a list of every ad account you can reach.
+    Expect READY, plus a list of every ad account you can reach.
 
   TROUBLESHOOTING
-    "0 ad accounts found"  ->  the token works but your Facebook user has no
-        ad account access. Someone with admin rights must add you in
-        Business Settings -> Users -> People.
-    Token expires in ~60 days. For a team, use a System User token instead
-        (Business Settings -> Users -> System Users -> Generate New Token) -
-        it never expires and belongs to the business, not to one person.
-        Same five permissions.
+    "0 ad accounts found"
+        The token works, but your Facebook user has no ad account access.
+        An admin adds you here:
+          https://business.facebook.com/settings/people
+    Token expires in ~60 days.
+        For a team, use a System User token instead - it never expires and
+        belongs to the business, not to one person. Same five permissions:
+          https://business.facebook.com/settings/system-users
 """
 
 OK, WARN, BAD, SKIP = "[ OK ]", "[WARN]", "[FAIL]", "[ -- ]"
