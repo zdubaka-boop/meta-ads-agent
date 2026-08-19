@@ -22,7 +22,6 @@ It does **not** generate creative. Bring your own images and videos.
    Instagram accounts, pixels, catalogs, and existing campaigns.
 5. **Open `spec/CAMPAIGN-TEMPLATE.xlsx`** — the Excel template. Read its START HERE
    tab, then fill in Campaign / Ad Sets / Ads. This is how most work will arrive.
-6. **Read `reference/mcp-vs-api.md`** — when to use the Meta MCP instead of this repo.
 
 Then just talk to Claude: *"Build me a prospecting campaign in act_X, two ad
 sets, these 40 creatives, this landing page, €200/day CBO."* It will write the

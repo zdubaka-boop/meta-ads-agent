@@ -13,47 +13,57 @@ import meta
 
 
 TOKEN_TUTORIAL = """
-  You need a Meta access token. ~5 minutes, one time. Every link you need:
+  You need a Meta access token. ~5 minutes, one time. All links below.
 
-  STEP 1 — Create or open an app
-    Your apps:    https://developers.facebook.com/apps
-    Create one:   https://developers.facebook.com/apps/create/
-    Choose type "Business". An "app" here is just a container for API access -
-    it stays in Development mode, is never submitted for review, and is never
-    seen by the public.
+  STEP 1 — Create the app
+    https://developers.facebook.com/apps/create/
+    When it asks what you want to do, pick:
+
+        "Create and manage ads with Marketing API"
+
+    That choice matters - it sets the app up for ads access. If you pick
+    anything else the permissions you need will not be offered later.
+    Name it anything (e.g. "Ads Agent"), attach your Business account.
 
   STEP 2 — Fill in the Privacy Policy URL
-    App settings -> Basic:
-      https://developers.facebook.com/apps/  ->  your app  ->  Settings  ->  Basic
-    Paste ANY working privacy policy URL and click "Save changes".
-    It genuinely does not matter which - the app never goes public and nobody
-    reviews it. This field just has to be non-empty before Meta will hand out
-    ads permissions. Your company's policy page, or any public one, is fine:
+    Your app  ->  App settings  ->  Basic
+    Paste ANY working privacy policy URL, then "Save changes".
+    It genuinely does not matter which one. The app stays in Development
+    mode, is never reviewed, and is never public - the field just has to be
+    non-empty before Meta will hand out ads permissions. Any public page:
       https://www.iubenda.com/privacy-policy/7787549
-    (If you have your own, use it - takes two seconds and is tidier.)
 
-  STEP 3 — Open the Graph API Explorer
-    https://developers.facebook.com/tools/explorer/
-    Top right: choose your app in the "Meta App" dropdown.
+  STEP 3 — Open the use case, then Customize
+    In your app's left sidebar click  "Use cases"
+    On "Create and manage ads with Marketing API" click  "Customize"
+    Wait for it to load.
 
-  STEP 4 — Tick all five permissions
-    In the "Permissions" box on the left, add each of these:
+    (Do NOT use the old Graph API Explorer - the permissions you need are
+     granted from inside the use case, not there.)
+
+  STEP 4 — Go to Tools, then Get access token
+    Inside the Customize screen, open the  "Tools"  tab.
+    Click  "Get access token".
+
+    Direct link - swap in your own app id from the browser address bar:
+      https://developers.facebook.com/apps/YOUR_APP_ID/use_cases/customize/tools/?use_case_enum=MARKETING_API_ADS_MANAGEMENT&selected_tab=tools&product_route=marketing-api
+
+  STEP 5 — Select every permission, then generate
+    TICK EVERY BOX in the permissions list, including:
         ads_read
         ads_management
         business_management
         pages_read_engagement
         pages_show_list
-    All five. Miss one and the tools fail later with a confusing error.
-
-  STEP 5 — Generate the token
-    Click "Generate Access Token" and approve the Facebook login prompt.
+    Select them all - miss one and the tools fail later with a confusing
+    error. Click "Get token" and approve the Facebook login prompt.
     A long string starting with "EAA..." appears. Copy it.
 
   STEP 6 — Hand it to this repo
     Run:   bash scripts/setup.sh
-    Paste the token when asked. NOTHING APPEARS ON SCREEN as you paste - that
-    is deliberate, not a bug. Press Enter. The next four questions are
-    optional; press Enter to skip them.
+    Paste the token when asked. NOTHING APPEARS ON SCREEN as you paste -
+    that is deliberate, not a freeze. Press Enter. The next four questions
+    are optional; press Enter to skip them.
 
     >>> Do NOT paste the token into the Claude chat window. <<<
     Chat is saved in the transcript. setup.sh keeps it in a local .env only
@@ -66,12 +76,12 @@ TOKEN_TUTORIAL = """
 
   TROUBLESHOOTING
     "0 ad accounts found"
-        The token works, but your Facebook user has no ad account access.
+        Token works, but your Facebook user has no ad account access.
         An admin adds you here:
           https://business.facebook.com/settings/people
     Token expires in ~60 days.
-        For a team, use a System User token instead - it never expires and
-        belongs to the business, not to one person. Same five permissions:
+        For a team, use a System User token instead - never expires, belongs
+        to the business rather than one person, same permissions:
           https://business.facebook.com/settings/system-users
 """
 

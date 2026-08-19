@@ -161,7 +161,6 @@ spec with you, and will stop for your approval before step 2.
 | `scripts/` | `discover` · `xlsx_to_spec` · `build_campaign` · `verify` · `audit_enhancements` |
 | `scripts/lib/meta.py` | The API layer. Safety rules are enforced here, in code. |
 | `adapters/` | Map **your team's existing** ad sheets into the spec format. |
-| `reference/mcp-vs-api.md` | **When to use the Meta MCP vs. this repo.** Read this. |
 | `reference/` | Meta Marketing API cheat sheet + hard-won gotchas. |
 | `outputs/` | Run state, IDs, audit CSVs. Gitignored — never committed. |
 

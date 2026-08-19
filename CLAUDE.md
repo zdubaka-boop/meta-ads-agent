@@ -7,24 +7,17 @@ You produce Meta ad campaigns from written specs. These rules are not advisory.
 When the user first asks you to start work in this repo — including vague
 openers like "let's start", "go", or "help me upload ads" — do **not** ask them
 what they want yet, and do **not** hand them setup homework. Diagnose first,
-then report. Two actions, in this order:
+then report.
 
-**1. Check whether the Meta MCP is connected.** Look for tools named
-`mcp__*meta*` / `mcp__*ads*` (search your available tools for "meta ads campaign
-adset"). Meta's official MCP is at `https://mcp.facebook.com/ads` and uses
-OAuth — if it is connected, the user may not need a token at all for creating,
-duplicating, and editing ads. Record yes/no.
-
-**2. Run the preflight.** It is read-only and safe to run unprompted:
+**Run the preflight.** It is read-only and safe to run unprompted:
 
 ```bash
 python3 scripts/preflight.py
 ```
 
-Then present **one checklist** covering both, in this shape:
+Then present **one checklist**, in this shape:
 
 ```
-  Meta MCP connected        yes / no        (what that unlocks)
   Token + permissions       from preflight
   Ad accounts reachable     N — list them
   Workspace ready           template / creatives / specs
@@ -60,22 +53,21 @@ Stay with them: if `setup.sh` reports 0 ad accounts, or a scope is missing,
 diagnose it from the preflight output rather than sending them back to the
 README.
 
-If the Meta MCP *is* connected, say so — ad creation and campaign duplication
-can proceed through it immediately, while the token unlocks the spreadsheet
-pipeline, verification, and the audit scripts.
 
-## Which tool for which job
 
-| Job | Use |
+## What this repo can and cannot do
+
+| Job | Possible? |
 |---|---|
-| A handful of ads, conversationally | Meta MCP, if connected |
-| Duplicate a campaign and tweak it | Meta MCP — its strongest feature |
-| Hundreds/thousands of ads from a sheet | This repo's spec pipeline |
-| Verify what was created against a spec | This repo — `verify.py` |
-| Audit which live ads have enhancements on | This repo — `audit_enhancements.py` |
-| Edit ads that are already live | Neither — Meta locks creatives. Manual in Ads Manager. |
+| Build campaigns, ad sets, ads in bulk from a spreadsheet | Yes |
+| Upload images and videos | Yes |
+| Duplicate a campaign, ad set, or ad — editing it in the copy | Yes |
+| Turn creative enhancements off at creation | Yes |
+| Verify what was created against the spec | Yes |
+| Audit which live ads have enhancements on | Yes (read-only report) |
+| Edit ads that are already live | No — Meta locks creatives. Manual in Ads Manager. |
 
-See `reference/mcp-vs-api.md`.
+See `reference/gotchas.md` for why the last row is a hard limit.
 
 ## Non-negotiable
 
