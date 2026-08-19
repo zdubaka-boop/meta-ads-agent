@@ -11,9 +11,13 @@ It does **not** generate creative. Bring your own images and videos.
 
 ## Ten-minute onboarding
 
+0. **`python3 scripts/preflight.py`** — run this first, always. It checks every
+   prerequisite and tells you exactly what (if anything) is missing. Safe to run
+   before setup: it degrades gracefully and names the one command to fix things.
 1. **Get a token** — `README.md` §2. Five permissions, one privacy policy URL.
 2. **`bash scripts/setup.sh`** — token goes into `.env`, never into chat.
-3. **`python3 scripts/discover.py`** — confirm you can see your ad accounts.
+3. **`python3 scripts/preflight.py`** again — should now say READY and list every
+   ad account you can reach.
 4. **`python3 scripts/discover.py act_<id>`** — see that account's Pages,
    Instagram accounts, pixels, catalogs, and existing campaigns.
 5. **Open `spec/CAMPAIGN-TEMPLATE.xlsx`** — the Excel template. Read its START HERE

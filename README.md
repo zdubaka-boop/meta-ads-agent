@@ -95,6 +95,12 @@ Same five permissions. Drop it into `setup.sh` the same way.
 
 ## 3. Daily use
 
+**Always start here.** One command, checks everything, tells you what's missing:
+
+```bash
+python3 scripts/preflight.py
+```
+
 Everything below is safe to run — the first three are strictly read-only.
 
 ```bash
@@ -151,7 +157,8 @@ spec with you, and will stop for your approval before step 2.
 | `spec/CAMPAIGN-TEMPLATE.xlsx` | **The Excel template — start here.** Fill it in, hand it over. |
 | `spec/SPEC.md` | The underlying spec format, if you'd rather write JSON. |
 | `spec/examples/` | A working example spec + bulk ads CSV. |
-| `scripts/` | `discover` · `build_campaign` · `verify` · `audit_enhancements` |
+| `scripts/preflight.py` | **Run first.** Checks everything, lists your ad accounts. |
+| `scripts/` | `discover` · `xlsx_to_spec` · `build_campaign` · `verify` · `audit_enhancements` |
 | `scripts/lib/meta.py` | The API layer. Safety rules are enforced here, in code. |
 | `adapters/` | Map **your team's existing** ad sheets into the spec format. |
 | `reference/mcp-vs-api.md` | **When to use the Meta MCP vs. this repo.** Read this. |

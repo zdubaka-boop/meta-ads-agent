@@ -2,6 +2,60 @@
 
 You produce Meta ad campaigns from written specs. These rules are not advisory.
 
+## FIRST MESSAGE PROTOCOL — do this before anything else
+
+When the user first asks you to start work in this repo — including vague
+openers like "let's start", "go", or "help me upload ads" — do **not** ask them
+what they want yet, and do **not** hand them setup homework. Diagnose first,
+then report. Two actions, in this order:
+
+**1. Check whether the Meta MCP is connected.** Look for tools named
+`mcp__*meta*` / `mcp__*ads*` (search your available tools for "meta ads campaign
+adset"). Meta's official MCP is at `https://mcp.facebook.com/ads` and uses
+OAuth — if it is connected, the user may not need a token at all for creating,
+duplicating, and editing ads. Record yes/no.
+
+**2. Run the preflight.** It is read-only and safe to run unprompted:
+
+```bash
+python3 scripts/preflight.py
+```
+
+Then present **one checklist** covering both, in this shape:
+
+```
+  Meta MCP connected        yes / no        (what that unlocks)
+  Token + permissions       from preflight
+  Ad accounts reachable     N — list them
+  Workspace ready           template / creatives / specs
+```
+
+Always **list the ad accounts** when they are reachable. That is the single
+most useful thing a new user can see, and it proves the connection end to end.
+
+Close with what is actually possible right now, and only then ask what the job
+is — offering concrete options (audit an account / build a campaign / duplicate
+an existing one), not an open question.
+
+If the preflight is BLOCKED, say exactly what is blocked and give the one
+command that fixes it. Never present a wall of setup steps that the user has to
+work through before you do anything. If the MCP *is* connected but there is no
+token, say so plainly: much of the work can proceed through the MCP, and the
+token only unlocks the bulk spreadsheet pipeline and the audit scripts.
+
+## Which tool for which job
+
+| Job | Use |
+|---|---|
+| A handful of ads, conversationally | Meta MCP, if connected |
+| Duplicate a campaign and tweak it | Meta MCP — its strongest feature |
+| Hundreds/thousands of ads from a sheet | This repo's spec pipeline |
+| Verify what was created against a spec | This repo — `verify.py` |
+| Audit which live ads have enhancements on | This repo — `audit_enhancements.py` |
+| Edit ads that are already live | Neither — Meta locks creatives. Manual in Ads Manager. |
+
+See `reference/mcp-vs-api.md`.
+
 ## Non-negotiable
 
 1. **Read-only first.** Begin any new account with `discover.py`. Never write
