@@ -1,0 +1,26 @@
+# Credentials — never commit
+.env
+.env.*
+!.env.example
+
+# Run state, created object IDs, audit exports, account data
+outputs/*
+!outputs/.gitkeep
+*-state.json
+
+# Creative assets
+creatives/*
+!creatives/.gitkeep
+*.mp4
+*.mov
+*.jpg
+*.jpeg
+*.png
+
+# Team specs may contain account IDs and URLs — commit deliberately
+specs/*.local.json
+
+__pycache__/
+*.pyc
+.DS_Store
+.venv/

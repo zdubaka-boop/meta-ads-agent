@@ -1,0 +1,5 @@
+adset,ad_name,creative,body,headline,description,cta,link
+Example — LT — Broad,EX-01-yellow,creatives/yellow.png,"Bright ideas, zero guesswork.",Yellow Test,Pipeline check,LEARN_MORE,https://example.com
+Example — LT — Broad,EX-02-red,creatives/red.png,"Stop scrolling. This one is red.",Red Test,Pipeline check,LEARN_MORE,https://example.com
+Example — LT — 25-44,EX-03-blue,creatives/blue.png,"Calm, clear, and built to convert.",Blue Test,Pipeline check,LEARN_MORE,https://example.com
+Example — LT — 25-44,EX-04-black,creatives/black.png,"Simple. Bold. Impossible to miss.",Black Test,Pipeline check,LEARN_MORE,https://example.com

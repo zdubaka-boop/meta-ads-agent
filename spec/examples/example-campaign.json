@@ -1,0 +1,42 @@
+{
+  "account_id": "act_REPLACE_ME",
+  "campaign": {
+    "name": "Example — Prospecting LT",
+    "objective": "OUTCOME_TRAFFIC",
+    "budget_mode": "CBO",
+    "daily_budget_minor": 200,
+    "special_ad_categories": []
+  },
+  "defaults": {
+    "page_id": "REPLACE_ME",
+    "link": "https://example.com",
+    "cta": "LEARN_MORE",
+    "url_tags": "utm_source=facebook&utm_medium=paid",
+    "dsa_beneficiary": "REPLACE ME Ltd"
+  },
+  "ads_csv": "spec/examples/example-ads.csv",
+  "adsets": [
+    {
+      "name": "Example — LT — Broad",
+      "optimization_goal": "LINK_CLICKS",
+      "billing_event": "IMPRESSIONS",
+      "targeting": {
+        "geo_locations": { "countries": ["LT"] },
+        "age_min": 18,
+        "age_max": 65
+      },
+      "ads": []
+    },
+    {
+      "name": "Example — LT — 25-44",
+      "optimization_goal": "LINK_CLICKS",
+      "billing_event": "IMPRESSIONS",
+      "targeting": {
+        "geo_locations": { "countries": ["LT"] },
+        "age_min": 25,
+        "age_max": 44
+      },
+      "ads": []
+    }
+  ]
+}
