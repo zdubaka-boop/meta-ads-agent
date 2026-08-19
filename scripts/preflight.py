@@ -11,6 +11,63 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import meta
 
+
+TOKEN_TUTORIAL = """
+  You need a Meta access token. About 5 minutes, one time.
+
+  STEP 1 — Open or create an app
+    Go to  https://developers.facebook.com/apps
+    Use an existing app, or click "Create app" and choose type "Business".
+    (An "app" here is just a container for API access. You are not building
+     anything or submitting it for review.)
+
+  STEP 2 — Add a Privacy Policy URL          <-- the step everyone misses
+    In your app:  App settings  ->  Basic
+    Fill in "Privacy Policy URL", then click "Save changes" at the bottom.
+    Meta will NOT grant ads permissions to an app without one. Any publicly
+    reachable page works - your company's existing privacy policy is fine.
+
+  STEP 3 — Open the Graph API Explorer
+    Go to  https://developers.facebook.com/tools/explorer/
+    Top right: pick your app in the "Meta App" dropdown.
+
+  STEP 4 — Tick all five permissions
+    In the "Permissions" box on the left, add each of these:
+        ads_read
+        ads_management
+        business_management
+        pages_read_engagement
+        pages_show_list
+    All five. Miss one and the tools will fail later with a confusing error.
+
+  STEP 5 — Generate the token
+    Click "Generate Access Token". Approve the Facebook login prompt.
+    A long string starting with "EAA..." appears. Copy it.
+
+  STEP 6 — Hand it to this repo
+    Run:   bash scripts/setup.sh
+    Paste the token when it asks. Nothing is shown on screen as you type -
+    that is deliberate. The other four questions are optional; press Enter to
+    skip them, they can be discovered automatically later.
+
+    >>> Do NOT paste the token into the Claude chat window. <<<
+    Anything typed in chat is saved in the conversation transcript. The setup
+    script keeps it in a local .env file that only you can read.
+
+  STEP 7 — Confirm
+    Run:   python3 scripts/preflight.py
+    You should see READY, and a list of every ad account you can reach.
+
+  TROUBLESHOOTING
+    "0 ad accounts found"  ->  the token works but your Facebook user has no
+        ad account access. Someone with admin rights must add you in
+        Business Settings -> Users -> People.
+    Token expires in ~60 days. For a team, use a System User token instead
+        (Business Settings -> Users -> System Users -> Generate New Token) -
+        it never expires and belongs to the business, not to one person.
+        Same five permissions.
+"""
+
 OK, WARN, BAD, SKIP = "[ OK ]", "[WARN]", "[FAIL]", "[ -- ]"
 lines, blockers, notes = [], [], []
 
@@ -136,6 +193,11 @@ if blockers:
     print(f"  BLOCKED — {len(blockers)} thing(s) to fix:\n")
     for b in blockers:
         print(f"    * {b}")
+    # A missing/invalid token is the only blocker a new user will normally hit,
+    # so print the whole walkthrough here rather than pointing at a doc.
+    if any(k in " ".join(blockers) for k in ("No .env", "META_ACCESS_TOKEN", "Token rejected",
+                                             "expired", "missing ads", "is missing")):
+        print(TOKEN_TUTORIAL)
 else:
     print("  READY — everything needed to start is in place.")
     print("\n  Next, pick a job:")

@@ -37,11 +37,32 @@ Close with what is actually possible right now, and only then ask what the job
 is — offering concrete options (audit an account / build a campaign / duplicate
 an existing one), not an open question.
 
-If the preflight is BLOCKED, say exactly what is blocked and give the one
-command that fixes it. Never present a wall of setup steps that the user has to
-work through before you do anything. If the MCP *is* connected but there is no
-token, say so plainly: much of the work can proceed through the MCP, and the
-token only unlocks the bulk spreadsheet pipeline and the audit scripts.
+### If the preflight is BLOCKED
+
+The token is **mandatory** for every script in this repo — there is no
+token-free path to the bulk pipeline, verification, or the audit. So treat a
+missing token as the whole job right now, and walk the user through it.
+
+`preflight.py` prints a complete 7-step tutorial when the token is what's
+missing. **Relay it as a walkthrough, not a link.** Give the steps inline,
+in the user's language, and call out the two that actually trip people:
+
+* the **Privacy Policy URL** in App settings → Basic (Meta grants no ads
+  permissions without one), and
+* ticking **all five** permissions, not four.
+
+Then stop and wait. `setup.sh` prompts silently in *their* terminal, so you
+cannot run it for them — and must not offer to, since the point is that the
+token never enters the chat. Tell them to say the word when it's done, and
+rerun the preflight yourself rather than making them run it again.
+
+Stay with them: if `setup.sh` reports 0 ad accounts, or a scope is missing,
+diagnose it from the preflight output rather than sending them back to the
+README.
+
+If the Meta MCP *is* connected, say so — ad creation and campaign duplication
+can proceed through it immediately, while the token unlocks the spreadsheet
+pipeline, verification, and the audit scripts.
 
 ## Which tool for which job
 
