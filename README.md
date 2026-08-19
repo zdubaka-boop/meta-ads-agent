@@ -32,34 +32,56 @@ library only. (`pip3 install pyyaml` only if you prefer YAML specs over JSON.)
 
 You need a token with five permissions. This takes about five minutes.
 
-### 2.1 Create or open an app
+### 2.1 Create the app
 
-Go to **[developers.facebook.com/apps](https://developers.facebook.com/apps)**.
-Use an existing app, or **Create app** → type **Business**.
+Go to **[developers.facebook.com/apps/create](https://developers.facebook.com/apps/create/)**.
+
+When it asks what you want to do, pick **"Create and manage ads with Marketing
+API"**. This matters — choose anything else and the permissions you need are
+never offered later. Name it anything, and attach your Business account.
 
 ### 2.2 Add a Privacy Policy URL
 
-**App Settings → Basic** → fill in **Privacy Policy URL** → **Save changes**.
+Your app → **App settings → Basic** → fill in **Privacy Policy URL** →
+**Save changes**.
 
-Meta will not grant ads permissions to an app without one. Any publicly
-reachable privacy policy page works — your company's existing one is fine.
-This is a one-off, per app.
+Any working URL will do. The app stays in Development mode, is never reviewed,
+and is never public — the field only has to be non-empty before Meta will grant
+ads permissions. Your company's page, or [any public
+one](https://www.iubenda.com/privacy-policy/7787549). One-off, per app.
 
-### 2.3 Generate the token
+### 2.3 Use cases → Customize
 
-Go to **Tools → [Graph API Explorer](https://developers.facebook.com/tools/explorer/)**.
+In your app's left sidebar, click **Use cases**. On **"Create and manage ads
+with Marketing API"**, click **Customize**. Let it load.
 
-1. Pick your app in the **Meta App** dropdown.
-2. Under **Permissions**, tick **all five**:
-   - `ads_read`
-   - `ads_management`
-   - `business_management`
-   - `pages_read_engagement`
-   - `pages_show_list`
-3. Click **Generate Access Token** and complete the Facebook login prompt.
-4. Copy the token.
+> Do **not** use the old Graph API Explorer. The permissions you need are
+> granted from inside the use case, not there.
 
-### 2.4 Put it into `.env` — never into the chat
+### 2.4 Tools → Get access token
+
+Inside the Customize screen, open the **Tools** tab, then click
+**Get access token**.
+
+Direct link — swap in your own app id from the browser address bar:
+
+```
+https://developers.facebook.com/apps/YOUR_APP_ID/use_cases/customize/tools/?use_case_enum=MARKETING_API_ADS_MANAGEMENT&selected_tab=tools&product_route=marketing-api
+```
+
+**Tick every permission in the list**, including:
+
+- `ads_read`
+- `ads_management`
+- `business_management`
+- `pages_read_engagement`
+- `pages_show_list`
+
+Select them all — miss one and the tools fail later with a confusing error.
+Click **Get token**, approve the Facebook login prompt, and copy the `EAA...`
+string.
+
+### 2.5 Put it into `.env` — never into the chat
 
 ```bash
 bash scripts/setup.sh
@@ -73,7 +95,7 @@ It prompts for the token **silently** (nothing is echoed), writes `.env` with
 > your machine, in a file the agent reads directly. If you ever do paste one,
 > revoke it: Facebook → Settings → Business Integrations → remove the app.
 
-### 2.5 Confirm
+### 2.6 Confirm
 
 ```bash
 python3 scripts/check_env.py
@@ -84,12 +106,12 @@ reach. Any missing permission is named explicitly.
 
 ### For teams: use a System User token instead
 
-Graph API Explorer tokens are tied to **one person** and expire in ~60 days.
+Tokens issued this way are tied to **one person** and expire in ~60 days.
 For shared use, generate a **System User** token in Business Manager
 (**Business Settings → Users → System Users → Add → Generate New Token**). It
 never expires, belongs to the business rather than an individual, can be scoped
 per ad account, and can be revoked without touching anyone's personal login.
-Same five permissions. Drop it into `setup.sh` the same way.
+Same permissions. Drop it into `setup.sh` the same way.
 
 ---
 
