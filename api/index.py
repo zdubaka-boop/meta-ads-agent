@@ -27,22 +27,26 @@ TTL = 8 * 3600
 PUBLIC = Path(__file__).resolve().parent.parent / "public"
 
 
-def sign(exp):
-    msg = str(exp).encode()
+def sign(payload):
+    msg = payload.encode() if isinstance(payload, str) else str(payload).encode()
     sig = hmac.new(SECRET.encode(), msg, hashlib.sha256).digest()
     return base64.urlsafe_b64encode(msg + b"." + sig).decode().rstrip("=")
 
 
 def verify(cookie):
+    """-> the login code carried by the cookie, or None."""
     if not cookie or not SECRET:
-        return False
+        return None
     try:
         raw = base64.urlsafe_b64decode(cookie + "=" * (-len(cookie) % 4))
         msg, sig = raw.rsplit(b".", 1)
         good = hmac.new(SECRET.encode(), msg, hashlib.sha256).digest()
-        return hmac.compare_digest(sig, good) and int(msg) > time.time()
+        if not hmac.compare_digest(sig, good):
+            return None
+        exp, code = msg.decode().split("|", 1)
+        return code if int(exp) > time.time() else None
     except Exception:
-        return False
+        return None
 
 
 class handler(BaseHTTPRequestHandler):
@@ -62,19 +66,23 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _signed_in(self):
+    def _code(self):
         m = re.search(r"ms=([A-Za-z0-9_\-]+)", self.headers.get("Cookie", "") or "")
-        return verify(m.group(1)) if m else False
+        return verify(m.group(1)) if m else None
 
     def _need_auth(self):
-        if not self._signed_in():
+        """Load this person's own Meta token from the encrypted store."""
+        code = self._code()
+        if not code:
             self._send(401, {"error": "not signed in"})
             return False
-        tok = os.getenv("META_ACCESS_TOKEN")
-        if not tok:
-            self._send(500, {"error": "server is missing META_ACCESS_TOKEN"})
+        import store
+        rec = store.load(code)
+        if not rec:
+            self._send(401, {"error": "your session is no longer valid — sign in again"})
             return False
-        os.environ["META_ACCESS_TOKEN"] = tok
+        os.environ["META_ACCESS_TOKEN"] = rec["token"]
+        self._who = rec.get("who")
         return True
 
     def _body(self):
@@ -92,8 +100,13 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, (PUBLIC / "index.html").read_bytes(),
                                   "text/html; charset=utf-8")
             if p.path == "/api/session":
-                return self._send(200, {"signed_in": self._signed_in(),
-                                        "mode": "access_code", "who": None})
+                code = self._code()
+                who = None
+                if code:
+                    import store
+                    rec = store.load(code)
+                    who = rec.get("who") if rec else None
+                return self._send(200, {"signed_in": bool(who), "mode": "code", "who": who})
             q = parse_qs(p.query)
             one = lambda k: (q.get(k) or [None])[0]
 
@@ -190,18 +203,48 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         p = urlparse(self.path)
         try:
+            if p.path == "/api/register":
+                if not SECRET:
+                    return self._send(500, {"error": "META_SESSION_SECRET is not set"})
+                import store
+                token = (self._body().get("token") or "").strip()
+                if not token.startswith("EAA"):
+                    return self._send(400, {"error": "That does not look like a Meta token "
+                                                     "(they start with EAA)."})
+                os.environ["META_ACCESS_TOKEN"] = token
+                try:
+                    me = meta.whoami()
+                except Exception as e:
+                    return self._send(401, {"error": f"Meta rejected that token: {e}"})
+                d = meta.get("debug_token", None, input_token=token).get("data", {})
+                need = {"ads_read", "ads_management", "business_management",
+                        "pages_show_list", "pages_read_engagement"}
+                missing = sorted(need - set(d.get("scopes", [])))
+                if missing:
+                    return self._send(403, {"error": "That token is missing permissions: "
+                                                     + ", ".join(missing)})
+                code = store.new_code()
+                store.save(code, token, me.get("name"))
+                exp = int(time.time()) + TTL
+                return self._send(200, {"ok": True, "code": code, "who": me.get("name"),
+                                        "expires_at": d.get("expires_at", 0)},
+                    cookie=f"ms={sign(str(exp) + '|' + code)}; Path=/; HttpOnly; Secure; "
+                           f"SameSite=Strict; Max-Age={TTL}")
+
             if p.path == "/api/login":
                 if not SECRET:
                     return self._send(500, {"error": "META_SESSION_SECRET is not set"})
-                if not CODE:
-                    return self._send(500, {"error": "META_WEB_ACCESS_CODE is not set"})
-                supplied = (self._body().get("code") or "").strip()
-                if not hmac.compare_digest(supplied, CODE):
+                import store
+                code = (self._body().get("code") or "").strip().lower()
+                rec = store.load(code)
+                if not rec:
                     time.sleep(1)
-                    return self._send(401, {"error": "wrong access code"})
+                    return self._send(401, {"error": "No account for that code. "
+                                                     "If this is your first time, register instead."})
                 exp = int(time.time()) + TTL
-                return self._send(200, {"ok": True, "who": "team"},
-                    cookie=f"ms={sign(exp)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={TTL}")
+                return self._send(200, {"ok": True, "who": rec.get("who")},
+                    cookie=f"ms={sign(str(exp) + '|' + code)}; Path=/; HttpOnly; Secure; "
+                           f"SameSite=Strict; Max-Age={TTL}")
 
             if p.path == "/api/logout":
                 return self._send(200, {"ok": True},

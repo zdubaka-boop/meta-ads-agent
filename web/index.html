@@ -79,18 +79,33 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:
   <!-- LOGIN -->
   <section id="login" class="card hide">
     <h2>Sign in</h2>
-    <p class="sub" id="loginSub"></p>
-    <div id="tokenBox">
-      <label for="tok">Your Meta access token</label>
-      <input id="tok" type="password" placeholder="EAA…" autocomplete="off" spellcheck="false">
-      <div class="note">Your token stays in this server's memory for your session only. It is
-        never written to disk. Getting one takes ~5 min — see the repo README, section 2.</div>
+    <p class="sub">Enter your personal login code.</p>
+    <label for="code">Login code</label>
+    <input id="code" type="text" placeholder="abcd-efgh-ijkl" autocomplete="off" spellcheck="false">
+    <div class="row" style="margin-top:14px">
+      <button onclick="login()">Sign in</button>
+      <button class="ghost" onclick="showReg()">First time? Set up my code</button>
     </div>
-    <div id="codeBox" class="hide">
-      <label for="code">Access code</label>
-      <input id="code" type="password" placeholder="access code" autocomplete="off">
+  </section>
+
+  <!-- REGISTER -->
+  <section id="reg" class="card hide">
+    <h2>Set up your login code</h2>
+    <p class="sub">Paste your own Meta access token once. We check it works, store it
+      encrypted, and give you a short code to use from then on.</p>
+    <label for="tok">Your Meta access token</label>
+    <input id="tok" type="password" placeholder="EAA…" autocomplete="off" spellcheck="false">
+    <div class="note">Your token is encrypted with a key derived from your login code, so
+      nobody — including whoever runs this server — can read it without that code.
+      Because it is <b>your</b> token, Meta records every action against <b>you</b>, not a
+      shared account. Don't have one? See
+      <a href="https://github.com/zdubaka-boop/meta-ads-agent#2-get-your-meta-access-token"
+         style="color:var(--accent)">the 5-minute setup</a>.</div>
+    <div class="row" style="margin-top:14px">
+      <button onclick="register()">Create my code</button>
+      <button class="ghost" onclick="show('login')">Back</button>
     </div>
-    <div class="row" style="margin-top:14px"><button onclick="login()">Sign in</button></div>
+    <div id="regOut"></div>
   </section>
 
   <!-- ACCOUNT -->
@@ -125,7 +140,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:
 <script>
 let MODE="own_token", ACCT=null, ACCT_NAME="", CAMP=null, CAMP_NAME="";
 const $=id=>document.getElementById(id);
-const show=(...ids)=>["login","acct","menu","pane"].forEach(i=>$(i).classList.toggle("hide",!ids.includes(i)));
+const show=(...ids)=>["login","reg","acct","menu","pane"].forEach(i=>$(i).classList.toggle("hide",!ids.includes(i)));
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function err(m){ $("err").textContent=m; $("err").classList.remove("hide"); }
 function clearErr(){ $("err").classList.add("hide"); }
@@ -139,21 +154,31 @@ async function api(path,opts){
 
 async function boot(){
   const s=await api("/api/session"); MODE=s.mode;
-  $("loginSub").textContent = MODE==="access_code"
-    ? "Enter the access code your team lead gave you."
-    : "Paste your own Meta access token. It is not stored on disk.";
-  $("tokenBox").classList.toggle("hide", MODE==="access_code");
-  $("codeBox").classList.toggle("hide", MODE!=="access_code");
   if(s.signed_in){ $("who").textContent=s.who||""; $("out").classList.remove("hide"); toAccounts(); }
   else show("login");
 }
 
+function showReg(){ clearErr(); show("reg"); }
+
+async function register(){
+  clearErr(); $("regOut").innerHTML='<p class="spin">Checking the token with Meta…</p>';
+  try{
+    const d=await api("/api/register",{method:"POST",body:JSON.stringify({token:$("tok").value})});
+    $("tok").value="";
+    $("regOut").innerHTML=`<div class="note" style="border-color:#1c3a24;background:#12241a">
+      <b>Your login code is</b>
+      <div style="font-size:26px;letter-spacing:2px;margin:10px 0;font-family:ui-monospace,monospace">${esc(d.code)}</div>
+      Write it down now — it is the only key to your token and cannot be recovered.
+      From now on just sign in with this code.</div>`;
+    $("who").textContent=d.who||""; $("out").classList.remove("hide");
+  }catch(e){ $("regOut").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
+}
+
 async function login(){
   clearErr();
-  const body = MODE==="access_code" ? {code:$("code").value} : {token:$("tok").value};
   try{
-    const d=await api("/api/login",{method:"POST",body:JSON.stringify(body)});
-    $("tok").value=""; $("code").value="";
+    const d=await api("/api/login",{method:"POST",body:JSON.stringify({code:$("code").value})});
+    $("code").value="";
     $("who").textContent=d.who||""; $("out").classList.remove("hide");
     toAccounts();
   }catch(e){ err(e.message); }
