@@ -165,6 +165,22 @@ python3 scripts/build_campaign.py --spec specs/q3-uk.json --execute
 python3 scripts/verify.py --state outputs/q3-uk-state.json --spec specs/q3-uk.json
 ```
 
+### Adding to a campaign that already exists
+
+Campaign names must be unique, so `build_campaign.py` refuses to rebuild one
+that exists. To add into it instead:
+
+```bash
+python3 scripts/add_to_campaign.py --account act_<id> --list                 # which campaign?
+python3 scripts/add_to_campaign.py --account act_<id> --campaign <id> --list # which ad set?
+python3 scripts/add_to_campaign.py --account act_<id> --adset <id> --ads new-ads.csv
+python3 scripts/add_to_campaign.py --account act_<id> --adset <id> --ads new-ads.csv --execute
+```
+
+`--ads` accepts a CSV or the **Ads** tab of a workbook. Ads already present in
+that ad set are skipped, so re-running is safe. To add a whole new ad set to an
+existing campaign, use `--campaign <id> --new-adsets-from <spec.json>`.
+
 Or just describe what you want to Claude — it knows the workflow, will write the
 spec with you, and will stop for your approval before step 2.
 
@@ -180,6 +196,7 @@ spec with you, and will stop for your approval before step 2.
 | `spec/SPEC.md` | The underlying spec format, if you'd rather write JSON. |
 | `spec/examples/` | A working example spec + bulk ads CSV. |
 | `scripts/preflight.py` | **Run first.** Checks everything, lists your ad accounts. |
+| `scripts/add_to_campaign.py` | Add ads / ad sets to a campaign that already exists. |
 | `scripts/` | `discover` · `xlsx_to_spec` · `build_campaign` · `verify` · `audit_enhancements` |
 | `scripts/lib/meta.py` | The API layer. Safety rules are enforced here, in code. |
 | `adapters/` | Map **your team's existing** ad sheets into the spec format. |

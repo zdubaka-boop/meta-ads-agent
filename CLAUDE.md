@@ -26,9 +26,54 @@ Then present **one checklist**, in this shape:
 Always **list the ad accounts** when they are reachable. That is the single
 most useful thing a new user can see, and it proves the connection end to end.
 
-Close with what is actually possible right now, and only then ask what the job
-is — offering concrete options (audit an account / build a campaign / duplicate
-an existing one), not an open question.
+### Then ask THE THREE QUESTIONS — always these, always in this order
+
+Never ask an open "what would you like to do?". Offer exactly these:
+
+```
+  1  Create a NEW campaign
+  2  Add to an EXISTING campaign      (new ads, or a new ad set)
+  3  Audit an account                 (read-only, changes nothing)
+```
+
+**If they pick 1** — the spec pipeline. Excel template -> `xlsx_to_spec.py` ->
+`build_campaign.py` dry run -> approval -> `--execute` -> `verify.py`.
+
+**If they pick 2** — walk them down the tree, one question at a time. Never make
+them hunt for an ID; show the list and let them point at a row.
+
+```bash
+python3 scripts/add_to_campaign.py --account act_<id> --list
+```
+Show the campaigns. Ask **which campaign**.
+
+```bash
+python3 scripts/add_to_campaign.py --account act_<id> --campaign <id> --list
+```
+Show the ad sets, with how many ads each already has. Then ask **which of
+these**:
+
+```
+  a  Add ads into one of these ad sets
+  b  Add a NEW ad set (with its ads) to this campaign
+```
+
+For (a): ask which ad set, take a CSV or the Ads tab of a workbook, and run
+`--adset <id> --ads <file>` as a dry run first. Ads whose name already exists in
+that ad set are skipped automatically, so re-running is always safe.
+
+For (b): build an adsets[] spec, then `--campaign <id> --new-adsets-from <spec>`.
+The script reads whether the campaign is CBO or ABO and rejects a mismatched
+budget rather than guessing.
+
+**If they pick 3** — `discover.py` then `audit_enhancements.py`. Read-only.
+
+### Never block on a name clash
+
+`build_campaign.py` refuses to create a campaign whose name already exists —
+that guard stays, it is what stops duplicate campaigns. But it is NOT a dead
+end. When it fires, do not tell the user to rename. Tell them the campaign
+already exists and offer route 2: add ads to it, or add a new ad set to it.
 
 ### If the preflight is BLOCKED
 
@@ -60,6 +105,8 @@ README.
 | Job | Possible? |
 |---|---|
 | Build campaigns, ad sets, ads in bulk from a spreadsheet | Yes |
+| Add ads to an ad set that already exists | Yes — `add_to_campaign.py` |
+| Add a new ad set to a campaign that already exists | Yes — `add_to_campaign.py` |
 | Upload images and videos | Yes |
 | Duplicate a campaign, ad set, or ad — editing it in the copy | Yes |
 | Turn creative enhancements off at creation | Yes |

@@ -185,9 +185,18 @@ def main():
         existing = [x for x in meta.get_all(f"{meta.account(acct)}/campaigns", "id,name")
                     if x.get("name") == c["name"]]
         if existing:
-            sys.exit(f"ABORT: a campaign named '{c['name']}' already exists "
-                     f"({', '.join(x['id'] for x in existing)}). Rename, or pass --state "
-                     f"pointing at the run that created it.")
+            ids = ", ".join(x["id"] for x in existing)
+            sys.exit(
+                f"ABORT: a campaign named '{c['name']}' already exists ({ids}).\n"
+                f"\nThis is not a dead end. To add to it instead of duplicating it:\n"
+                f"  see its ad sets:  python3 scripts/add_to_campaign.py "
+                f"--account {acct} --campaign {existing[0]['id']} --list\n"
+                f"  add ads:          python3 scripts/add_to_campaign.py "
+                f"--account {acct} --adset <ADSET_ID> --ads <file.csv|.xlsx>\n"
+                f"  add an ad set:    python3 scripts/add_to_campaign.py "
+                f"--account {acct} --campaign {existing[0]['id']} --new-adsets-from <spec.json>\n"
+                f"\nOr rename the campaign in your spec, or pass --state pointing at the "
+                f"run that created it.")
         state["campaign_id"] = meta.create_campaign(
             acct, c["name"], c["objective"],
             budget_minor=c.get("daily_budget_minor") if (c.get("budget_mode") or "").upper() == "CBO" else None,
