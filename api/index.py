@@ -149,6 +149,43 @@ class handler(BaseHTTPRequestHandler):
             traceback.print_exc()
             return self._send(500, {"error": f"{type(e).__name__}: {e}"})
 
+    def _workbook(self, do_create):
+        """Parse an uploaded workbook + creatives. Preview, or actually build."""
+        import multipart, builder
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 4_300_000:
+            return self._send(413, {"error":
+                "Upload is too large. Vercel caps a serverless request at ~4.5MB. "
+                "Send fewer or smaller images, or use the CLI for this batch."})
+        fields, files = multipart.parse(self.rfile.read(n), self.headers.get("Content-Type"))
+
+        book = next(((k, v) for k, v in files.items() if k.lower().endswith((".xlsx", ".xlsm"))), None)
+        if not book:
+            return self._send(400, {"error": "No .xlsx found. Drop the campaign workbook in too."})
+        creatives = {k: v for k, v in files.items() if k is not book[0]
+                     and not k.lower().endswith((".xlsx", ".xlsm"))}
+
+        spec, problems, resolved = builder.parse_workbook(book[1], creatives)
+        if problems:
+            return self._send(200, {"ok": False, "problems": problems, "resolved": resolved})
+
+        counts = {"adsets": len(spec["adsets"]),
+                  "ads": sum(len(a["ads"]) for a in spec["adsets"])}
+        if not do_create:
+            return self._send(200, {"ok": True, "preview": True, "resolved": resolved,
+                                    "campaign": spec["campaign"], "counts": counts,
+                                    "adsets": [{"name": a["name"],
+                                                "countries": a["targeting"]["geo_locations"]["countries"],
+                                                "ads": [x["name"] for x in a["ads"]]}
+                                               for a in spec["adsets"]]})
+        log_lines = []
+        try:
+            res = builder.build(spec, creatives, log_lines.append)
+        except Exception as e:
+            return self._send(400, {"ok": False, "problems": [str(e)], "log": log_lines})
+        return self._send(200, {"ok": True, "created": True, "result": res,
+                                "log": log_lines, "counts": counts})
+
     # ----------------------------------------------------------------- POST
     def do_POST(self):
         p = urlparse(self.path)
@@ -169,6 +206,11 @@ class handler(BaseHTTPRequestHandler):
             if p.path == "/api/logout":
                 return self._send(200, {"ok": True},
                                   cookie="ms=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0")
+
+            if p.path in ("/api/preview", "/api/create"):
+                if not self._need_auth():
+                    return
+                return self._workbook(p.path.endswith("create"))
 
             if p.path == "/api/audit":
                 if not self._need_auth():

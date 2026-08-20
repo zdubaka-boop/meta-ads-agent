@@ -367,3 +367,13 @@ def find_custom_audience(acct, name):
         if (a.get("name") or "").lower() == name.lower():
             return a
     return None
+
+
+def upload_image_bytes(acct, data, filename, name=None):
+    """Upload an image already held in memory (web upload path)."""
+    b64 = base64.b64encode(data).decode()
+    r = post(f"{account(acct)}/adimages",
+             {"bytes": b64, "name": (name or filename)[:90]}, "upload_image")
+    if "images" not in r:
+        raise MetaError("upload_image", {"message": json.dumps(r)[:300]})
+    return list(r["images"].values())[0]["hash"]

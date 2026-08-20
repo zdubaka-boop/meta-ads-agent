@@ -55,6 +55,15 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:
 .crumb{color:var(--dim);font-size:13px;margin-bottom:14px}
 .crumb a{color:var(--accent);cursor:pointer;text-decoration:none}
 .hide{display:none}
+.drop{border:2px dashed var(--line);border-radius:11px;padding:38px 22px;text-align:center;
+  background:var(--panel2);transition:.15s;cursor:pointer}
+.drop.over{border-color:var(--accent);background:#16243a}
+.drop h3{margin:0 0 6px;font-size:16px}
+.drop p{margin:0;color:var(--dim);font-size:13.5px}
+.files{margin-top:14px;display:flex;flex-wrap:wrap;gap:7px}
+.chip{background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:4px 11px;font-size:12px}
+.chip.book{border-color:var(--accent);color:var(--accent)}
+.ok{color:var(--ok)}
 .spin{color:var(--dim);font-size:13.5px}
 </style></head><body>
 
@@ -168,23 +177,110 @@ async function toAccounts(){
 function pickAcct(id,name){ ACCT=id; ACCT_NAME=name; $("acctName").textContent=name+" ("+id+")"; show("menu"); }
 
 /* ---------- 1: create new ---------- */
+let FILES=[];
 function q1(){
+  FILES=[];
   show("pane");
   $("pane").innerHTML = crumb()+`
    <h2>Create a new campaign</h2>
-   <p class="sub">Building writes to your ad account, so it runs from the CLI where the
-     dry-run preview and your approval happen in one place.</p>
-   <ol style="color:var(--dim);font-size:14px;line-height:1.9">
-     <li>Fill in <b>spec/CAMPAIGN-TEMPLATE.xlsx</b> — Campaign, Ad Sets and Ads tabs.</li>
-     <li>Drop your images and videos into <b>creatives/</b>.</li>
-     <li>Run the three commands below. Nothing is created until the last one.</li>
-   </ol>
-   <pre>python3 scripts/xlsx_to_spec.py my-campaign.xlsx --out specs/mine.json
-python3 scripts/build_campaign.py --spec specs/mine.json            # preview only
-python3 scripts/build_campaign.py --spec specs/mine.json --execute  # creates, PAUSED
-python3 scripts/verify.py --state outputs/mine-state.json --spec specs/mine.json</pre>
-   <div class="note">Everything is created <b>paused</b>. A campaign name must be unique —
-     if it already exists, use option 2 instead of renaming.</div>`;
+   <p class="sub">Drop in the filled-in workbook and your images. Nothing is created
+     until you have read the preview and pressed the button.</p>
+   <div class="drop" id="dz">
+     <h3>Drop your files here</h3>
+     <p>One <b>.xlsx</b> workbook, plus every image it references.<br>
+        Or click to choose them.</p>
+   </div>
+   <input type="file" id="fi" multiple class="hide"
+          accept=".xlsx,.xlsm,image/png,image/jpeg,image/gif,image/webp">
+   <div class="files" id="chips"></div>
+   <div class="row" style="margin-top:16px">
+     <button id="go" disabled onclick="preview()">Check the workbook</button>
+     <a class="sub" style="margin:0" href="https://github.com/zdubaka-boop/meta-ads-agent/raw/main/spec/CAMPAIGN-TEMPLATE.xlsx">Download the template</a>
+   </div>
+   <div id="out"></div>`;
+  const dz=$("dz"), fi=$("fi");
+  dz.onclick=()=>fi.click();
+  fi.onchange=e=>addFiles(e.target.files);
+  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
+  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
+  dz.addEventListener("drop",e=>addFiles(e.dataTransfer.files));
+}
+function addFiles(list){
+  for(const f of list){ if(!FILES.some(x=>x.name===f.name)) FILES.push(f); }
+  const book=FILES.filter(f=>/\.xlsx?$|\.xlsm$/i.test(f.name));
+  $("chips").innerHTML=FILES.map(f=>{
+    const isBook=/\.xlsx?$|\.xlsm$/i.test(f.name);
+    return `<span class="chip ${isBook?"book":""}">${esc(f.name)} · ${(f.size/1024).toFixed(0)}kB</span>`;
+  }).join("");
+  const total=FILES.reduce((a,f)=>a+f.size,0);
+  $("go").disabled = book.length!==1;
+  let msg="";
+  if(book.length===0) msg="Add the .xlsx workbook.";
+  else if(book.length>1) msg="Only one workbook at a time.";
+  else if(total>4.2e6) msg="Total is over ~4.2MB — Vercel will reject it. Use fewer/smaller images.";
+  $("out").innerHTML = msg?`<div class="note">${esc(msg)}</div>`:"";
+}
+function formData(){ const fd=new FormData(); FILES.forEach(f=>fd.append("f",f,f.name)); return fd; }
+
+async function preview(){
+  $("go").disabled=true;
+  $("out").innerHTML='<p class="spin">Reading the workbook and checking it against Meta…</p>';
+  try{
+    const r=await fetch("/api/preview",{method:"POST",body:formData()});
+    const d=await r.json();
+    if(!r.ok){ $("out").innerHTML=`<div class="err">${esc(d.error||"upload failed")}</div>`;
+               $("go").disabled=false; return; }
+    if(!d.ok){
+      $("out").innerHTML=`<div class="err">${d.problems.length} problem(s) — nothing was created:\n\n`+
+        d.problems.map(x=>"• "+esc(x)).join("\n")+`</div>`;
+      $("go").disabled=false; return;
+    }
+    $("out").innerHTML=`
+      <div class="card" style="margin-top:18px;background:var(--panel2)">
+        <h2>${esc(d.campaign.name)}</h2>
+        <p class="sub">${esc(d.campaign.objective)} · ${esc(d.campaign.budget_mode)}
+          ${d.campaign.daily_budget_minor?" · budget "+d.campaign.daily_budget_minor+" (minor units)":""}
+          — <b>${d.counts.adsets} ad set(s), ${d.counts.ads} ad(s)</b></p>
+        ${d.adsets.map(a=>`<div style="margin:12px 0">
+           <b>${esc(a.name)}</b> <span class="mono">${(a.countries||[]).join(", ")}</span>
+           <div class="mono" style="margin-top:4px">${a.ads.map(esc).join(" · ")}</div></div>`).join("")}
+        ${d.resolved.length?`<div class="note"><b>Resolved to Meta IDs — check these:</b><br>`+
+           d.resolved.map(esc).join("<br>")+`</div>`:""}
+        <div class="note">Everything will be created <b>PAUSED</b>. Nothing can spend
+          until you launch it yourself in Ads Manager.</div>
+        <div class="row" style="margin-top:14px">
+          <button onclick="createNow()">Create these ${d.counts.ads} ad(s), paused</button>
+          <button class="ghost" onclick="q1()">Start over</button>
+        </div>
+      </div>`;
+  }catch(e){ $("out").innerHTML=`<div class="err">${esc(e.message)}</div>`; $("go").disabled=false; }
+}
+
+async function createNow(){
+  $("out").innerHTML='<p class="spin">Creating… uploading images and building each object. '+
+    'This can take a minute. Do not close the tab.</p>';
+  try{
+    const r=await fetch("/api/create",{method:"POST",body:formData()});
+    const d=await r.json();
+    if(!d.ok){ $("out").innerHTML=`<div class="err">`+
+        (d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`; return; }
+    const res=d.result;
+    $("out").innerHTML=`
+      <div class="card" style="margin-top:18px;background:var(--panel2)">
+        <h2 class="ok">Created — all paused</h2>
+        <p class="sub">${res.ads.length} ad(s) across ${res.adsets.length} ad set(s).</p>
+        <table><tr><th>Object</th><th>Name</th><th>ID</th></tr>
+          <tr><td>Campaign</td><td>${esc(res.campaign.name)}</td><td class="mono">${res.campaign.id}</td></tr>
+          ${res.adsets.map(a=>`<tr><td>Ad set</td><td>${esc(a.name)}</td><td class="mono">${a.id}</td></tr>`).join("")}
+          ${res.ads.map(a=>`<tr><td>Ad</td><td>${esc(a.name)}</td><td class="mono">${a.id}</td></tr>`).join("")}
+        </table>
+        ${res.skipped.length?`<div class="note">Skipped: ${res.skipped.map(esc).join(", ")}</div>`:""}
+        <div class="note">Review them in Ads Manager, then un-pause when you are ready.
+          Nothing is spending right now.</div>
+      </div>`;
+  }catch(e){ $("out").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 
 /* ---------- 2: add to existing ---------- */
