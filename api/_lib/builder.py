@@ -79,6 +79,30 @@ def parse_workbook(xlsx_bytes, creatives):
     acct = g("account_id")
     LOC = _locales()
 
+    # Validate the identities against the real account. These are the fields
+    # people leave as template placeholders, and Meta's error for a bad one
+    # ("The id of the object passed in is invalid") arrives only at ad
+    # creation - after the campaign and ad sets already exist.
+    if acct and defaults.get("page_id"):
+        try:
+            pages = {p["id"] for p in meta.get_all(f"{meta.account(acct)}/promote_pages", "id", cap=200)}
+            if pages and defaults["page_id"] not in pages:
+                problems.append(
+                    f"Campaign tab: page_id {defaults['page_id']} is not a Page this ad "
+                    f"account can promote. Available: {', '.join(sorted(pages)) or 'none'}")
+        except Exception:
+            pass
+    if acct and defaults.get("pixel_id"):
+        try:
+            pix = {x["id"] for x in meta.get_all(f"{meta.account(acct)}/adspixels", "id", cap=100)}
+            if pix and defaults["pixel_id"] not in pix:
+                problems.append(
+                    f"Campaign tab: pixel_id {defaults['pixel_id']} does not exist in this ad "
+                    f"account (this is the template placeholder - replace or clear it). "
+                    f"Available: {', '.join(sorted(pix)) or 'none'}")
+        except Exception:
+            pass
+
     rows = [r for r in xlsx.table(sheets["Ad Sets"])
             if str(r.get("adset_name", "")).strip()
             and (str(r.get("countries", "")).strip() or str(r.get("optimization_goal", "")).strip())]
@@ -228,6 +252,14 @@ def parse_workbook(xlsx_bytes, creatives):
     return spec, problems, resolved
 
 
+class PartialBuild(RuntimeError):
+    """Raised when a build dies after creating some objects, carrying their IDs
+    so nothing is silently orphaned and a retry is not blind."""
+    def __init__(self, msg, result):
+        super().__init__(msg)
+        self.result = result
+
+
 def build(spec, creatives, log):
     """Create everything, PAUSED. Assumes parse_workbook returned no problems."""
     acct = spec["account_id"]
@@ -273,7 +305,10 @@ def build(spec, creatives, log):
                 headline=ad.get("headline", ""), description=ad.get("description"),
                 cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
                 url_tags=pick("url_tags"))
-            ad_id = meta.create_ad(acct, aid, ad["name"], creative, pixel_id=d.get("pixel_id"))
+            try:
+                ad_id = meta.create_ad(acct, aid, ad["name"], creative, pixel_id=d.get("pixel_id"))
+            except Exception as e:
+                raise PartialBuild(f"Failed creating ad '{ad['name']}': {e}", result)
             result["ads"].append({"id": ad_id, "name": ad["name"], "adset": a["name"]})
             log(f"    ad {ad_id}  {ad['name']}")
     return result

@@ -289,8 +289,22 @@ async function createNow(){
   try{
     const r=await fetch("/api/create",{method:"POST",body:formData()});
     const d=await r.json();
-    if(!d.ok){ $("out").innerHTML=`<div class="err">`+
-        (d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`; return; }
+    if(!d.ok){
+      let h=`<div class="err">`+(d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`;
+      if(d.partial && (d.partial.campaign||d.partial.adsets.length)){
+        h+=`<div class="note"><b>Some objects were created before it failed.</b> They are
+          PAUSED and cannot spend, but they DO exist — delete them in Ads Manager, or rename
+          the campaign in your workbook before retrying, or the duplicate guard will block you.
+          <table style="margin-top:8px">
+          ${d.partial.campaign?`<tr><td>Campaign</td><td>${esc(d.partial.campaign.name)}</td>
+            <td class="mono">${d.partial.campaign.id}</td></tr>`:""}
+          ${d.partial.adsets.map(a=>`<tr><td>Ad set</td><td>${esc(a.name)}</td>
+            <td class="mono">${a.id}</td></tr>`).join("")}
+          ${d.partial.ads.map(a=>`<tr><td>Ad</td><td>${esc(a.name)}</td>
+            <td class="mono">${a.id}</td></tr>`).join("")}
+          </table></div>`;
+      }
+      $("out").innerHTML=h; return; }
     const res=d.result;
     $("out").innerHTML=`
       <div class="card" style="margin-top:18px;background:var(--panel2)">

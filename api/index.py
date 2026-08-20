@@ -194,6 +194,9 @@ class handler(BaseHTTPRequestHandler):
         log_lines = []
         try:
             res = builder.build(spec, creatives, log_lines.append)
+        except builder.PartialBuild as e:
+            return self._send(400, {"ok": False, "problems": [str(e)], "log": log_lines,
+                                    "partial": e.result})
         except Exception as e:
             return self._send(400, {"ok": False, "problems": [str(e)], "log": log_lines})
         return self._send(200, {"ok": True, "created": True, "result": res,
