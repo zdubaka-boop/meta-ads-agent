@@ -24,9 +24,15 @@ def _bt():
     return t
 
 
-def path_for(code):
+def prefix_for(code):
+    """Vercel Blob appends a random suffix to every upload, so the stored
+    pathname is u/<hash>-<random>.bin. Look records up by this prefix."""
     h = hashlib.sha256((code + "|" + SECRET).encode()).hexdigest()[:40]
-    return f"u/{h}.bin"
+    return f"u/{h}"
+
+
+def path_for(code):
+    return prefix_for(code) + ".bin"
 
 
 def _key(code):
@@ -53,7 +59,7 @@ def save(code, token, who):
 
 def load(code):
     """-> dict, or None if no such code / wrong code."""
-    prefix = path_for(code)
+    prefix = prefix_for(code)
     try:
         listing = json.loads(_req(f"{BLOB_API}/?prefix={urllib.parse.quote(prefix)}&limit=1"))
     except urllib.error.HTTPError:
