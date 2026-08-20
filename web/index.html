@@ -422,6 +422,7 @@ async function q2(replay){
 async function pickCamp(id,name,replay){
   CAMP=id; CAMP_NAME=name;
   if(!replay) return nav("adsets",{camp:id,campName:name});
+  show("pane");   // history restore lands here with another section visible
   $("pane").innerHTML=crumb()+"<p class='spin'>Loading ad sets…</p>";
   try{
     const d=await api("/api/adsets?campaign="+encodeURIComponent(id));
@@ -459,6 +460,7 @@ let CUR_ADSET=null, CUR_ADSET_NAME="";
 async function pickAdset(id,name,replay){
   if(!replay) return nav("ads",{adset:id,adsetName:name});
   CUR_ADSET=id; CUR_ADSET_NAME=name;
+  show("pane");   // history restore lands here with another section visible
   $("pane").innerHTML=crumb({camp:1})+"<p class='spin'>Loading ads and performance…</p>";
   try{
     const d=await api(`/api/ads?adset=${encodeURIComponent(id)}&preset=${myPreset()}`);
