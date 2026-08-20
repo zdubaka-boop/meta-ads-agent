@@ -52,13 +52,15 @@ def verify(cookie):
 def insights_by(edge, level, preset):
     """One insights call for a whole level -> {object_id: stats}."""
     out = {}
+    key = {"campaign": "campaign_id", "adset": "adset_id", "ad": "ad_id"}[level]
     try:
+        # The id field must be requested explicitly, otherwise every row comes
+        # back without one and there is nothing to join the stats onto.
         rows = meta.get_all(edge,
-            "spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type",
+            f"{key},spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type",
             limit=200, cap=2000, level=level, date_preset=preset)
     except Exception:
         return out
-    key = {"campaign": "campaign_id", "adset": "adset_id", "ad": "ad_id"}[level]
     for r in rows:
         acts = {a["action_type"]: float(a["value"]) for a in (r.get("actions") or [])}
         cpa_map = {a["action_type"]: float(a["value"])
