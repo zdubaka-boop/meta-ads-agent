@@ -208,8 +208,25 @@ function q1(){
   show("pane");
   $("pane").innerHTML = crumb()+`
    <h2>Create a new campaign</h2>
-   <p class="sub">Drop in the filled-in workbook and your images. Nothing is created
-     until you have read the preview and pressed the button.</p>
+   <p class="sub">Three steps. Nothing is created until you have read the preview
+     and pressed the button.</p>
+
+   <div class="card" style="background:var(--panel2);margin:0 0 16px">
+     <div class="row" style="justify-content:space-between">
+       <div>
+         <h3 style="margin:0 0 4px;font-size:15px">1 · Get the template</h3>
+         <p class="sub" style="margin:0">An Excel workbook with a Campaign, Ad Sets and
+           Ads tab. Fill it in, delete the grey example rows, keep the yellow cells.</p>
+       </div>
+       <a href="/api/template" download><button>Download the template</button></a>
+     </div>
+   </div>
+
+   <h3 style="margin:0 0 4px;font-size:15px">2 · Fill it in, and gather your images</h3>
+   <p class="sub">Every filename in the <b>creative_file</b> column must match an image
+     you drop in below.</p>
+
+   <h3 style="margin:18px 0 8px;font-size:15px">3 · Drop it all here</h3>
    <div class="drop" id="dz">
      <h3>Drop your files here</h3>
      <p>One <b>.xlsx</b> workbook, plus every image it references.<br>
@@ -220,7 +237,6 @@ function q1(){
    <div class="files" id="chips"></div>
    <div class="row" style="margin-top:16px">
      <button id="go" disabled onclick="preview()">Check the workbook</button>
-     <a class="sub" style="margin:0" href="https://github.com/zdubaka-boop/meta-ads-agent/raw/main/spec/CAMPAIGN-TEMPLATE.xlsx">Download the template</a>
    </div>
    <div id="out"></div>`;
   const dz=$("dz"), fi=$("fi");

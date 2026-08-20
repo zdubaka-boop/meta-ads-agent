@@ -99,6 +99,19 @@ class handler(BaseHTTPRequestHandler):
             if p.path in ("/", "/index.html"):
                 return self._send(200, (PUBLIC / "index.html").read_bytes(),
                                   "text/html; charset=utf-8")
+            if p.path in ("/api/template", "/CAMPAIGN-TEMPLATE.xlsx"):
+                f = PUBLIC / "CAMPAIGN-TEMPLATE.xlsx"
+                self.send_response(200)
+                self.send_header("Content-Type",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition",
+                    'attachment; filename="CAMPAIGN-TEMPLATE.xlsx"')
+                data = f.read_bytes()
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+
             if p.path == "/api/session":
                 code = self._code()
                 who = None
