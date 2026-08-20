@@ -200,12 +200,15 @@ class handler(BaseHTTPRequestHandler):
                             "ctr": round(float(r.get("ctr") or 0), 2),
                             "cpc": round(float(r.get("cpc") or 0), 2),
                             "results": results, "cpa": round(cpa, 2) if cpa else None}
-                except Exception:
-                    pass
+                except Exception as e:
+                    stats_error = f"{type(e).__name__}: {e}"[:200]
+                else:
+                    stats_error = None
                 for a in ads:
                     a["stats"] = stats.get(a["id"])
                 return self._send(200, {"ads": ads, "preset": preset,
-                                        "has_stats": bool(stats)})
+                                        "has_stats": bool(stats),
+                                        "stats_error": stats_error})
 
             return self._send(404, {"error": "no such endpoint"})
         except meta.MetaError as e:

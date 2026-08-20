@@ -106,11 +106,15 @@ def post(path, params, op=None):
     return _request(path, params, post=True, op=op or f"POST {path}")
 
 
-def get_all(path, fields=None, limit=200, cap=5000):
-    """Follow pagination. Returns a flat list."""
+def get_all(path, fields=None, limit=200, cap=5000, **extra):
+    """Follow pagination. Returns a flat list.
+
+    **extra passes through additional query params (level, date_preset, ...);
+    without it an insights call raises TypeError and looks like 'no data'.
+    """
     out, after = [], None
     while len(out) < cap:
-        p = {"limit": limit}
+        p = {"limit": limit, **extra}
         if fields:
             p["fields"] = fields
         if after:
