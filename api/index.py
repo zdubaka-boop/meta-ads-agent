@@ -49,6 +49,36 @@ def verify(cookie):
         return None
 
 
+def insights_by(edge, level, preset):
+    """One insights call for a whole level -> {object_id: stats}."""
+    out = {}
+    try:
+        rows = meta.get_all(edge,
+            "spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type",
+            limit=200, cap=2000, level=level, date_preset=preset)
+    except Exception:
+        return out
+    key = {"campaign": "campaign_id", "adset": "adset_id", "ad": "ad_id"}[level]
+    for r in rows:
+        acts = {a["action_type"]: float(a["value"]) for a in (r.get("actions") or [])}
+        cpa_map = {a["action_type"]: float(a["value"])
+                   for a in (r.get("cost_per_action_type") or [])}
+        pick = lambda m: (m.get("purchase") or m.get("offsite_conversion.fb_pixel_purchase")
+                          or m.get("lead") or m.get("link_click"))
+        cpa = pick(cpa_map)
+        oid = r.get(key)
+        if not oid:
+            continue
+        out[oid] = {"spend": float(r.get("spend") or 0),
+                    "impressions": int(r.get("impressions") or 0),
+                    "clicks": int(r.get("clicks") or 0),
+                    "ctr": round(float(r.get("ctr") or 0), 2),
+                    "cpc": round(float(r.get("cpc") or 0), 2),
+                    "results": pick(acts) or 0,
+                    "cpa": round(cpa, 2) if cpa else None}
+    return out
+
+
 class handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -159,7 +189,12 @@ class handler(BaseHTTPRequestHandler):
                 for c in camps:
                     c["budget_mode"] = "CBO" if (c.get("daily_budget") or c.get("lifetime_budget")) else "ABO"
                 camps.sort(key=lambda c: c.get("created_time") or "", reverse=True)
-                return self._send(200, {"campaigns": camps})
+                preset = one("preset") or "last_7d"
+                stats = insights_by(f"{meta.account(one('account'))}/insights", "campaign", preset)
+                for c in camps:
+                    c["stats"] = stats.get(c["id"])
+                return self._send(200, {"campaigns": camps, "preset": preset,
+                                        "has_stats": bool(stats)})
 
             if p.path == "/api/adsets":
                 if not self._need_auth():
@@ -175,7 +210,12 @@ class handler(BaseHTTPRequestHandler):
                         a["ad_count"] = len(meta.get_all(f"{a['id']}/ads", "id", cap=500))
                     except Exception:
                         a["ad_count"] = None
-                return self._send(200, {"adsets": sets_})
+                preset = one("preset") or "last_7d"
+                stats = insights_by(f"{one('campaign')}/insights", "adset", preset)
+                for a in sets_:
+                    a["stats"] = stats.get(a["id"])
+                return self._send(200, {"adsets": sets_, "preset": preset,
+                                        "has_stats": bool(stats)})
 
             if p.path == "/api/ads":
                 if not self._need_auth():
@@ -185,31 +225,8 @@ class handler(BaseHTTPRequestHandler):
                 # Merge performance so buyers can judge what to switch off
                 # without leaving for Ads Manager.
                 preset = one("preset") or "last_7d"
-                stats = {}
-                try:
-                    rows = meta.get_all(f"{one('adset')}/insights",
-                        "ad_id,spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type",
-                        limit=200, cap=1000, level="ad", date_preset=preset)
-                    for r in rows:
-                        acts = {a["action_type"]: float(a["value"]) for a in (r.get("actions") or [])}
-                        cpa_map = {a["action_type"]: float(a["value"])
-                                   for a in (r.get("cost_per_action_type") or [])}
-                        results = (acts.get("purchase") or acts.get("offsite_conversion.fb_pixel_purchase")
-                                   or acts.get("lead") or acts.get("link_click") or 0)
-                        cpa = (cpa_map.get("purchase")
-                               or cpa_map.get("offsite_conversion.fb_pixel_purchase")
-                               or cpa_map.get("lead") or cpa_map.get("link_click"))
-                        stats[r["ad_id"]] = {
-                            "spend": float(r.get("spend") or 0),
-                            "impressions": int(r.get("impressions") or 0),
-                            "clicks": int(r.get("clicks") or 0),
-                            "ctr": round(float(r.get("ctr") or 0), 2),
-                            "cpc": round(float(r.get("cpc") or 0), 2),
-                            "results": results, "cpa": round(cpa, 2) if cpa else None}
-                except Exception as e:
-                    stats_error = f"{type(e).__name__}: {e}"[:200]
-                else:
-                    stats_error = None
+                stats = insights_by(f"{one('adset')}/insights", "ad", preset)
+                stats_error = None
                 for a in ads:
                     a["stats"] = stats.get(a["id"])
                 return self._send(200, {"ads": ads, "preset": preset,
@@ -222,6 +239,48 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             traceback.print_exc()
             return self._send(500, {"error": f"{type(e).__name__}: {e}"})
+
+    def _add_ads(self, do_create):
+        """Add ads into an ad set that already exists."""
+        import multipart, builder
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 4_300_000:
+            return self._send(413, {"error": "Upload is too large (Vercel caps a request at "
+                                             "~4.5MB). Send fewer or smaller images."})
+        fields, files = multipart.parse(self.rfile.read(n), self.headers.get("Content-Type"))
+        adset_id = (fields.get("adset") or "").strip()
+        acct = (fields.get("account") or "").strip()
+        if not adset_id or not acct:
+            return self._send(400, {"error": "missing ad set or account"})
+
+        book = next(((k, v) for k, v in files.items()
+                     if k.lower().endswith((".xlsx", ".xlsm", ".csv"))), None)
+        if not book:
+            return self._send(400, {"error": "Drop in a .csv or .xlsx listing the new ads."})
+        creatives = {k: v for k, v in files.items() if k != book[0]}
+
+        # Defaults come from the ad set's own campaign context where possible.
+        defaults = {}
+        try:
+            pages = meta.get_all(f"{meta.account(acct)}/promote_pages", "id", cap=5)
+            if len(pages) == 1:
+                defaults["page_id"] = pages[0]["id"]
+        except Exception:
+            pass
+
+        ads, problems = builder.parse_ads_only(book[1], book[0], creatives, defaults)
+        if problems:
+            return self._send(200, {"ok": False, "problems": problems})
+        if not do_create:
+            return self._send(200, {"ok": True, "preview": True,
+                                    "ads": [a["name"] for a in ads],
+                                    "count": len(ads)})
+        log = []
+        try:
+            res = builder.add_ads_to_adset(acct, adset_id, ads, creatives, defaults, log.append)
+        except Exception as e:
+            return self._send(400, {"ok": False, "problems": [str(e)], "log": log})
+        return self._send(200, {"ok": True, "created": True, **res, "log": log})
 
     def _workbook(self, do_create):
         """Parse an uploaded workbook + creatives. Preview, or actually build."""
@@ -313,6 +372,11 @@ class handler(BaseHTTPRequestHandler):
             if p.path == "/api/logout":
                 return self._send(200, {"ok": True},
                                   cookie="ms=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0")
+
+            if p.path in ("/api/add-preview", "/api/add-create"):
+                if not self._need_auth():
+                    return
+                return self._add_ads(p.path.endswith("create"))
 
             if p.path in ("/api/preview", "/api/create"):
                 if not self._need_auth():

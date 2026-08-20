@@ -402,19 +402,24 @@ async function q2(replay){
   if(!replay) return nav("campaigns");
   show("pane"); $("pane").innerHTML=crumb()+"<h2>Add to an existing campaign</h2><p class='spin'>Loading campaigns…</p>";
   try{
-    const d=await api("/api/campaigns?account="+encodeURIComponent(ACCT));
+    const d=await api("/api/campaigns?account="+encodeURIComponent(ACCT)+"&preset="+myPreset());
+    const C=COLS.filter(c=>myCols().includes(c[0]));
     $("pane").innerHTML = crumb()+`<h2>Which campaign?</h2>`+
+      presetBar()+colsBar()+
       (d.campaigns.length
         ? searchBox("qCamp","tCamp","Search campaigns by name or ID…","campaign(s)")+
           `<table id="tCamp"><thead><tr>
             <th class="sortable" onclick="sortBy('tCamp',0)">Name</th>
-            <th class="sortable" onclick="sortBy('tCamp',1)">Objective</th>
-            <th>Budget</th><th>Status</th></tr></thead><tbody>`+
-          d.campaigns.map(c=>`<tr class="pick" onclick="pickCamp('${c.id}','${esc(c.name).replace(/'/g,"")}')">
-            <td>${esc(c.name)}<div class="mono">${c.id}</div></td><td>${esc(c.objective||"")}</td>
+            <th>Budget</th>
+            ${C.map((c,n)=>`<th class="num sortable" onclick="sortBy('tCamp',${2+n},true)">${c[1]}</th>`).join("")}
+            <th>Status</th></tr></thead><tbody>`+
+          d.campaigns.map(c=>{const st=c.stats||{};return `
+            <tr class="pick" onclick="pickCamp('${c.id}','${esc(c.name).replace(/'/g,"")}')">
+            <td>${esc(c.name)}<div class="mono">${c.id}</div></td>
             <td>${c.budget_mode}</td>
+            ${C.map(x=>`<td class="num" data-v="${st[x[0]]??-1}">${fmtStat(st[x[0]],x[0])}</td>`).join("")}
             <td><span class="tag ${/ACTIVE/.test(c.effective_status)?"ok":"warn"}">${esc(c.effective_status||c.status)}</span></td>
-          </tr>`).join("")+`</tbody></table>`
+          </tr>`;}).join("")+`</tbody></table>`
         : "<p class='sub'>No campaigns in this account yet.</p>");
     if(d.campaigns.length) filterRows("qCamp","tCamp");
   }catch(e){ err(e.message); }
@@ -425,24 +430,48 @@ async function pickCamp(id,name,replay){
   show("pane");   // history restore lands here with another section visible
   $("pane").innerHTML=crumb()+"<p class='spin'>Loading ad sets…</p>";
   try{
-    const d=await api("/api/adsets?campaign="+encodeURIComponent(id));
+    const d=await api("/api/adsets?campaign="+encodeURIComponent(id)+"&preset="+myPreset());
+    const C=COLS.filter(c=>myCols().includes(c[0]));
     $("pane").innerHTML = crumb(true)+`<h2>${esc(name)}</h2>`+
+      presetBar()+colsBar()+
       searchBox("qSet","tSet","Search ad sets by name, ID or country…","ad set(s)")+
       `<table id="tSet"><thead><tr>
         <th class="sortable" onclick="sortBy('tSet',0)">Ad set</th>
         <th class="num sortable" onclick="sortBy('tSet',1,true)">Ads</th>
-        <th>Countries</th><th>Budget</th><th>Status</th></tr></thead><tbody>`+
-      d.adsets.map(a=>`<tr class="pick" onclick="pickAdset('${a.id}','${esc(a.name).replace(/'/g,"")}')">
+        <th>Countries</th><th>Budget</th>
+        ${C.map((c,n)=>`<th class="num sortable" onclick="sortBy('tSet',${4+n},true)">${c[1]}</th>`).join("")}
+        <th>Status</th></tr></thead><tbody>`+
+      d.adsets.map(a=>{const st=a.stats||{};return `
+        <tr class="pick" onclick="pickAdset('${a.id}','${esc(a.name).replace(/'/g,"")}')">
         <td>${esc(a.name)}<div class="mono">${a.id}</div></td>
         <td class="num" data-v="${a.ad_count||0}">${a.ad_count??"?"}</td>
-        <td>${(a.countries||[]).join(", ")}</td>
+        <td style="max-width:260px;font-size:12px">${(a.countries||[]).join(", ")}</td>
         <td>${a.daily_budget||a.lifetime_budget||"campaign-level"}</td>
+        ${C.map(x=>`<td class="num" data-v="${st[x[0]]??-1}">${fmtStat(st[x[0]],x[0])}</td>`).join("")}
         <td><span class="tag ${/ACTIVE/.test(a.effective_status)?"ok":"warn"}">${esc(a.effective_status||a.status)}</span></td>
-      </tr>`).join("")+`</tbody></table>
-      <div class="note"><b>Or add a whole new ad set</b> to this campaign:
-      <pre>python3 scripts/add_to_campaign.py --account ${ACCT} \\
-    --campaign ${id} --new-adsets-from specs/extra.json --execute</pre></div>`;
+      </tr>`;}).join("")+`</tbody></table>
+      <div class="note">Click an ad set to see its ads, add more ads to it, or switch
+        ads on and off.</div>`;
+    filterRows("qSet","tSet");
   }catch(e){ err(e.message); }
+}
+function fmtStat(v,k){
+  if(v==null||v<0) return "—";
+  return (k==="spend"||k==="cpa"||k==="cpc"||k==="ctr") ? Number(v).toFixed(2)
+       : Number(v).toLocaleString();
+}
+function presetBar(){
+  return `<div class="bar"><select class="mini" onchange="setPreset(this.value)">
+    ${[["today","Today"],["yesterday","Yesterday"],["last_7d","Last 7 days"],
+       ["last_14d","Last 14 days"],["last_30d","Last 30 days"],["maximum","All time"]]
+      .map(([v,l])=>`<option value="${v}" ${myPreset()===v?"selected":""}>${l}</option>`).join("")}
+  </select><span class="sub" style="margin:0">performance window</span></div>`;
+}
+function colsBar(){
+  return `<div class="cols">Columns:
+    ${COLS.map(([k,l])=>`<label><input type="checkbox" value="${k}"
+      ${myCols().includes(k)?"checked":""} onchange="saveCols()">${l}</label>`).join("")}
+    <span>(saved on this browser)</span></div>`;
 }
 const COLS=[["spend","Spend"],["results","Results"],["cpa","CPA"],["ctr","CTR %"],
             ["cpc","CPC"],["clicks","Clicks"],["impressions","Impr."]];
@@ -451,10 +480,16 @@ function myCols(){ try{ return JSON.parse(localStorage.getItem("cols")) ||
 function saveCols(){
   const on=[...document.querySelectorAll(".cols input:checked")].map(x=>x.value);
   localStorage.setItem("cols",JSON.stringify(on));
-  pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
+  redraw();
+}
+function redraw(){
+  const st=history.state||{};
+  if(st.view==="ads")       return pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
+  if(st.view==="adsets")    return pickCamp(CAMP,CAMP_NAME,true);
+  if(st.view==="campaigns") return q2(true);
 }
 function myPreset(){ return localStorage.getItem("preset")||"last_7d"; }
-function setPreset(v){ localStorage.setItem("preset",v); pickAdset(CUR_ADSET,CUR_ADSET_NAME,true); }
+function setPreset(v){ localStorage.setItem("preset",v); redraw(); }
 let CUR_ADSET=null, CUR_ADSET_NAME="";
 
 async function pickAdset(id,name,replay){
@@ -465,27 +500,12 @@ async function pickAdset(id,name,replay){
   try{
     const d=await api(`/api/ads?adset=${encodeURIComponent(id)}&preset=${myPreset()}`);
     const cols=myCols(), C=COLS.filter(c=>cols.includes(c[0]));
-    const fmt=(v,k)=> v==null?"—" : (k==="spend"||k==="cpa"||k==="cpc")?Number(v).toFixed(2)
-                     : (k==="ctr")?Number(v).toFixed(2) : Number(v).toLocaleString();
+    const fmt=fmtStat;
     $("pane").innerHTML = crumb({camp:1})+`
       <h2>${esc(name)}</h2>
       <p class="sub">${d.ads.length} ad(s). Tick rows to change several at once.</p>
 
-      <div class="bar">
-        <select class="mini" onchange="setPreset(this.value)">
-          ${[["today","Today"],["yesterday","Yesterday"],["last_7d","Last 7 days"],
-             ["last_14d","Last 14 days"],["last_30d","Last 30 days"],
-             ["maximum","All time"]].map(([v,l])=>
-            `<option value="${v}" ${myPreset()===v?"selected":""}>${l}</option>`).join("")}
-        </select>
-        <span class="sub" style="margin:0">${d.has_stats?"":"no spend in this period"}</span>
-      </div>
-
-      <div class="cols">Columns:
-        ${COLS.map(([k,l])=>`<label><input type="checkbox" value="${k}"
-          ${cols.includes(k)?"checked":""} onchange="saveCols()">${l}</label>`).join("")}
-        <span>(saved on this browser)</span>
-      </div>
+      ${presetBar()}${colsBar()}
 
       ${searchBox("qAd","tAd","Search ads by name or ID…","ad(s)")}
       <table id="tAd"><thead><tr>
@@ -508,12 +528,81 @@ async function pickAdset(id,name,replay){
         </tr>`;}).join("")+
       `</tbody></table>
       <div id="bulk"></div>
+
+      <h3 style="margin:26px 0 6px;font-size:15px">Add more ads to this ad set</h3>
+      <p class="sub">Drop a CSV (or a workbook — its <b>Ads</b> tab is used) plus the images
+        it names. Ads already here are skipped, so re-dropping the same file is safe.</p>
+      <div class="drop" id="dz2" style="padding:24px">
+        <h3 style="font-size:15px">Drop the ad list and images here</h3>
+        <p>Columns: ad_name, creative_file, body, headline, description, cta, link</p>
+      </div>
+      <input type="file" id="fi2" multiple class="hide">
+      <div class="files" id="chips2"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="go2" disabled onclick="addPreview()">Check these ads</button>
+      </div>
+      <div id="out2"></div>
       <div class="note">Switching an ad <b>off</b> takes effect immediately and never costs
         anything. Switching one <b>on</b> starts spending, so it asks first.
         <br>CPA and Results use whichever conversion the ad set optimises for
         (purchase, lead, or link click).</div>`;
-    filterRows("qAd","tAd"); refreshBulk();
+    filterRows("qAd","tAd"); refreshBulk(); wireDrop2();
   }catch(e){ err(e.message); }
+}
+
+let FILES2=[];
+function wireDrop2(){
+  const dz=$("dz2"), fi=$("fi2"); if(!dz) return;
+  dz.onclick=()=>fi.click();
+  fi.onchange=e=>add2(e.target.files);
+  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
+  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
+  dz.addEventListener("drop",e=>add2(e.dataTransfer.files));
+}
+function add2(list){
+  for(const f of list){ if(!FILES2.some(x=>x.name===f.name)) FILES2.push(f); }
+  const sheet=FILES2.filter(f=>/\.(xlsx|xlsm|csv)$/i.test(f.name));
+  $("chips2").innerHTML=FILES2.map(f=>{
+    const isSheet=/\.(xlsx|xlsm|csv)$/i.test(f.name);
+    return `<span class="chip ${isSheet?"book":""}">${esc(f.name)} · ${(f.size/1024).toFixed(0)}kB</span>`;
+  }).join("");
+  $("go2").disabled = sheet.length!==1;
+  $("out2").innerHTML = sheet.length!==1
+    ? `<div class="note">Add exactly one .csv or .xlsx listing the ads.</div>` : "";
+}
+function fd2(){ const fd=new FormData();
+  FILES2.forEach(f=>fd.append("f",f,f.name));
+  fd.append("adset",CUR_ADSET); fd.append("account",ACCT); return fd; }
+async function addPreview(){
+  $("go2").disabled=true; $("out2").innerHTML='<p class="spin">Checking…</p>';
+  try{
+    const r=await fetch("/api/add-preview",{method:"POST",body:fd2()});
+    const d=await r.json();
+    if(!r.ok||!d.ok){
+      $("out2").innerHTML=`<div class="err">`+
+        (d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`;
+      $("go2").disabled=false; return; }
+    $("out2").innerHTML=`<div class="note"><b>${d.count} ad(s) ready:</b><br>
+      ${d.ads.map(esc).join(" · ")}<br><br>They will be created <b>PAUSED</b> in this ad set.
+      <div class="row" style="margin-top:10px">
+        <button onclick="addCreate()">Create these ${d.count} ad(s), paused</button>
+      </div></div>`;
+  }catch(e){ $("out2").innerHTML=`<div class="err">${esc(e.message)}</div>`; $("go2").disabled=false; }
+}
+async function addCreate(){
+  $("out2").innerHTML='<p class="spin">Uploading images and creating ads…</p>';
+  try{
+    const r=await fetch("/api/add-create",{method:"POST",body:fd2()});
+    const d=await r.json();
+    if(!d.ok){ $("out2").innerHTML=`<div class="err">`+
+      (d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`; return; }
+    FILES2=[];
+    alert(`Created ${d.created.length} ad(s), paused.`+
+      (d.skipped.length?`\nSkipped (already there): ${d.skipped.join(", ")}`:""));
+    pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
+  }catch(e){ $("out2").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 
 function tickAll(box){

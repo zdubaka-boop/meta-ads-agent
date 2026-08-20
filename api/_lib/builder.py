@@ -312,3 +312,81 @@ def build(spec, creatives, log):
             result["ads"].append({"id": ad_id, "name": ad["name"], "adset": a["name"]})
             log(f"    ad {ad_id}  {ad['name']}")
     return result
+
+
+def parse_ads_only(file_bytes, filename, creatives, defaults):
+    """Read ads from a CSV or the Ads tab of a workbook, for adding into an
+    ad set that already exists. Returns (ads, problems)."""
+    import csv as _csv, io, os, tempfile
+    problems, rows = [], []
+    if filename.lower().endswith((".xlsx", ".xlsm")):
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx")
+        try:
+            os.write(fd, file_bytes); os.close(fd)
+            sheets = xlsx.sheets(tmp)
+        finally:
+            try: os.unlink(tmp)
+            except OSError: pass
+        if "Ads" not in sheets:
+            return [], ["That workbook has no 'Ads' tab."]
+        rows = xlsx.table(sheets["Ads"])
+    else:
+        rows = list(_csv.DictReader(io.StringIO(file_bytes.decode("utf-8-sig", "replace"))))
+
+    have = {Path(k).name.lower(): k for k in creatives}
+    ads, seen = [], set()
+    for r in rows:
+        r = {(k or "").strip(): (str(v).strip() if v is not None else "")
+             for k, v in r.items() if k}
+        name = r.get("ad_name") or r.get("name")
+        cf = r.get("creative_file") or r.get("creative") or ""
+        if not name or not cf:
+            continue
+        if name in seen:
+            problems.append(f"Duplicate ad name '{name}' in the file")
+        seen.add(name)
+        key = Path(cf).name.lower()
+        if key not in have:
+            problems.append(f"Ad '{name}': '{cf}' was not among the files you dropped in")
+        elif Path(key).suffix in VIDEO_EXT:
+            problems.append(f"Ad '{name}': '{cf}' is a video — browser uploads cap at ~4.5MB, "
+                            f"so videos go through the CLI.")
+        ad = {"name": name, "creative": have.get(key, cf)}
+        for k in ("body", "headline", "description", "cta", "link",
+                  "url_tags", "page_id", "instagram_user_id"):
+            if r.get(k):
+                ad[k] = r[k]
+        if not (ad.get("link") or defaults.get("link")):
+            problems.append(f"Ad '{name}': no link, and no default on the account")
+        if not (ad.get("page_id") or defaults.get("page_id")):
+            problems.append(f"Ad '{name}': no page_id, and no default on the account")
+        ads.append(ad)
+    if not ads:
+        problems.append("No ads found. Need columns ad_name and creative_file.")
+    return ads, problems
+
+
+def add_ads_to_adset(acct, adset_id, ads, creatives, defaults, log):
+    """Create ads inside an ad set that already exists. PAUSED, dedup by name."""
+    existing = {a.get("name") for a in meta.get_all(f"{adset_id}/ads", "id,name", cap=1000)}
+    created, skipped, media = [], [], {}
+    for ad in ads:
+        if ad["name"] in existing:
+            skipped.append(ad["name"]); continue
+        blob = creatives.get(ad["creative"])
+        if blob is None:
+            skipped.append(f"{ad['name']} (creative missing)"); continue
+        key = hashlib.sha256(blob).hexdigest()[:16]
+        if key not in media:
+            media[key] = meta.upload_image_bytes(acct, blob, ad["creative"], ad["name"])
+        pick = lambda k, dv=None: ad.get(k) or defaults.get(k) or dv
+        creative = meta.image_creative(
+            pick("page_id"), media[key], link=pick("link"), body=ad.get("body", ""),
+            headline=ad.get("headline", ""), description=ad.get("description"),
+            cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
+            url_tags=pick("url_tags"))
+        ad_id = meta.create_ad(acct, adset_id, ad["name"], creative,
+                               pixel_id=defaults.get("pixel_id"))
+        created.append({"id": ad_id, "name": ad["name"]})
+        log(f"ad {ad_id}  {ad['name']}")
+    return {"created": created, "skipped": skipped}
