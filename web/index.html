@@ -186,8 +186,9 @@ async function login(){
 async function logout(){ await api("/api/logout",{method:"POST"});
   $("who").textContent=""; $("out").classList.add("hide"); ACCT=null; show("login"); }
 
-async function toAccounts(){
-  clearErr(); show("acct"); $("acctList").textContent="Loading…";
+async function toAccounts(replay){
+  clearErr(); show("acct");
+  if(!replay) history.replaceState({view:"accounts"},"",location.pathname); $("acctList").textContent="Loading…";
   try{
     const d=await api("/api/accounts");
     $("acctList").innerHTML = "<table><tr><th>Account</th><th>ID</th><th>Business</th>"+
@@ -199,12 +200,45 @@ async function toAccounts(){
       +"</table>";
   }catch(e){ err(e.message); $("acctList").textContent=""; }
 }
-function pickAcct(id,name){ ACCT=id; ACCT_NAME=name; $("acctName").textContent=name+" ("+id+")"; show("menu"); }
+function pickAcct(id,name){ ACCT=id; ACCT_NAME=name;
+  $("acctName").textContent=name+" ("+id+")"; nav("menu"); }
+
+/* ---------- history: Back steps back one screen, not to the start ----------
+   Each screen pushes a state carrying everything needed to rebuild it, so
+   the browser Back button lands on the previous screen with the same
+   account/campaign/ad set already selected. */
+function nav(view, extra){
+  const st = Object.assign({view, acct:ACCT, acctName:ACCT_NAME,
+                            camp:CAMP, campName:CAMP_NAME}, extra||{});
+  history.pushState(st, "", location.pathname);
+  render(st);
+}
+function render(st){
+  ACCT=st.acct||ACCT; ACCT_NAME=st.acctName||ACCT_NAME;
+  CAMP=st.camp||CAMP; CAMP_NAME=st.campName||CAMP_NAME;
+  if(ACCT_NAME) $("acctName").textContent=ACCT_NAME+(ACCT?" ("+ACCT+")":"");
+  clearErr();
+  switch(st.view){
+    case "accounts": return toAccounts(true);
+    case "menu":     return show("menu");
+    case "q1":       return q1(true);
+    case "campaigns":return q2(true);
+    case "adsets":   return pickCamp(st.camp, st.campName, true);
+    case "ads":      return pickAdset(st.adset, st.adsetName, true);
+    case "audit":    return q3(true);
+    default:         return show("acct");
+  }
+}
+window.addEventListener("popstate", e=>{
+  if(e.state && e.state.view) render(e.state);
+  else show(ACCT?"menu":"acct");
+});
 
 /* ---------- 1: create new ---------- */
 let FILES=[];
-function q1(){
+function q1(replay){
   FILES=[];
+  if(!replay) return nav("q1");
   show("pane");
   $("pane").innerHTML = crumb()+`
    <h2>Create a new campaign</h2>
@@ -339,7 +373,8 @@ async function createNow(){
 }
 
 /* ---------- 2: add to existing ---------- */
-async function q2(){
+async function q2(replay){
+  if(!replay) return nav("campaigns");
   show("pane"); $("pane").innerHTML=crumb()+"<h2>Add to an existing campaign</h2><p class='spin'>Loading campaigns…</p>";
   try{
     const d=await api("/api/campaigns?account="+encodeURIComponent(ACCT));
@@ -353,12 +388,13 @@ async function q2(){
       </tr>`).join("")+`</table>` : "<p class='sub'>No campaigns in this account yet.</p>");
   }catch(e){ err(e.message); }
 }
-async function pickCamp(id,name){
+async function pickCamp(id,name,replay){
   CAMP=id; CAMP_NAME=name;
+  if(!replay) return nav("adsets",{camp:id,campName:name});
   $("pane").innerHTML=crumb()+"<p class='spin'>Loading ad sets…</p>";
   try{
     const d=await api("/api/adsets?campaign="+encodeURIComponent(id));
-    $("pane").innerHTML = crumb()+`<h2>${esc(name)}</h2>
+    $("pane").innerHTML = crumb(true)+`<h2>${esc(name)}</h2>
       <p class="sub">${d.adsets.length} ad set(s). Pick one to add ads into it.</p>`+
       `<table><tr><th>Ad set</th><th>Ads</th><th>Countries</th><th>Budget</th><th>Status</th></tr>`+
       d.adsets.map(a=>`<tr class="pick" onclick="pickAdset('${a.id}','${esc(a.name).replace(/'/g,"")}')">
@@ -372,11 +408,12 @@ async function pickCamp(id,name){
     --campaign ${id} --new-adsets-from specs/extra.json --execute</pre></div>`;
   }catch(e){ err(e.message); }
 }
-async function pickAdset(id,name){
+async function pickAdset(id,name,replay){
+  if(!replay) return nav("ads",{adset:id,adsetName:name});
   $("pane").innerHTML=crumb()+"<p class='spin'>Loading ads…</p>";
   try{
     const d=await api("/api/ads?adset="+encodeURIComponent(id));
-    $("pane").innerHTML = crumb()+`<h2>${esc(name)}</h2>
+    $("pane").innerHTML = crumb({camp:1})+`<h2>${esc(name)}</h2>
       <p class="sub">${d.ads.length} ad(s) already in this ad set.</p>`+
       (d.ads.length?`<table><tr><th>Ad</th><th>Status</th></tr>`+d.ads.map(a=>
         `<tr><td>${esc(a.name)}<div class="mono">${a.id}</div></td>
@@ -397,7 +434,8 @@ python3 scripts/add_to_campaign.py --account ${ACCT} \\
 }
 
 /* ---------- 3: audit ---------- */
-async function q3(){
+async function q3(replay){
+  if(!replay) return nav("audit");
   show("pane"); $("pane").innerHTML=crumb()+"<h2>Audit</h2><p class='spin'>Scanning every ad in the account…</p>";
   try{
     const d=await api("/api/audit",{method:"POST",body:JSON.stringify({account:ACCT})});
@@ -419,7 +457,12 @@ async function q3(){
   }catch(e){ err(e.message); }
 }
 
-function crumb(){ return `<div class="crumb"><a onclick="toAccounts()">← accounts</a> ·
-  <a onclick="show('menu')">${esc(ACCT_NAME)}</a></div>`; }
+function crumb(extra){
+  let h=`<div class="crumb"><a onclick="nav('accounts')">← accounts</a> · `+
+        `<a onclick="nav('menu')">${esc(ACCT_NAME)}</a>`;
+  if(extra) h+=` · <a onclick="nav('campaigns')">campaigns</a>`;
+  if(extra && extra.camp) h+=` · <a onclick="nav('adsets',{camp:CAMP,campName:CAMP_NAME})">${esc(CAMP_NAME)}</a>`;
+  return h+`</div>`;
+}
 boot().catch(e=>err(e.message));
 </script></body></html>

@@ -100,13 +100,22 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, (PUBLIC / "index.html").read_bytes(),
                                   "text/html; charset=utf-8")
             if p.path in ("/api/template", "/CAMPAIGN-TEMPLATE.xlsx"):
-                f = PUBLIC / "CAMPAIGN-TEMPLATE.xlsx"
+                # Read BEFORE sending any header: a read failure after the
+                # status line is written kills the whole invocation.
+                data = None
+                for cand in (Path(__file__).parent / "_lib" / "CAMPAIGN-TEMPLATE.xlsx",
+                             PUBLIC / "CAMPAIGN-TEMPLATE.xlsx"):
+                    try:
+                        data = cand.read_bytes(); break
+                    except OSError:
+                        continue
+                if data is None:
+                    return self._send(500, {"error": "template file is missing from the deployment"})
                 self.send_response(200)
                 self.send_header("Content-Type",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 self.send_header("Content-Disposition",
                     'attachment; filename="CAMPAIGN-TEMPLATE.xlsx"')
-                data = f.read_bytes()
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)
