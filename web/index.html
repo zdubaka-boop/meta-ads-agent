@@ -55,6 +55,25 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:
 .crumb{color:var(--dim);font-size:13px;margin-bottom:14px}
 .crumb a{color:var(--accent);cursor:pointer;text-decoration:none}
 .hide{display:none}
+.search{width:100%;max-width:340px;padding:8px 12px;font-size:14px;margin:0 0 12px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.bar .sp{flex:1}
+.bulk{position:sticky;bottom:0;background:var(--panel2);border:1px solid var(--accent);
+  border-radius:9px;padding:11px 14px;margin-top:12px;display:flex;gap:10px;align-items:center;
+  flex-wrap:wrap}
+th.sortable{cursor:pointer;user-select:none} th.sortable:hover{color:var(--ink)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.sw{position:relative;display:inline-block;width:38px;height:21px;cursor:pointer;vertical-align:middle}
+.sw input{display:none}
+.sl{position:absolute;inset:0;background:#39424e;border-radius:21px;transition:.15s}
+.sl:before{content:"";position:absolute;height:15px;width:15px;left:3px;top:3px;background:#c9d1d9;
+  border-radius:50%;transition:.15s}
+.sw input:checked + .sl{background:var(--ok)}
+.sw input:checked + .sl:before{transform:translateX(17px)}
+.cols{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--dim);margin-bottom:10px}
+.cols label{display:inline-flex;gap:5px;align-items:center;margin:0;cursor:pointer}
+.cols input{width:auto}
+select.mini{width:auto;padding:7px 10px;font-size:13px}
 .drop{border:2px dashed var(--line);border-radius:11px;padding:38px 22px;text-align:center;
   background:var(--panel2);transition:.15s;cursor:pointer}
 .drop.over{border-color:var(--accent);background:#16243a}
@@ -191,13 +210,19 @@ async function toAccounts(replay){
   if(!replay) history.replaceState({view:"accounts"},"",location.pathname); $("acctList").textContent="Loading…";
   try{
     const d=await api("/api/accounts");
-    $("acctList").innerHTML = "<table><tr><th>Account</th><th>ID</th><th>Business</th>"+
-      "<th>Currency</th><th></th></tr>"+ d.accounts.map(a=>
+    $("acctList").innerHTML =
+      searchBox("qAcct","tAcct","Search by name, ID or business…","account(s)")+
+      `<table id="tAcct"><thead><tr>
+        <th class="sortable" onclick="sortBy('tAcct',0)">Account</th><th>ID</th>
+        <th class="sortable" onclick="sortBy('tAcct',2)">Business</th>
+        <th>Currency</th><th>Status</th></tr></thead><tbody>`+
+      d.accounts.map(a=>
       `<tr class="pick" onclick="pickAcct('${a.id}','${esc(a.name).replace(/'/g,"")}')">
         <td>${esc(a.name)}</td><td class="mono">${a.id}</td><td>${esc(a.business)}</td>
         <td>${esc(a.currency)}</td>
         <td><span class="tag ${a.status==="ACTIVE"?"ok":"warn"}">${a.status}</span></td></tr>`).join("")
-      +"</table>";
+      +"</tbody></table>";
+    filterRows("qAcct","tAcct");
   }catch(e){ err(e.message); $("acctList").textContent=""; }
 }
 function pickAcct(id,name){ ACCT=id; ACCT_NAME=name;
@@ -378,14 +403,20 @@ async function q2(replay){
   show("pane"); $("pane").innerHTML=crumb()+"<h2>Add to an existing campaign</h2><p class='spin'>Loading campaigns…</p>";
   try{
     const d=await api("/api/campaigns?account="+encodeURIComponent(ACCT));
-    $("pane").innerHTML = crumb()+`<h2>Which campaign?</h2>
-      <p class="sub">${d.campaigns.length} campaign(s), newest first.</p>`+
-      (d.campaigns.length? `<table><tr><th>Name</th><th>Objective</th><th>Budget</th><th>Status</th></tr>`+
-      d.campaigns.map(c=>`<tr class="pick" onclick="pickCamp('${c.id}','${esc(c.name).replace(/'/g,"")}')">
-        <td>${esc(c.name)}<div class="mono">${c.id}</div></td><td>${esc(c.objective||"")}</td>
-        <td>${c.budget_mode}</td>
-        <td><span class="tag ${/ACTIVE/.test(c.effective_status)?"ok":"warn"}">${esc(c.effective_status||c.status)}</span></td>
-      </tr>`).join("")+`</table>` : "<p class='sub'>No campaigns in this account yet.</p>");
+    $("pane").innerHTML = crumb()+`<h2>Which campaign?</h2>`+
+      (d.campaigns.length
+        ? searchBox("qCamp","tCamp","Search campaigns by name or ID…","campaign(s)")+
+          `<table id="tCamp"><thead><tr>
+            <th class="sortable" onclick="sortBy('tCamp',0)">Name</th>
+            <th class="sortable" onclick="sortBy('tCamp',1)">Objective</th>
+            <th>Budget</th><th>Status</th></tr></thead><tbody>`+
+          d.campaigns.map(c=>`<tr class="pick" onclick="pickCamp('${c.id}','${esc(c.name).replace(/'/g,"")}')">
+            <td>${esc(c.name)}<div class="mono">${c.id}</div></td><td>${esc(c.objective||"")}</td>
+            <td>${c.budget_mode}</td>
+            <td><span class="tag ${/ACTIVE/.test(c.effective_status)?"ok":"warn"}">${esc(c.effective_status||c.status)}</span></td>
+          </tr>`).join("")+`</tbody></table>`
+        : "<p class='sub'>No campaigns in this account yet.</p>");
+    if(d.campaigns.length) filterRows("qCamp","tCamp");
   }catch(e){ err(e.message); }
 }
 async function pickCamp(id,name,replay){
@@ -394,42 +425,137 @@ async function pickCamp(id,name,replay){
   $("pane").innerHTML=crumb()+"<p class='spin'>Loading ad sets…</p>";
   try{
     const d=await api("/api/adsets?campaign="+encodeURIComponent(id));
-    $("pane").innerHTML = crumb(true)+`<h2>${esc(name)}</h2>
-      <p class="sub">${d.adsets.length} ad set(s). Pick one to add ads into it.</p>`+
-      `<table><tr><th>Ad set</th><th>Ads</th><th>Countries</th><th>Budget</th><th>Status</th></tr>`+
+    $("pane").innerHTML = crumb(true)+`<h2>${esc(name)}</h2>`+
+      searchBox("qSet","tSet","Search ad sets by name, ID or country…","ad set(s)")+
+      `<table id="tSet"><thead><tr>
+        <th class="sortable" onclick="sortBy('tSet',0)">Ad set</th>
+        <th class="num sortable" onclick="sortBy('tSet',1,true)">Ads</th>
+        <th>Countries</th><th>Budget</th><th>Status</th></tr></thead><tbody>`+
       d.adsets.map(a=>`<tr class="pick" onclick="pickAdset('${a.id}','${esc(a.name).replace(/'/g,"")}')">
         <td>${esc(a.name)}<div class="mono">${a.id}</div></td>
-        <td>${a.ad_count??"?"}</td><td>${(a.countries||[]).join(", ")}</td>
+        <td class="num" data-v="${a.ad_count||0}">${a.ad_count??"?"}</td>
+        <td>${(a.countries||[]).join(", ")}</td>
         <td>${a.daily_budget||a.lifetime_budget||"campaign-level"}</td>
         <td><span class="tag ${/ACTIVE/.test(a.effective_status)?"ok":"warn"}">${esc(a.effective_status||a.status)}</span></td>
-      </tr>`).join("")+`</table>
+      </tr>`).join("")+`</tbody></table>
       <div class="note"><b>Or add a whole new ad set</b> to this campaign:
       <pre>python3 scripts/add_to_campaign.py --account ${ACCT} \\
     --campaign ${id} --new-adsets-from specs/extra.json --execute</pre></div>`;
   }catch(e){ err(e.message); }
 }
+const COLS=[["spend","Spend"],["results","Results"],["cpa","CPA"],["ctr","CTR %"],
+            ["cpc","CPC"],["clicks","Clicks"],["impressions","Impr."]];
+function myCols(){ try{ return JSON.parse(localStorage.getItem("cols")) ||
+  ["spend","results","cpa","ctr"]; }catch(e){ return ["spend","results","cpa","ctr"]; } }
+function saveCols(){
+  const on=[...document.querySelectorAll(".cols input:checked")].map(x=>x.value);
+  localStorage.setItem("cols",JSON.stringify(on));
+  pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
+}
+function myPreset(){ return localStorage.getItem("preset")||"last_7d"; }
+function setPreset(v){ localStorage.setItem("preset",v); pickAdset(CUR_ADSET,CUR_ADSET_NAME,true); }
+let CUR_ADSET=null, CUR_ADSET_NAME="";
+
 async function pickAdset(id,name,replay){
   if(!replay) return nav("ads",{adset:id,adsetName:name});
-  $("pane").innerHTML=crumb()+"<p class='spin'>Loading ads…</p>";
+  CUR_ADSET=id; CUR_ADSET_NAME=name;
+  $("pane").innerHTML=crumb({camp:1})+"<p class='spin'>Loading ads and performance…</p>";
   try{
-    const d=await api("/api/ads?adset="+encodeURIComponent(id));
-    $("pane").innerHTML = crumb({camp:1})+`<h2>${esc(name)}</h2>
-      <p class="sub">${d.ads.length} ad(s) already in this ad set.</p>`+
-      (d.ads.length?`<table><tr><th>Ad</th><th>Status</th></tr>`+d.ads.map(a=>
-        `<tr><td>${esc(a.name)}<div class="mono">${a.id}</div></td>
-         <td><span class="tag ${/ACTIVE/.test(a.effective_status)?"ok":"warn"}">${esc(a.effective_status)}</span></td></tr>`
-       ).join("")+`</table>`:"")+
-      `<h2 style="margin-top:22px">Add ads here</h2>
-       <p class="sub">Put your new rows in a CSV, or reuse the <b>Ads</b> tab of the workbook.
-         Ads whose name already exists here are skipped automatically, so re-running is safe.</p>
-       <pre>python3 scripts/add_to_campaign.py --account ${ACCT} \\
-    --adset ${id} --ads new-ads.csv
+    const d=await api(`/api/ads?adset=${encodeURIComponent(id)}&preset=${myPreset()}`);
+    const cols=myCols(), C=COLS.filter(c=>cols.includes(c[0]));
+    const fmt=(v,k)=> v==null?"—" : (k==="spend"||k==="cpa"||k==="cpc")?Number(v).toFixed(2)
+                     : (k==="ctr")?Number(v).toFixed(2) : Number(v).toLocaleString();
+    $("pane").innerHTML = crumb({camp:1})+`
+      <h2>${esc(name)}</h2>
+      <p class="sub">${d.ads.length} ad(s). Tick rows to change several at once.</p>
 
-# then, after reading the preview:
-python3 scripts/add_to_campaign.py --account ${ACCT} \\
-    --adset ${id} --ads new-ads.csv --execute</pre>
-       <div class="note">New ads land <b>paused</b>. Adding an ad does not reset the learning
-         phase of the ads already in this ad set.</div>`;
+      <div class="bar">
+        <select class="mini" onchange="setPreset(this.value)">
+          ${[["today","Today"],["yesterday","Yesterday"],["last_7d","Last 7 days"],
+             ["last_14d","Last 14 days"],["last_30d","Last 30 days"],
+             ["maximum","All time"]].map(([v,l])=>
+            `<option value="${v}" ${myPreset()===v?"selected":""}>${l}</option>`).join("")}
+        </select>
+        <span class="sub" style="margin:0">${d.has_stats?"":"no spend in this period"}</span>
+      </div>
+
+      <div class="cols">Columns:
+        ${COLS.map(([k,l])=>`<label><input type="checkbox" value="${k}"
+          ${cols.includes(k)?"checked":""} onchange="saveCols()">${l}</label>`).join("")}
+        <span>(saved on this browser)</span>
+      </div>
+
+      ${searchBox("qAd","tAd","Search ads by name or ID…","ad(s)")}
+      <table id="tAd"><thead><tr>
+        <th style="width:28px"><input type="checkbox" onchange="tickAll(this)"></th>
+        <th class="sortable" onclick="sortBy('tAd',1)">Ad</th>
+        <th>On / off</th>
+        ${C.map((c,n)=>`<th class="num sortable" onclick="sortBy('tAd',${3+n},true)">${c[1]}</th>`).join("")}
+        <th>Status</th><th></th></tr></thead><tbody>`+
+      d.ads.map(a=>{
+        const st=a.stats||{}, live=/ACTIVE/.test(a.effective_status);
+        return `<tr>
+          <td><input type="checkbox" class="pk" value="${a.id}" onchange="refreshBulk()"></td>
+          <td>${esc(a.name)}<div class="mono">${a.id}</div></td>
+          <td><label class="sw"><input type="checkbox" ${a.status==="ACTIVE"?"checked":""}
+                onchange="toggleOne('${a.id}',this)"><span class="sl"></span></label></td>
+          ${C.map(c=>`<td class="num" data-v="${st[c[0]]??-1}">${fmt(st[c[0]],c[0])}</td>`).join("")}
+          <td><span class="tag ${live?"ok":"warn"}">${esc(a.effective_status||a.status)}</span></td>
+          <td><button class="ghost" style="padding:4px 9px;font-size:12px"
+               onclick="renameAd('${a.id}','${esc(a.name).replace(/'/g,"")}')">Rename</button></td>
+        </tr>`;}).join("")+
+      `</tbody></table>
+      <div id="bulk"></div>
+      <div class="note">Switching an ad <b>off</b> takes effect immediately and never costs
+        anything. Switching one <b>on</b> starts spending, so it asks first.
+        <br>CPA and Results use whichever conversion the ad set optimises for
+        (purchase, lead, or link click).</div>`;
+    filterRows("qAd","tAd"); refreshBulk();
+  }catch(e){ err(e.message); }
+}
+
+function tickAll(box){
+  document.querySelectorAll("#tAd tbody tr").forEach(tr=>{
+    if(tr.style.display!=="none") tr.querySelector(".pk").checked=box.checked; });
+  refreshBulk();
+}
+function picked(){ return [...document.querySelectorAll(".pk:checked")].map(x=>x.value); }
+function refreshBulk(){
+  const n=picked().length;
+  $("bulk").innerHTML = n? `<div class="bulk">
+      <b>${n} ad(s) selected</b><span class="sp"></span>
+      <button onclick="bulk('PAUSED')">Turn off</button>
+      <button class="ghost" onclick="bulk('ACTIVE')">Turn on…</button>
+    </div>` : "";
+}
+async function bulk(status){
+  const ids=picked(); if(!ids.length) return;
+  if(status==="ACTIVE" && !confirm(
+      `Turn ON ${ids.length} ad(s)?\n\nThey will start delivering and SPENDING MONEY `+
+      `immediately, using their ad set's budget.\n\nThis is the only action here that costs anything.`))
+    return;
+  $("bulk").innerHTML='<div class="bulk">Applying…</div>';
+  try{
+    const d=await api("/api/status",{method:"POST",body:JSON.stringify(
+      {ids,status,confirm_spend:status==="ACTIVE"})});
+    if(d.failed.length) err(`${d.failed.length} failed: `+d.failed.map(f=>f.error).join("; "));
+    pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
+  }catch(e){ err(e.message); refreshBulk(); }
+}
+async function toggleOne(id,box){
+  const want = box.checked ? "ACTIVE" : "PAUSED";
+  if(want==="ACTIVE" && !confirm(
+      "Turn this ad ON?\n\nIt will start delivering and SPENDING MONEY immediately.")){
+    box.checked=false; return; }
+  try{
+    await api("/api/status",{method:"POST",body:JSON.stringify(
+      {ids:[id],status:want,confirm_spend:want==="ACTIVE"})});
+  }catch(e){ err(e.message); box.checked=!box.checked; }
+}
+async function renameAd(id,current){
+  const name=prompt("New name for this ad:",current); if(!name||name===current) return;
+  try{ await api("/api/rename",{method:"POST",body:JSON.stringify({id,name})});
+       pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
   }catch(e){ err(e.message); }
 }
 
@@ -457,6 +583,38 @@ async function q3(replay){
   }catch(e){ err(e.message); }
 }
 
+
+/* ---------- search / sort helpers ----------
+   Marketing teams run hundreds of accounts and thousands of ads, so every
+   list is filterable and every numeric column is sortable. Filtering is
+   client-side over the already-fetched rows: instant, no extra API calls. */
+function filterRows(inputId, tableId){
+  const q=($(inputId).value||"").toLowerCase().trim();
+  document.querySelectorAll("#"+tableId+" tbody tr").forEach(tr=>{
+    tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? "" : "none";
+  });
+  const shown=[...document.querySelectorAll("#"+tableId+" tbody tr")]
+    .filter(tr=>tr.style.display!=="none").length;
+  const c=$(tableId+"-count"); if(c) c.textContent=shown;
+}
+function searchBox(inputId, tableId, placeholder, countLabel){
+  return `<div class="bar">
+    <input class="search" id="${inputId}" placeholder="${placeholder}"
+           oninput="filterRows('${inputId}','${tableId}')" autocomplete="off">
+    <span class="sub" style="margin:0"><b id="${tableId}-count">0</b> ${countLabel}</span>
+    <span class="sp"></span></div>`;
+}
+let SORT={};
+function sortBy(tableId, idx, numeric){
+  const tb=document.querySelector("#"+tableId+" tbody");
+  const dir = SORT[tableId+idx] = -(SORT[tableId+idx]||1);
+  [...tb.rows].sort((a,b)=>{
+    const x=a.cells[idx]?.dataset.v ?? a.cells[idx]?.textContent ?? "";
+    const y=b.cells[idx]?.dataset.v ?? b.cells[idx]?.textContent ?? "";
+    return numeric ? dir*((parseFloat(x)||0)-(parseFloat(y)||0))
+                   : dir*String(x).localeCompare(String(y));
+  }).forEach(r=>tb.appendChild(r));
+}
 function crumb(extra){
   let h=`<div class="crumb"><a onclick="nav('accounts')">← accounts</a> · `+
         `<a onclick="nav('menu')">${esc(ACCT_NAME)}</a>`;

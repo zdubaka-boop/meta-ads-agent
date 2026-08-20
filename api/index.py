@@ -174,8 +174,38 @@ class handler(BaseHTTPRequestHandler):
             if p.path == "/api/ads":
                 if not self._need_auth():
                     return
-                return self._send(200, {"ads": meta.get_all(f"{one('adset')}/ads",
-                    "id,name,status,effective_status", cap=500)})
+                ads = meta.get_all(f"{one('adset')}/ads",
+                    "id,name,status,effective_status,created_time", cap=500)
+                # Merge performance so buyers can judge what to switch off
+                # without leaving for Ads Manager.
+                preset = one("preset") or "last_7d"
+                stats = {}
+                try:
+                    rows = meta.get_all(f"{one('adset')}/insights",
+                        "ad_id,spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type",
+                        limit=200, cap=1000, level="ad", date_preset=preset)
+                    for r in rows:
+                        acts = {a["action_type"]: float(a["value"]) for a in (r.get("actions") or [])}
+                        cpa_map = {a["action_type"]: float(a["value"])
+                                   for a in (r.get("cost_per_action_type") or [])}
+                        results = (acts.get("purchase") or acts.get("offsite_conversion.fb_pixel_purchase")
+                                   or acts.get("lead") or acts.get("link_click") or 0)
+                        cpa = (cpa_map.get("purchase")
+                               or cpa_map.get("offsite_conversion.fb_pixel_purchase")
+                               or cpa_map.get("lead") or cpa_map.get("link_click"))
+                        stats[r["ad_id"]] = {
+                            "spend": float(r.get("spend") or 0),
+                            "impressions": int(r.get("impressions") or 0),
+                            "clicks": int(r.get("clicks") or 0),
+                            "ctr": round(float(r.get("ctr") or 0), 2),
+                            "cpc": round(float(r.get("cpc") or 0), 2),
+                            "results": results, "cpa": round(cpa, 2) if cpa else None}
+                except Exception:
+                    pass
+                for a in ads:
+                    a["stats"] = stats.get(a["id"])
+                return self._send(200, {"ads": ads, "preset": preset,
+                                        "has_stats": bool(stats)})
 
             return self._send(404, {"error": "no such endpoint"})
         except meta.MetaError as e:
@@ -279,6 +309,41 @@ class handler(BaseHTTPRequestHandler):
                 if not self._need_auth():
                     return
                 return self._workbook(p.path.endswith("create"))
+
+            if p.path == "/api/status":
+                if not self._need_auth():
+                    return
+                b = self._body()
+                ids = [str(i) for i in (b.get("ids") or []) if i]
+                want = (b.get("status") or "").upper()
+                if want not in ("PAUSED", "ACTIVE"):
+                    return self._send(400, {"error": "status must be PAUSED or ACTIVE"})
+                if not ids:
+                    return self._send(400, {"error": "no ads selected"})
+                # Turning ads ON spends real money, so it needs its own explicit
+                # confirmation. Turning them OFF never does and does not.
+                if want == "ACTIVE" and not b.get("confirm_spend"):
+                    return self._send(400, {"error": "Activating ads spends money. "
+                                                     "confirm_spend must be true."})
+                done, failed = [], []
+                for i in ids:
+                    try:
+                        meta.post(i, {"status": want}, "set_status")
+                        done.append(i)
+                    except Exception as e:
+                        failed.append({"id": i, "error": str(e)})
+                return self._send(200, {"ok": not failed, "changed": done,
+                                        "failed": failed, "status": want})
+
+            if p.path == "/api/rename":
+                if not self._need_auth():
+                    return
+                b = self._body()
+                oid, name = str(b.get("id") or ""), (b.get("name") or "").strip()
+                if not oid or not name:
+                    return self._send(400, {"error": "id and name are required"})
+                meta.post(oid, {"name": name}, "rename")
+                return self._send(200, {"ok": True, "id": oid, "name": name})
 
             if p.path == "/api/audit":
                 if not self._need_auth():
