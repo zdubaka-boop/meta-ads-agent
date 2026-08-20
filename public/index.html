@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meta Ads Agent</title>
+<style>
+:root{
+  --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2a323d;
+  --ink:#e6edf3; --dim:#8b98a5; --accent:#4a9eff; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--line);
+  background:var(--panel);position:sticky;top:0;z-index:5}
+header h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.2px}
+header .sp{flex:1}
+.who{font-size:13px;color:var(--dim)}
+main{max-width:1040px;margin:0 auto;padding:26px 22px 80px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px}
+h2{font-size:17px;margin:0 0 4px}
+.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
+label{display:block;font-size:13px;color:var(--dim);margin:0 0 6px}
+input,select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);
+  border-radius:7px;padding:10px 12px;font:inherit;font-size:14px}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+button{background:var(--accent);color:#08121f;border:0;border-radius:7px;padding:10px 16px;
+  font:inherit;font-weight:620;cursor:pointer}
+button:hover{filter:brightness(1.08)} button:disabled{opacity:.45;cursor:default}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.choices{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.choice{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:16px;
+  cursor:pointer;transition:.12s}
+.choice:hover{border-color:var(--accent);transform:translateY(-1px)}
+.choice .n{color:var(--accent);font-weight:700;font-size:12px;letter-spacing:.6px}
+.choice h3{margin:6px 0 4px;font-size:15px}
+.choice p{margin:0;color:var(--dim);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;
+  letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line)}
+tr.pick{cursor:pointer} tr.pick:hover{background:var(--panel2)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--dim)}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;
+  border:1px solid var(--line);color:var(--dim)}
+.tag.ok{color:var(--ok);border-color:#1c3a24}
+.tag.warn{color:var(--warn);border-color:#3d3218}
+.tag.bad{color:var(--bad);border-color:#4a2222}
+.err{background:#2a1618;border:1px solid #4a2222;color:#ffb3ae;padding:11px 14px;border-radius:7px;
+  font-size:13.5px;margin-bottom:14px;white-space:pre-wrap}
+.note{background:#1a2230;border:1px solid #24374f;color:#a9c6e8;padding:11px 14px;border-radius:7px;
+  font-size:13px;margin-top:14px}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:13px;overflow:auto;
+  font-size:12.5px;color:#c9d6e2;margin:10px 0 0}
+.crumb{color:var(--dim);font-size:13px;margin-bottom:14px}
+.crumb a{color:var(--accent);cursor:pointer;text-decoration:none}
+.hide{display:none}
+.spin{color:var(--dim);font-size:13.5px}
+</style></head><body>
+
+<header>
+  <h1>Meta Ads Agent</h1><span class="sp"></span>
+  <span class="who" id="who"></span>
+  <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
+</header>
+
+<main>
+  <div id="err" class="err hide"></div>
+
+  <!-- LOGIN -->
+  <section id="login" class="card hide">
+    <h2>Sign in</h2>
+    <p class="sub" id="loginSub"></p>
+    <div id="tokenBox">
+      <label for="tok">Your Meta access token</label>
+      <input id="tok" type="password" placeholder="EAA…" autocomplete="off" spellcheck="false">
+      <div class="note">Your token stays in this server's memory for your session only. It is
+        never written to disk. Getting one takes ~5 min — see the repo README, section 2.</div>
+    </div>
+    <div id="codeBox" class="hide">
+      <label for="code">Access code</label>
+      <input id="code" type="password" placeholder="access code" autocomplete="off">
+    </div>
+    <div class="row" style="margin-top:14px"><button onclick="login()">Sign in</button></div>
+  </section>
+
+  <!-- ACCOUNT -->
+  <section id="acct" class="card hide">
+    <h2>Choose an ad account</h2>
+    <p class="sub">Everything after this is scoped to the account you pick.</p>
+    <div id="acctList" class="spin">Loading…</div>
+  </section>
+
+  <!-- THREE QUESTIONS -->
+  <section id="menu" class="card hide">
+    <div class="crumb"><a onclick="toAccounts()">← accounts</a> · <b id="acctName"></b></div>
+    <h2>What do you want to do?</h2>
+    <p class="sub">Nothing is ever created live. Everything lands paused.</p>
+    <div class="choices">
+      <div class="choice" onclick="q1()">
+        <div class="n">1</div><h3>Create a NEW campaign</h3>
+        <p>Build a campaign, ad sets and ads from the Excel template.</p></div>
+      <div class="choice" onclick="q2()">
+        <div class="n">2</div><h3>Add to an EXISTING campaign</h3>
+        <p>New ads into an ad set, or a new ad set into a campaign.</p></div>
+      <div class="choice" onclick="q3()">
+        <div class="n">3</div><h3>Audit an account</h3>
+        <p>Which live ads still have creative enhancements switched on.</p></div>
+    </div>
+  </section>
+
+  <!-- PANE -->
+  <section id="pane" class="card hide"></section>
+</main>
+
+<script>
+let MODE="own_token", ACCT=null, ACCT_NAME="", CAMP=null, CAMP_NAME="";
+const $=id=>document.getElementById(id);
+const show=(...ids)=>["login","acct","menu","pane"].forEach(i=>$(i).classList.toggle("hide",!ids.includes(i)));
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function err(m){ $("err").textContent=m; $("err").classList.remove("hide"); }
+function clearErr(){ $("err").classList.add("hide"); }
+
+async function api(path,opts){
+  const r=await fetch(path,Object.assign({headers:{"Content-Type":"application/json"}},opts||{}));
+  const d=await r.json().catch(()=>({error:"bad response from server"}));
+  if(!r.ok) throw new Error(d.error||("HTTP "+r.status));
+  return d;
+}
+
+async function boot(){
+  const s=await api("/api/session"); MODE=s.mode;
+  $("loginSub").textContent = MODE==="access_code"
+    ? "Enter the access code your team lead gave you."
+    : "Paste your own Meta access token. It is not stored on disk.";
+  $("tokenBox").classList.toggle("hide", MODE==="access_code");
+  $("codeBox").classList.toggle("hide", MODE!=="access_code");
+  if(s.signed_in){ $("who").textContent=s.who||""; $("out").classList.remove("hide"); toAccounts(); }
+  else show("login");
+}
+
+async function login(){
+  clearErr();
+  const body = MODE==="access_code" ? {code:$("code").value} : {token:$("tok").value};
+  try{
+    const d=await api("/api/login",{method:"POST",body:JSON.stringify(body)});
+    $("tok").value=""; $("code").value="";
+    $("who").textContent=d.who||""; $("out").classList.remove("hide");
+    toAccounts();
+  }catch(e){ err(e.message); }
+}
+async function logout(){ await api("/api/logout",{method:"POST"});
+  $("who").textContent=""; $("out").classList.add("hide"); ACCT=null; show("login"); }
+
+async function toAccounts(){
+  clearErr(); show("acct"); $("acctList").textContent="Loading…";
+  try{
+    const d=await api("/api/accounts");
+    $("acctList").innerHTML = "<table><tr><th>Account</th><th>ID</th><th>Business</th>"+
+      "<th>Currency</th><th></th></tr>"+ d.accounts.map(a=>
+      `<tr class="pick" onclick="pickAcct('${a.id}','${esc(a.name).replace(/'/g,"")}')">
+        <td>${esc(a.name)}</td><td class="mono">${a.id}</td><td>${esc(a.business)}</td>
+        <td>${esc(a.currency)}</td>
+        <td><span class="tag ${a.status==="ACTIVE"?"ok":"warn"}">${a.status}</span></td></tr>`).join("")
+      +"</table>";
+  }catch(e){ err(e.message); $("acctList").textContent=""; }
+}
+function pickAcct(id,name){ ACCT=id; ACCT_NAME=name; $("acctName").textContent=name+" ("+id+")"; show("menu"); }
+
+/* ---------- 1: create new ---------- */
+function q1(){
+  show("pane");
+  $("pane").innerHTML = crumb()+`
+   <h2>Create a new campaign</h2>
+   <p class="sub">Building writes to your ad account, so it runs from the CLI where the
+     dry-run preview and your approval happen in one place.</p>
+   <ol style="color:var(--dim);font-size:14px;line-height:1.9">
+     <li>Fill in <b>spec/CAMPAIGN-TEMPLATE.xlsx</b> — Campaign, Ad Sets and Ads tabs.</li>
+     <li>Drop your images and videos into <b>creatives/</b>.</li>
+     <li>Run the three commands below. Nothing is created until the last one.</li>
+   </ol>
+   <pre>python3 scripts/xlsx_to_spec.py my-campaign.xlsx --out specs/mine.json
+python3 scripts/build_campaign.py --spec specs/mine.json            # preview only
+python3 scripts/build_campaign.py --spec specs/mine.json --execute  # creates, PAUSED
+python3 scripts/verify.py --state outputs/mine-state.json --spec specs/mine.json</pre>
+   <div class="note">Everything is created <b>paused</b>. A campaign name must be unique —
+     if it already exists, use option 2 instead of renaming.</div>`;
+}
+
+/* ---------- 2: add to existing ---------- */
+async function q2(){
+  show("pane"); $("pane").innerHTML=crumb()+"<h2>Add to an existing campaign</h2><p class='spin'>Loading campaigns…</p>";
+  try{
+    const d=await api("/api/campaigns?account="+encodeURIComponent(ACCT));
+    $("pane").innerHTML = crumb()+`<h2>Which campaign?</h2>
+      <p class="sub">${d.campaigns.length} campaign(s), newest first.</p>`+
+      (d.campaigns.length? `<table><tr><th>Name</th><th>Objective</th><th>Budget</th><th>Status</th></tr>`+
+      d.campaigns.map(c=>`<tr class="pick" onclick="pickCamp('${c.id}','${esc(c.name).replace(/'/g,"")}')">
+        <td>${esc(c.name)}<div class="mono">${c.id}</div></td><td>${esc(c.objective||"")}</td>
+        <td>${c.budget_mode}</td>
+        <td><span class="tag ${/ACTIVE/.test(c.effective_status)?"ok":"warn"}">${esc(c.effective_status||c.status)}</span></td>
+      </tr>`).join("")+`</table>` : "<p class='sub'>No campaigns in this account yet.</p>");
+  }catch(e){ err(e.message); }
+}
+async function pickCamp(id,name){
+  CAMP=id; CAMP_NAME=name;
+  $("pane").innerHTML=crumb()+"<p class='spin'>Loading ad sets…</p>";
+  try{
+    const d=await api("/api/adsets?campaign="+encodeURIComponent(id));
+    $("pane").innerHTML = crumb()+`<h2>${esc(name)}</h2>
+      <p class="sub">${d.adsets.length} ad set(s). Pick one to add ads into it.</p>`+
+      `<table><tr><th>Ad set</th><th>Ads</th><th>Countries</th><th>Budget</th><th>Status</th></tr>`+
+      d.adsets.map(a=>`<tr class="pick" onclick="pickAdset('${a.id}','${esc(a.name).replace(/'/g,"")}')">
+        <td>${esc(a.name)}<div class="mono">${a.id}</div></td>
+        <td>${a.ad_count??"?"}</td><td>${(a.countries||[]).join(", ")}</td>
+        <td>${a.daily_budget||a.lifetime_budget||"campaign-level"}</td>
+        <td><span class="tag ${/ACTIVE/.test(a.effective_status)?"ok":"warn"}">${esc(a.effective_status||a.status)}</span></td>
+      </tr>`).join("")+`</table>
+      <div class="note"><b>Or add a whole new ad set</b> to this campaign:
+      <pre>python3 scripts/add_to_campaign.py --account ${ACCT} \\
+    --campaign ${id} --new-adsets-from specs/extra.json --execute</pre></div>`;
+  }catch(e){ err(e.message); }
+}
+async function pickAdset(id,name){
+  $("pane").innerHTML=crumb()+"<p class='spin'>Loading ads…</p>";
+  try{
+    const d=await api("/api/ads?adset="+encodeURIComponent(id));
+    $("pane").innerHTML = crumb()+`<h2>${esc(name)}</h2>
+      <p class="sub">${d.ads.length} ad(s) already in this ad set.</p>`+
+      (d.ads.length?`<table><tr><th>Ad</th><th>Status</th></tr>`+d.ads.map(a=>
+        `<tr><td>${esc(a.name)}<div class="mono">${a.id}</div></td>
+         <td><span class="tag ${/ACTIVE/.test(a.effective_status)?"ok":"warn"}">${esc(a.effective_status)}</span></td></tr>`
+       ).join("")+`</table>`:"")+
+      `<h2 style="margin-top:22px">Add ads here</h2>
+       <p class="sub">Put your new rows in a CSV, or reuse the <b>Ads</b> tab of the workbook.
+         Ads whose name already exists here are skipped automatically, so re-running is safe.</p>
+       <pre>python3 scripts/add_to_campaign.py --account ${ACCT} \\
+    --adset ${id} --ads new-ads.csv
+
+# then, after reading the preview:
+python3 scripts/add_to_campaign.py --account ${ACCT} \\
+    --adset ${id} --ads new-ads.csv --execute</pre>
+       <div class="note">New ads land <b>paused</b>. Adding an ad does not reset the learning
+         phase of the ads already in this ad set.</div>`;
+  }catch(e){ err(e.message); }
+}
+
+/* ---------- 3: audit ---------- */
+async function q3(){
+  show("pane"); $("pane").innerHTML=crumb()+"<h2>Audit</h2><p class='spin'>Scanning every ad in the account…</p>";
+  try{
+    const d=await api("/api/audit",{method:"POST",body:JSON.stringify({account:ACCT})});
+    const bad=d.ads.filter(a=>a.on.length);
+    $("pane").innerHTML = crumb()+`<h2>Enhancement audit</h2>
+      <p class="sub">${d.flagged} of ${d.total} ad(s) have at least one creative enhancement switched on.</p>`+
+      (bad.length?`<table><tr><th>Ad</th><th>Campaign</th><th>Status</th><th>Enhancements ON</th></tr>`+
+        bad.map(a=>`<tr><td>${esc(a.name)}<div class="mono">${a.id}</div></td>
+          <td>${esc(a.campaign)}<div class="mono">${esc(a.adset)}</div></td>
+          <td><span class="tag ${/ACTIVE/.test(a.status)?"ok":"warn"}">${esc(a.status)}</span></td>
+          <td><span class="tag bad">${a.on.length}</span> <span class="mono">${esc(a.on.join(", "))}</span></td>
+        </tr>`).join("")+`</table>`
+       :`<p class="sub">Nothing flagged. Every ad has enhancements off.</p>`)+
+      `<div class="note">This report changes nothing. Switching enhancements off on a <b>live</b>
+        ad means a new creative, which restarts review, resets the learning phase and loses
+        likes and comments — a per-ad decision, not a bulk fix.<br><br>
+        <b>Not included:</b> multi-advertiser ads. Meta does not return that setting through the
+        API, so it cannot be audited. Check it in Ads Manager.</div>`;
+  }catch(e){ err(e.message); }
+}
+
+function crumb(){ return `<div class="crumb"><a onclick="toAccounts()">← accounts</a> ·
+  <a onclick="show('menu')">${esc(ACCT_NAME)}</a></div>`; }
+boot().catch(e=>err(e.message));
+</script></body></html>
