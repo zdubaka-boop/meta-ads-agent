@@ -53,7 +53,7 @@ class handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-    def _send(self, code, payload, ctype="application/json", cookie=None):
+    def _send(self, code, payload, ctype="application/json", cookie=None, no_cache=False):
         body = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
         self.send_response(code)
         self.send_header("Content-Type", ctype)
@@ -61,6 +61,9 @@ class handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Frame-Options", "DENY")
+        if no_cache:
+            self.send_header("Cache-Control", "no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
         if cookie:
             self.send_header("Set-Cookie", cookie)
         self.end_headers()
@@ -97,8 +100,11 @@ class handler(BaseHTTPRequestHandler):
         p = urlparse(self.path)
         try:
             if p.path in ("/", "/index.html"):
+                # The app shell changes on every deploy, and a cached copy makes
+                # people think a fix never shipped. Never cache it.
                 return self._send(200, (PUBLIC / "index.html").read_bytes(),
-                                  "text/html; charset=utf-8")
+                                  "text/html; charset=utf-8",
+                                  no_cache=True)
             if p.path in ("/api/template", "/CAMPAIGN-TEMPLATE.xlsx"):
                 # Read BEFORE sending any header: a read failure after the
                 # status line is written kills the whole invocation.
