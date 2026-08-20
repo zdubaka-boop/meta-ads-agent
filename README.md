@@ -186,7 +186,34 @@ spec with you, and will stop for your approval before step 2.
 
 ---
 
-## 4. Repo layout
+## 4. Web UI
+
+For people who would rather click than type:
+
+```bash
+python3 web/server.py          # http://localhost:8770
+```
+
+Sign in, pick an ad account, then the same three questions: create a new
+campaign, add to an existing one, or audit. Browsing and auditing happen right
+in the browser; creating still runs from the CLI so the dry-run preview and
+your approval stay in one place.
+
+**Two auth modes**, set with `META_WEB_MODE`:
+
+| Mode | How it works | Trade-off |
+|---|---|---|
+| `own_token` (default) | Each person pastes their own Meta token. Held in server memory for that session, never written to disk. | Meta's audit log attributes every change to the real person. |
+| `access_code` | One shared token from `.env`, unlocked with `META_WEB_ACCESS_CODE`. | Convenient, but every action is attributed to the token owner, and one leaked code exposes every ad account that token reaches. |
+
+```bash
+META_WEB_MODE=access_code META_WEB_ACCESS_CODE=<code> python3 web/server.py
+```
+
+It binds to `127.0.0.1` only. Putting it on a shared host means adding TLS and
+real logins first — see the security note in `web/server.py`.
+
+## 5. Repo layout
 
 | Path | What it is |
 |---|---|
@@ -199,13 +226,14 @@ spec with you, and will stop for your approval before step 2.
 | `scripts/add_to_campaign.py` | Add ads / ad sets to a campaign that already exists. |
 | `scripts/` | `discover` · `xlsx_to_spec` · `build_campaign` · `verify` · `audit_enhancements` |
 | `scripts/lib/meta.py` | The API layer. Safety rules are enforced here, in code. |
+| `web/` | Browser UI: `server.py` (stdlib only) + `index.html`. |
 | `adapters/` | Map **your team's existing** ad sheets into the spec format. |
 | `reference/` | Meta Marketing API cheat sheet + hard-won gotchas. |
 | `outputs/` | Run state, IDs, audit CSVs. Gitignored — never committed. |
 
 ---
 
-## 5. What this repo will not do
+## 6. What this repo will not do
 
 - Create anything in an active state
 - Un-pause, launch, or increase spend
