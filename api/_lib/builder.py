@@ -320,6 +320,7 @@ def build(spec, creatives, log):
 
     media = {}
     for a in spec["adsets"]:
+      try:
         aid = meta.create_adset(acct, cid, a["name"], a["targeting"],
                                 budget_minor=a.get("daily_budget_minor"),
                                 optimization_goal=a.get("optimization_goal", "LINK_CLICKS"),
@@ -328,6 +329,14 @@ def build(spec, creatives, log):
                                 dsa_beneficiary=a.get("dsa_beneficiary") or d.get("dsa_beneficiary"),
                                 dsa_payor=a.get("dsa_payor") or d.get("dsa_payor"),
                                 start_time=a.get("start_time"), end_time=a.get("end_time"))
+      except Exception as e:
+        msg = str(e)
+        if "Taiwan" in msg:
+            msg = (f"Ad set '{a['name']}': Meta requires a Taiwan Universal Ads Declaration "
+                   f"before anyone can target worldwide. Either list the countries you want "
+                   f"explicitly, or put TW in excluded_countries.")
+        raise PartialBuild(msg, result)
+      else:
         result["adsets"].append({"id": aid, "name": a["name"]})
         log(f"  ad set {aid}  {a['name']}")
 
