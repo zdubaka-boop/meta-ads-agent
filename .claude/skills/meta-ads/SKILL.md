@@ -1,0 +1,146 @@
+---
+name: meta-ads
+description: >-
+  Run Meta ad work end to end in chat — check the token, pick an ad account,
+  create a campaign from a filled template, or add ads and ad sets to a campaign
+  that already exists without rebuilding it. Also turns a chat dump of copy, ad
+  set names, links and creative filenames into a populated campaign workbook.
+  Use for anything involving Meta / Facebook / Instagram ads in this repo:
+  launching, adding ads, adding ad sets, auditing, pausing, or filling in the
+  template. Everything is created PAUSED.
+---
+
+# Meta ads, run from chat
+
+The people using this are media buyers, not engineers. They will never open a
+terminal or read a script. You run everything; they answer questions.
+
+## THE OPENING MOVE — every new conversation
+
+Do not ask "how can I help". Diagnose, then present one short checklist.
+
+```bash
+python3 scripts/preflight.py
+```
+
+**No token → walk them through it.** preflight prints a complete 7-step
+walkthrough. Relay it in your own words, in their language, calling out the two
+steps people miss: the **Privacy Policy URL** in App settings → Basic, and
+ticking **all five** permissions. Then stop. `setup.sh` prompts silently in
+their terminal, so you cannot run it for them — tell them to run it and say
+"done", then rerun preflight yourself.
+
+**Token present → list their ad accounts and ask which one.** Never make them
+type an ID; show the list and let them point at a row.
+
+Then ask exactly this:
+
+```
+  1  Create a NEW campaign
+  2  Add to a campaign that already exists
+  3  See what's running / audit
+```
+
+## 1 — Create a new campaign
+
+They give you a filled-in template (they will drag the .xlsx into the chat, or
+give you a path). Then:
+
+```bash
+python3 scripts/xlsx_to_spec.py <file>.xlsx --out specs/<name>.json
+python3 scripts/build_campaign.py --spec specs/<name>.json              # preview
+python3 scripts/build_campaign.py --spec specs/<name>.json --execute    # creates, PAUSED
+python3 scripts/verify.py --state outputs/<name>-state.json --spec specs/<name>.json
+```
+
+Show them the preview in plain language — campaign name, budget, how many ad
+sets and ads, which countries — and **wait for a yes** before `--execute`.
+Afterwards show the verify diff and every ID.
+
+If a creative file is missing, say which filenames you need and stop. Do not
+substitute anything.
+
+## 2 — Add to a campaign that already exists
+
+**Never rebuild the campaign.** Rebuilding restarts the learning phase on
+everything that is already delivering. Create only what is new.
+
+List the campaigns and ask which one:
+
+```bash
+python3 scripts/add_to_campaign.py --account act_<id> --list
+python3 scripts/add_to_campaign.py --account act_<id> --campaign <id> --list
+```
+
+Then ask what they want:
+
+**(a) Add ads to one of these ad sets** — the common case.
+
+```bash
+python3 scripts/add_to_campaign.py --account act_<id> --adset <id> --ads new.csv
+python3 scripts/add_to_campaign.py --account act_<id> --adset <id> --ads new.csv --execute
+```
+
+They usually will not have a CSV. That is fine — collect the details in chat
+(images, copy, headline, link) and write the CSV yourself, then run the above.
+Ads whose name already exists in that ad set are skipped automatically, so a
+re-run is always safe.
+
+**(b) Add a new ad set to the campaign.**
+
+```bash
+python3 scripts/add_to_campaign.py --account act_<id> --campaign <id> \
+    --new-adsets-from specs/extra.json --execute
+```
+
+Build `extra.json` yourself from what they tell you. Read the campaign's
+CBO/ABO mode off the live campaign — a budget on an ad set under a CBO
+campaign is rejected, and a missing one under ABO is rejected. Never guess it.
+
+## 3 — See what's running
+
+```bash
+python3 scripts/discover.py act_<id>
+python3 scripts/audit_enhancements.py act_<id> --csv outputs/audit.csv
+```
+
+Report which ads still have creative enhancements on. Say plainly that turning
+them off on a **live** ad means a new creative, which restarts review, resets
+learning and loses social proof — a per-ad decision, not a bulk fix.
+
+## Filling the template from a chat dump
+
+Someone will paste a pile of copy, ad set names, links and creative filenames.
+Turn it into JSON and run:
+
+```bash
+python3 scripts/fill_template.py brief.json --out ~/Desktop/CAMPAIGN.xlsx
+```
+
+The JSON shape is documented at the top of that script. Then send them the file.
+
+**Ask about anything missing rather than filling it in.** Budget, Page, pixel,
+destination URL and ad account are never inferred — a plausible guess is a real
+mistake in a real account. Leave a field blank and say what is still needed
+rather than inventing it.
+
+## Rules that do not bend
+
+- **Everything is created PAUSED.** There is no path that creates a live ad.
+  "Upload these" is never permission to launch.
+- **Never infer a budget, ad account, Page, Instagram account, pixel,
+  conversion event, audience or destination URL.** Missing means ask.
+- **Show the full config and wait for a yes before any write.**
+- **Verify by read-back.** Never say a setting was applied unless the object you
+  fetched from Meta says so. Where Meta returns nothing — notably
+  `contextual_multi_ads` — say it is unverifiable rather than claiming success.
+- **Report every ID** created: campaign, ad set, creative, ad.
+- **On failure, report the exact operation and the IDs already created.** State
+  files prevent duplicates on a retry; use them rather than starting over.
+- **Never ask for a token in chat.** It goes in `.env` via `scripts/setup.sh`.
+
+## How to talk to them
+
+Short. Concrete. Name the campaign, the count, the money. No jargon they did not
+use first. When something is not possible, say so in one sentence and give the
+nearest thing that is.

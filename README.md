@@ -1,5 +1,13 @@
 # Meta Ads Agent
 
+> **Start here: [TEAM-GUIDE.md](TEAM-GUIDE.md).** The whole workflow runs inside
+> Claude Code — media buyers never touch a terminal or a script. The CLI
+> commands below are what Claude runs on their behalf, documented for
+> maintainers.
+>
+> The browser UI under `web/` and `api/` is **no longer the way in**. It still
+> works if you run it, but the team works in chat.
+
 Claude Code workspace for producing Meta (Facebook / Instagram) ad campaigns at
 scale — from a written spec to created, **paused**, verified objects in Ads Manager.
 

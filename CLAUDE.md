@@ -4,101 +4,14 @@ You produce Meta ad campaigns from written specs. These rules are not advisory.
 
 ## FIRST MESSAGE PROTOCOL — do this before anything else
 
-When the user first asks you to start work in this repo — including vague
-openers like "let's start", "go", or "help me upload ads" — do **not** ask them
-what they want yet, and do **not** hand them setup homework. Diagnose first,
-then report.
+**Everyone using this repo works entirely through chat.** They are media buyers,
+not engineers: they will not open a terminal, read a script, or edit a file.
+You run every command; they answer questions.
 
-**Run the preflight.** It is read-only and safe to run unprompted:
-
-```bash
-python3 scripts/preflight.py
-```
-
-Then present **one checklist**, in this shape:
-
-```
-  Token + permissions       from preflight
-  Ad accounts reachable     N — list them
-  Workspace ready           template / creatives / specs
-```
-
-Always **list the ad accounts** when they are reachable. That is the single
-most useful thing a new user can see, and it proves the connection end to end.
-
-### Then ask THE THREE QUESTIONS — always these, always in this order
-
-Never ask an open "what would you like to do?". Offer exactly these:
-
-```
-  1  Create a NEW campaign
-  2  Add to an EXISTING campaign      (new ads, or a new ad set)
-  3  Audit an account                 (read-only, changes nothing)
-```
-
-**If they pick 1** — the spec pipeline. Excel template -> `xlsx_to_spec.py` ->
-`build_campaign.py` dry run -> approval -> `--execute` -> `verify.py`.
-
-**If they pick 2** — walk them down the tree, one question at a time. Never make
-them hunt for an ID; show the list and let them point at a row.
-
-```bash
-python3 scripts/add_to_campaign.py --account act_<id> --list
-```
-Show the campaigns. Ask **which campaign**.
-
-```bash
-python3 scripts/add_to_campaign.py --account act_<id> --campaign <id> --list
-```
-Show the ad sets, with how many ads each already has. Then ask **which of
-these**:
-
-```
-  a  Add ads into one of these ad sets
-  b  Add a NEW ad set (with its ads) to this campaign
-```
-
-For (a): ask which ad set, take a CSV or the Ads tab of a workbook, and run
-`--adset <id> --ads <file>` as a dry run first. Ads whose name already exists in
-that ad set are skipped automatically, so re-running is always safe.
-
-For (b): build an adsets[] spec, then `--campaign <id> --new-adsets-from <spec>`.
-The script reads whether the campaign is CBO or ABO and rejects a mismatched
-budget rather than guessing.
-
-**If they pick 3** — `discover.py` then `audit_enhancements.py`. Read-only.
-
-### Never block on a name clash
-
-`build_campaign.py` refuses to create a campaign whose name already exists —
-that guard stays, it is what stops duplicate campaigns. But it is NOT a dead
-end. When it fires, do not tell the user to rename. Tell them the campaign
-already exists and offer route 2: add ads to it, or add a new ad set to it.
-
-### If the preflight is BLOCKED
-
-The token is **mandatory** for every script in this repo — there is no
-token-free path to the bulk pipeline, verification, or the audit. So treat a
-missing token as the whole job right now, and walk the user through it.
-
-`preflight.py` prints a complete 7-step tutorial when the token is what's
-missing. **Relay it as a walkthrough, not a link.** Give the steps inline,
-in the user's language, and call out the two that actually trip people:
-
-* the **Privacy Policy URL** in App settings → Basic (Meta grants no ads
-  permissions without one), and
-* ticking **all five** permissions, not four.
-
-Then stop and wait. `setup.sh` prompts silently in *their* terminal, so you
-cannot run it for them — and must not offer to, since the point is that the
-token never enters the chat. Tell them to say the word when it's done, and
-rerun the preflight yourself rather than making them run it again.
-
-Stay with them: if `setup.sh` reports 0 ad accounts, or a scope is missing,
-diagnose it from the preflight output rather than sending them back to the
-README.
-
-
+Load the **`meta-ads`** skill and follow it. In short: run
+`python3 scripts/preflight.py` unprompted, present one checklist, list their ad
+accounts, then offer exactly three choices — create a new campaign, add to one
+that already exists, or see what is running. Never open with "how can I help".
 
 ## What this repo can and cannot do
 
