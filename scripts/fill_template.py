@@ -52,6 +52,36 @@ AD_COLS = {"adset": 1, "name": 2, "creative": 3, "body": 4, "headline": 5,
            "url_tags": 10, "page_id": 11, "instagram_user_id": 12}
 
 
+def _openpyxl():
+    """Import openpyxl, installing it on first use.
+
+    Writing .xlsx needs it, and a media buyer should not have to debug a pip
+    error. Every other script in this repo stays standard-library only.
+    """
+    try:
+        from openpyxl import load_workbook
+        from openpyxl.styles import Font
+        return load_workbook, Font
+    except ImportError:
+        pass
+    import subprocess
+    print("Installing openpyxl (needed once, to write .xlsx files)…")
+    for extra in ([], ["--user"], ["--break-system-packages"],
+                  ["--user", "--break-system-packages"]):
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", "--quiet",
+                            "openpyxl"] + extra, check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            from openpyxl import load_workbook
+            from openpyxl.styles import Font
+            print("  installed.")
+            return load_workbook, Font
+        except Exception:
+            continue
+    sys.exit("Could not install openpyxl automatically. Run this once:\n"
+             f"  {sys.executable} -m pip install --user openpyxl")
+
+
 def joined(v):
     """Lists become the sheet's own separators: | for text, comma for codes."""
     if v is None or v == "":
@@ -71,11 +101,7 @@ def main():
     ap.add_argument("--template", default=str(ROOT / "spec" / "CAMPAIGN-TEMPLATE.xlsx"))
     args = ap.parse_args()
 
-    try:
-        from openpyxl import load_workbook
-        from openpyxl.styles import Font
-    except ImportError:
-        sys.exit("openpyxl is needed to write the workbook:  pip3 install openpyxl")
+    load_workbook, Font = _openpyxl()
 
     brief = json.loads(Path(args.brief).read_text())
     wb = load_workbook(args.template)
