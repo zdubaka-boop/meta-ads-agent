@@ -69,7 +69,8 @@ def main():
             adid = state["ads"].get(ad["name"])
             if not adid:
                 print(f"{FAIL}  ad '{ad['name']}' missing from state"); rows.append(False); continue
-            ga = meta.get(adid, "name,status,adset_id,creative{id,degrees_of_freedom_spec,object_story_spec}")
+            ga = meta.get(adid, "name,status,adset_id,creative{id,degrees_of_freedom_spec,"
+                                "object_story_spec,asset_feed_spec}")
             cr = ga.get("creative", {})
             oss = cr.get("object_story_spec", {})
             data = oss.get("link_data") or oss.get("video_data") or {}
@@ -80,6 +81,36 @@ def main():
             want_link = (ad.get("link") or d.get("link") or "").rstrip("/")
             got_link = (data.get("link") or (data.get("call_to_action", {}).get("value", {}) or {}).get("link") or "").rstrip("/")
             check("  ad.link", want_link, got_link)
+
+            # --- content checks, independent of the spec ---------------------
+            # A spec that was parsed wrongly still "matches" whatever it built,
+            # so these assert things that are true of a correct ad regardless
+            # of what the spec says. This is what catches a parsing bug.
+            feed = cr.get("asset_feed_spec") or {}
+            stored_bodies = [b.get("text", "") for b in feed.get("bodies", [])] or \
+                            ([data.get("message")] if data.get("message") else [])
+            stored_titles = [t.get("text", "") for t in feed.get("titles", [])] or \
+                            ([data.get("name") or data.get("title")]
+                             if (data.get("name") or data.get("title")) else [])
+
+            # 1. A pipe surviving into live ad copy means the variant split
+            #    never happened — the reader stored "A | B | C" as one string.
+            leaked = [t for t in stored_bodies + stored_titles if t and "|" in t]
+            rows.append(not leaked)
+            if leaked:
+                print(f"{FAIL}    copy contains a literal '|' — variants were NOT split:")
+                for t in leaked[:3]:
+                    print(f"           {t[:78]}")
+            else:
+                print(f"{PASS}    no unsplit '|' in the stored copy")
+
+            # 2. Variant counts must match what the sheet asked for.
+            want_b = len(ad.get("bodies") or ([ad["body"]] if ad.get("body") else []))
+            want_t = len(ad.get("headlines") or ([ad["headline"]] if ad.get("headline") else []))
+            ok_counts = (len(stored_bodies) == want_b and len(stored_titles) == want_t)
+            rows.append(ok_counts)
+            print(f"{PASS if ok_counts else FAIL}    variants  "
+                  f"bodies {len(stored_bodies)}/{want_b}  headlines {len(stored_titles)}/{want_t}")
 
             cfs = (cr.get("degrees_of_freedom_spec") or {}).get("creative_features_spec", {}) or {}
             optin = [k for k, v in cfs.items() if v.get("enroll_status") == "OPT_IN"]

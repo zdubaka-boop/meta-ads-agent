@@ -181,6 +181,40 @@ destination URL and ad account are never inferred — a plausible guess is a rea
 mistake in a real account. Leave a field blank and say what is still needed
 rather than inventing it.
 
+## Verify properly, and fix what you find
+
+`verify.py` is not optional and passing it is not the same as being correct.
+It now checks two things that are true of a correct ad **regardless of what
+the spec says**, because a spec parsed wrongly still matches whatever it built:
+
+- **no literal `|` in the stored copy** — a pipe surviving into live ad text
+  means the variant split never happened,
+- **variant counts match** what the sheet asked for.
+
+That distinction is not theoretical. A 20-ad campaign once passed 134/134
+checks while every multi-variant ad had shipped with its three primary texts
+concatenated into one string with the pipes visible. Spec equality did not
+catch it; reading an actual ad back did.
+
+So after any build, on top of `verify.py`, **fetch one real ad and look at it**:
+
+```bash
+python3 scripts/verify.py --state outputs/<name>-state.json --spec specs/<name>.json
+```
+
+If anything is wrong: **fix the code, delete what was built, and rebuild.** Do
+not hand over a campaign with known-bad ads and a note about it. They are
+PAUSED, so deleting and rebuilding costs nothing.
+
+Before changing anything in the parsing path, and after fixing any bug:
+
+```bash
+python3 scripts/selftest.py     # offline, no API, no cost
+```
+
+Every test in there exists because that exact bug shipped once. Add a new one
+whenever you fix a new one.
+
 ## Rules that do not bend
 
 - **Everything is created PAUSED.** There is no path that creates a live ad.
