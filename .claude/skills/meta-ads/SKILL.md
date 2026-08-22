@@ -43,8 +43,45 @@ Then ask exactly this:
 
 ## 1 — Create a new campaign
 
-They give you a filled-in template (they will drag the .xlsx into the chat, or
-give you a path). Then:
+**Ask this FIRST, before anything else. Do not start interviewing them about
+objectives and budgets — most of the time the answer makes those questions
+unnecessary.**
+
+```
+  How do you want to start?
+
+  a  I already have the filled-in template   → drop it in
+  b  Copy the settings from a campaign that already exists
+  c  From scratch — ask me the questions
+```
+
+**(a) They have a template.** Skip to the build steps below.
+
+**(b) Copy an existing campaign — the fast path, and usually the right one.**
+List the account's campaigns and ask which one is closest to what they want.
+Then:
+
+```bash
+# structure, targeting AND the existing ads (creatives come out as image
+# hashes, so no image files are needed to rebuild it)
+python3 scripts/export_campaign.py <campaign_id> --out ~/Desktop/NEW.xlsx
+
+# or: keep the structure and targeting, drop the ads, because the ads are new
+python3 scripts/export_campaign.py <campaign_id> --out ~/Desktop/NEW.xlsx --settings-only
+```
+
+Ask which of those two they want — "same ads too" or "same setup, new ads".
+Then tell them what came out (how many ad sets, which countries, what budget),
+and ask only what actually changes: the campaign name, and whatever else
+differs. Edit the workbook for them with `fill_template.py` or by editing the
+cells directly — **do not make them open Excel** unless they want to.
+
+**(c) From scratch.** Only now ask the full set: name, objective, budget and
+mode, targeting, destination URL, creatives and copy. Run `discover.py` first
+so you can offer the account's real Pages and pixels instead of asking them to
+find IDs.
+
+### Then, for all three paths
 
 ```bash
 python3 scripts/xlsx_to_spec.py <file>.xlsx --out specs/<name>.json
