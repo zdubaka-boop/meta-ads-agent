@@ -292,9 +292,8 @@ def parse_workbook(xlsx_bytes, creatives):
         an, adn = str(r["adset_name"]).strip(), str(r["ad_name"]).strip()
         if an not in by_name:
             problems.append(f"Ad '{adn}' names ad set '{an}', which is not on the Ad Sets tab"); continue
-        if adn in seen:
-            problems.append(f"Duplicate ad name '{adn}' — ad names must be unique")
-        seen.add(adn)
+        # Uniqueness is checked inside the creative loop below, since one row
+        # can produce several ads.
         creatives_cell = _variants(r.get("creative_file"))
         if not creatives_cell:
             problems.append(f"Ad '{adn}': creative_file is empty")
