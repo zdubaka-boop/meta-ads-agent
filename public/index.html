@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build ONESHEET</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build QUICK</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -617,8 +617,46 @@ async function pickAdset(id,name,replay){
       <div id="bulk"></div>
 
       <h3 style="margin:26px 0 6px;font-size:15px">Add more ads to this ad set</h3>
-      <p class="sub">Drop a CSV (or a workbook — its <b>Ads</b> tab is used) plus the images
-        it names. Ads already here are skipped, so re-dropping the same file is safe.</p>
+      <p class="sub">No spreadsheet needed. Drop images, check the copy, done —
+        one ad per image.</p>
+
+      <div class="card" style="background:var(--panel2);margin:0 0 14px">
+        <div class="drop" id="dzq" style="padding:20px">
+          <h3 style="font-size:15px">Drop the new images here</h3>
+          <p>One ad is created per image. Or click to choose them.</p>
+        </div>
+        <input type="file" id="fiq" multiple class="hide" accept="image/*">
+        <div class="files" id="chipsq"></div>
+
+        <div style="margin-top:14px">
+          <label>Primary text <span class="sub">— several variants? separate with |</span></label>
+          <input id="qBody" placeholder="loading the copy from an existing ad…">
+          <div style="height:8px"></div>
+          <label>Headline <span class="sub">— several variants? separate with |</span></label>
+          <input id="qHead">
+          <div style="height:8px"></div>
+          <div class="row">
+            <div style="flex:2;min-width:220px"><label>Destination link</label>
+              <input id="qLink"></div>
+            <div style="flex:1;min-width:140px"><label>Button</label>
+              <select id="qCta">${["LEARN_MORE","SHOP_NOW","SIGN_UP","SUBSCRIBE","GET_OFFER",
+                 "BUY_NOW","ORDER_NOW","GET_STARTED","DOWNLOAD","APPLY_NOW"]
+                 .map(x=>`<option>${x}</option>`).join("")}</select></div>
+            <div style="flex:1;min-width:140px"><label>Name prefix</label>
+              <input id="qPrefix" value="new"></div>
+          </div>
+          <div class="sub" id="qFrom" style="margin-top:8px"></div>
+          <div class="row" style="margin-top:12px">
+            <button id="goq" disabled onclick="quickPreview()">Check these ads</button>
+          </div>
+          <div id="outq"></div>
+        </div>
+      </div>
+
+      <details><summary class="sub" style="cursor:pointer">Or upload a spreadsheet instead
+        (for bigger batches with different copy per ad)</summary>
+      <p class="sub" style="margin-top:10px">Drop a CSV (or a workbook — its <b>Ads</b> tab is
+        used) plus the images it names. Ads already here are skipped.</p>
       <div class="drop" id="dz2" style="padding:24px">
         <h3 style="font-size:15px">Drop the ad list and images here</h3>
         <p>Columns: ad_name, creative_file, body, headline, description, cta, link</p>
@@ -628,13 +666,73 @@ async function pickAdset(id,name,replay){
       <div class="row" style="margin-top:12px">
         <button id="go2" disabled onclick="addPreview()">Check these ads</button>
       </div>
-      <div id="out2"></div>
+      <div id="out2"></div></details>
       <div class="note">Switching an ad <b>off</b> takes effect immediately and never costs
         anything. Switching one <b>on</b> starts spending, so it asks first.
         <br>CPA and Results use whichever conversion the ad set optimises for
         (purchase, lead, or link click).</div>`;
-    filterRows("qAd","tAd"); refreshBulk(); wireDrop2();
+    filterRows("qAd","tAd"); refreshBulk(); wireDrop2(); wireQuick();
   }catch(e){ err(e.message); }
+}
+
+let FILESQ=[];
+function wireQuick(){
+  const dz=$("dzq"), fi=$("fiq"); if(!dz) return;
+  FILESQ=[];
+  dz.onclick=()=>fi.click();
+  fi.onchange=e=>addQ(e.target.files);
+  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
+  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
+  dz.addEventListener("drop",e=>takeDrop(e,addQ));
+  // Pre-fill the copy from an ad already in this ad set.
+  api("/api/ad-defaults?adset="+encodeURIComponent(CUR_ADSET)).then(d=>{
+    if(d.from_ad){
+      $("qBody").value=d.body||""; $("qHead").value=d.headline||"";
+      $("qLink").value=d.link||""; if(d.cta) $("qCta").value=d.cta;
+      $("qFrom").textContent=`Copy pre-filled from "${d.from_ad}". Edit it or leave as is.`;
+    } else { $("qBody").placeholder="Type the primary text"; }
+  }).catch(()=>{});
+}
+function addQ(list){
+  for(const f of list){ if(/^image\//.test(f.type) && !FILESQ.some(x=>x.name===f.name)) FILESQ.push(f); }
+  $("chipsq").innerHTML=FILESQ.map(f=>`<span class="chip">${esc(f.name)}</span>`).join("");
+  $("goq").disabled = !FILESQ.length;
+}
+function fdq(mode){
+  const fd=new FormData();
+  FILESQ.forEach(f=>fd.append("f",f,f.name));
+  fd.append("adset",CUR_ADSET); fd.append("account",ACCT);
+  fd.append("body",$("qBody").value); fd.append("headline",$("qHead").value);
+  fd.append("link",$("qLink").value); fd.append("cta",$("qCta").value);
+  fd.append("prefix",$("qPrefix").value); if(mode) fd.append("mode",mode);
+  return fd;
+}
+async function quickPreview(){
+  $("goq").disabled=true; $("outq").innerHTML='<p class="spin">Checking…</p>';
+  try{
+    const r=await fetch("/api/quick-add",{method:"POST",body:fdq()});
+    const d=await r.json();
+    if(!r.ok||!d.ok){ $("outq").innerHTML=`<div class="err">${esc(d.error||"failed")}</div>`;
+      $("goq").disabled=false; return; }
+    $("outq").innerHTML=`<div class="note"><b>${d.count} ad(s) will be created, PAUSED:</b><br>
+      ${d.ads.map(esc).join("<br>")}
+      <div class="row" style="margin-top:10px">
+        <button onclick="quickCreate()">Create ${d.count} ad(s)</button></div></div>`;
+  }catch(e){ $("outq").innerHTML=`<div class="err">${esc(e.message)}</div>`; $("goq").disabled=false; }
+}
+async function quickCreate(){
+  $("outq").innerHTML='<p class="spin">Uploading and creating…</p>';
+  try{
+    const r=await fetch("/api/quick-add",{method:"POST",body:fdq("create")});
+    const d=await r.json();
+    if(!d.ok){ $("outq").innerHTML=`<div class="err">`+(d.problems||[d.error]).map(esc).join("\n")+`</div>`; return; }
+    FILESQ=[];
+    alert(`Created ${d.created.length} ad(s), paused.`+
+      (d.skipped.length?`\nSkipped: ${d.skipped.join(", ")}`:""));
+    pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
+  }catch(e){ $("outq").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 
 let FILES3=[];

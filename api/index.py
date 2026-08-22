@@ -310,6 +310,33 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, {"adsets": sets_, "preset": preset,
                                         "has_stats": bool(stats)})
 
+            if p.path == "/api/ad-defaults":
+                # Copy from an ad already in this ad set, so "same copy, new
+                # images" needs no typing at all.
+                if not self._need_auth():
+                    return
+                out = {}
+                for ad in meta.get_all(f"{one('adset')}/ads",
+                        "name,creative{object_story_spec,asset_feed_spec,url_tags}", cap=1):
+                    cr = ad.get("creative") or {}
+                    oss = cr.get("object_story_spec") or {}
+                    ld = oss.get("link_data") or oss.get("video_data") or {}
+                    feed = cr.get("asset_feed_spec") or {}
+                    cta = ld.get("call_to_action") or {}
+                    bodies = [b["text"] for b in feed.get("bodies", [])] or \
+                             ([ld.get("message")] if ld.get("message") else [])
+                    titles = [t["text"] for t in feed.get("titles", [])] or \
+                             ([ld.get("name") or ld.get("title")] if
+                              (ld.get("name") or ld.get("title")) else [])
+                    out = {"body": " | ".join(x for x in bodies if x),
+                           "headline": " | ".join(x for x in titles if x),
+                           "description": ld.get("description") or "",
+                           "cta": cta.get("type") or "LEARN_MORE",
+                           "link": ld.get("link") or (cta.get("value") or {}).get("link") or "",
+                           "url_tags": cr.get("url_tags") or "",
+                           "from_ad": ad.get("name")}
+                return self._send(200, out)
+
             if p.path == "/api/ads":
                 if not self._need_auth():
                     return
@@ -522,6 +549,71 @@ class handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def _quick_add(self):
+        """Add ads to an existing ad set from a form — no spreadsheet.
+
+        The day-to-day job is "these new images, the copy we already use".
+        Making that require a workbook was the wrong shape. One ad per image;
+        everything created PAUSED as usual.
+        """
+        import multipart, builder
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 4_300_000:
+            return self._send(413, {"error": "Upload too large (~4.5MB cap). Reference "
+                                             "creatives already in the account instead."})
+        f, files = multipart.parse(self.rfile.read(n), self.headers.get("Content-Type"))
+        files = unpack_zip(files)
+        adset_id = (f.get("adset") or "").strip()
+        acct = (f.get("account") or "").strip()
+        if not adset_id or not acct:
+            return self._send(400, {"error": "missing ad set or account"})
+
+        page_id = (f.get("page_id") or "").strip()
+        if not page_id:
+            try:
+                pages = meta.get_all(f"{meta.account(acct)}/promote_pages", "id", cap=5)
+                if len(pages) == 1:
+                    page_id = pages[0]["id"]
+            except Exception:
+                pass
+        link = (f.get("link") or "").strip()
+        if not page_id or not link:
+            return self._send(400, {"error": "A destination link and a Page are required — "
+                                             "neither is ever guessed."})
+
+        names = [k for k in files if not k.lower().endswith((".xlsx", ".xlsm", ".csv", ".zip"))]
+        picked = [x.strip() for x in (f.get("existing") or "").split("|") if x.strip()]
+        if not names and not picked:
+            return self._send(400, {"error": "Add at least one image."})
+
+        prefix = (f.get("prefix") or "ad").strip() or "ad"
+        ads = []
+        for i, nm in enumerate(sorted(names) + picked, start=1):
+            ads.append({"name": f"{prefix} {i:02d} {Path(nm).stem}"[:80], "creative": nm,
+                        "body": f.get("body", ""), "headline": f.get("headline", ""),
+                        "description": f.get("description", ""),
+                        "cta": f.get("cta") or "LEARN_MORE", "link": link,
+                        "url_tags": f.get("url_tags", ""), "page_id": page_id})
+        for a in ads:
+            for src, many in (("body", "bodies"), ("headline", "headlines"),
+                              ("description", "descriptions")):
+                v = [x.strip() for x in str(a.get(src) or "").split("|") if x.strip()]
+                if v:
+                    a[src] = v[0]; a[many] = v
+
+        if f.get("mode") != "create":
+            return self._send(200, {"ok": True, "preview": True,
+                                    "ads": [a["name"] for a in ads], "count": len(ads)})
+
+        # Names already in the ad set are skipped by add_ads_to_adset.
+        defaults = {"page_id": page_id, "link": link}
+        log = []
+        try:
+            res = builder.add_ads_to_adset(acct, adset_id, ads, files, defaults, log.append)
+        except Exception as e:
+            return self._send(400, {"ok": False, "problems": [str(e)], "log": log})
+        return self._send(200, {"ok": True, "created": True, **res, "log": log})
 
     def _add_adsets(self, do_create):
         """Add new ad sets into a campaign that already exists.
@@ -739,6 +831,11 @@ class handler(BaseHTTPRequestHandler):
             if p.path == "/api/logout":
                 return self._send(200, {"ok": True},
                                   cookie="ms=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0")
+
+            if p.path == "/api/quick-add":
+                if not self._need_auth():
+                    return
+                return self._quick_add()
 
             if p.path in ("/api/adsets-preview", "/api/adsets-create"):
                 if not self._need_auth():
