@@ -657,6 +657,67 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _duplicate_adset(self):
+        """Copy an existing ad set inside the same campaign, changing only what
+        the user typed.
+
+        Adding an ad set almost always means "the same thing again, different
+        country / audience / budget". Meta can copy the ad set and its ads in
+        one call, so this is a ten-second job with no spreadsheet. The copy is
+        forced PAUSED, and nothing about the original is touched.
+        """
+        b = self._body()
+        src = str(b.get("adset") or "").strip()
+        name = (b.get("name") or "").strip()
+        if not src or not name:
+            return self._send(400, {"error": "ad set and new name are required"})
+
+        info = meta.get(src, "name,campaign_id,daily_budget,targeting")
+        try:
+            new_id = meta.copy_object(src, "adset",
+                                      campaign_id=info.get("campaign_id"),
+                                      deep_copy="true" if b.get("with_ads") else "false",
+                                      rename_strategy="NO_RENAME")
+        except Exception as e:
+            return self._send(400, {"error": f"Meta refused the copy: {e}"})
+        if not new_id:
+            return self._send(400, {"error": "Meta did not return a new ad set id"})
+
+        changed, warn = ["copied from " + (info.get("name") or src)], []
+        params = {"name": name}
+
+        countries = [c.strip().upper() for c in str(b.get("countries") or "").split(",")
+                     if c.strip()]
+        if countries:
+            t = info.get("targeting") or {}
+            geo = dict(t.get("geo_locations") or {})
+            geo.pop("country_groups", None); geo.pop("cities", None); geo.pop("regions", None)
+            geo["countries"] = countries
+            t = dict(t); t["geo_locations"] = geo
+            params["targeting"] = json.dumps(t)
+            changed.append("countries -> " + ", ".join(countries))
+
+        budget = b.get("daily_budget_minor")
+        if budget not in (None, "", 0):
+            try:
+                params["daily_budget"] = str(int(budget))
+                changed.append(f"daily budget -> {int(budget)} (minor units)")
+            except (TypeError, ValueError):
+                warn.append("budget ignored: not a whole number of cents")
+
+        try:
+            meta.post(new_id, params, "update_copy")
+        except Exception as e:
+            return self._send(200, {"ok": True, "id": new_id, "changed": changed,
+                                    "warnings": warn + [f"created, but the edits failed: {e}"]})
+
+        after = meta.get(new_id, "name,status,daily_budget,targeting")
+        return self._send(200, {"ok": True, "id": new_id, "name": after.get("name"),
+                                "status": after.get("status"), "changed": changed,
+                                "warnings": warn,
+                                "countries": ((after.get("targeting") or {})
+                                              .get("geo_locations") or {}).get("countries")})
+
     def _quick_add(self):
         """Add ads to an existing ad set from a form — no spreadsheet.
 
@@ -938,6 +999,11 @@ class handler(BaseHTTPRequestHandler):
             if p.path == "/api/logout":
                 return self._send(200, {"ok": True},
                                   cookie="ms=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0")
+
+            if p.path == "/api/duplicate-adset":
+                if not self._need_auth():
+                    return
+                return self._duplicate_adset()
 
             if p.path == "/api/quick-add":
                 if not self._need_auth():
