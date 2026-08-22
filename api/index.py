@@ -49,6 +49,18 @@ def verify(cookie):
         return None
 
 
+def _geo_label(targeting):
+    """Human label for a targeting block. Worldwide targets carry no
+    'countries' key, so this must not assume one."""
+    geo = (targeting or {}).get("geo_locations", {}) or {}
+    parts = list(geo.get("countries") or [])
+    if geo.get("country_groups"):
+        parts.append("worldwide")
+    if geo.get("cities"):
+        parts.append(f"{len(geo['cities'])} city/cities")
+    return parts or ["—"]
+
+
 def insights_by(edge, level, preset):
     """One insights call for a whole level -> {object_id: stats}."""
     out = {}
@@ -310,7 +322,7 @@ class handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True, "preview": True, "resolved": resolved,
                                     "campaign": spec["campaign"], "counts": counts,
                                     "adsets": [{"name": a["name"],
-                                                "countries": a["targeting"]["geo_locations"]["countries"],
+                                                "countries": _geo_label(a["targeting"]),
                                                 "ads": [x["name"] for x in a["ads"]]}
                                                for a in spec["adsets"]]})
         log_lines = []
