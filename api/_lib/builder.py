@@ -26,6 +26,19 @@ def _csv(v):
     return [x.strip() for x in str(v or "").split(",") if x.strip()]
 
 
+def _variants(v):
+    """Split a cell into text variants.
+
+    Buyers write several primary texts or headlines in one cell, separated by
+    a newline or a pipe. Commas are NOT a separator here: ad copy is full of
+    them. Meta accepts at most 5 of each.
+    """
+    raw = str(v or "")
+    parts = [p.strip() for p in raw.replace("\r", "").split("\n")] if "\n" in raw \
+            else [p.strip() for p in raw.split("|")]
+    return [p for p in parts if p][:5]
+
+
 def _minor(v, where, problems):
     if v in ("", None):
         return None
@@ -112,12 +125,30 @@ def parse_workbook(xlsx_bytes, creatives):
     adsets, by_name = [], {}
     for r in rows:
         name = str(r["adset_name"]).strip()
-        countries = [c.upper() for c in _csv(r.get("countries"))]
-        if not countries:
-            problems.append(f"Ad set '{name}': countries is required")
-        geo = {"countries": countries}
-        lt = str(r.get("location_types") or "home+recent").strip()
-        geo["location_types"] = ["home", "recent"] if lt == "home+recent" else [lt]
+        raw_countries = _csv(r.get("countries"))
+        worldwide = any(c.strip().lower() in ("worldwide", "ww", "all", "global")
+                        for c in raw_countries)
+        countries = [c.upper() for c in raw_countries
+                     if c.strip().lower() not in ("worldwide", "ww", "all", "global")]
+        langs_present = bool(_csv(r.get("languages")))
+        if worldwide or (not countries and langs_present):
+            # Language-only targeting: Meta still needs a geography, so use its
+            # worldwide country group. Common for "target Spanish speakers
+            # anywhere" style buys.
+            geo = {"country_groups": ["worldwide"]}
+            if countries:
+                geo["countries"] = countries
+        elif countries:
+            geo = {"countries": countries}
+        else:
+            problems.append(
+                f"Ad set '{name}': needs a location. Put ISO codes in 'countries' "
+                f"(e.g. GB,IE), or write 'worldwide', or set 'languages' and leave "
+                f"countries blank to target that language everywhere.")
+            geo = {"countries": []}
+        if "countries" in geo:
+            lt = str(r.get("location_types") or "home+recent").strip()
+            geo["location_types"] = ["home", "recent"] if lt == "home+recent" else [lt]
 
         for col, kind, key in (("cities", "city", "cities"), ("regions", "region", "regions")):
             out = []
@@ -229,11 +260,19 @@ def parse_workbook(xlsx_bytes, creatives):
             problems.append(f"Ad '{adn}': '{cf}' is a video. Serverless uploads cap at ~4.5MB, "
                             f"so videos must go through the CLI for now.")
         ad = {"name": adn, "creative": have.get(key, cf)}
-        for k in ("body", "headline", "description", "cta", "link", "url_tags",
-                  "page_id", "instagram_user_id"):
+        for k in ("cta", "link", "url_tags", "page_id", "instagram_user_id"):
             v = str(r.get(k, "")).strip()
             if v:
                 ad[k] = v
+        for src, many in (("body", "bodies"), ("headline", "headlines"),
+                          ("description", "descriptions")):
+            vs = _variants(r.get(src))
+            if vs:
+                ad[src] = vs[0]
+                ad[many] = vs
+        if len(ad.get("bodies", [])) > 5 or len(ad.get("headlines", [])) > 5:
+            problems.append(f"Ad '{adn}': Meta accepts at most 5 primary texts and "
+                            f"5 headlines per ad.")
         if not (ad.get("link") or defaults.get("link")):
             problems.append(f"Ad '{adn}': no link, and no Campaign-tab default")
         if not (ad.get("page_id") or defaults.get("page_id")):
@@ -304,7 +343,8 @@ def build(spec, creatives, log):
                 pick("page_id"), media[key], link=pick("link"), body=ad.get("body", ""),
                 headline=ad.get("headline", ""), description=ad.get("description"),
                 cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
-                url_tags=pick("url_tags"))
+                url_tags=pick("url_tags"), bodies=ad.get("bodies"),
+                headlines=ad.get("headlines"), descriptions=ad.get("descriptions"))
             try:
                 ad_id = meta.create_ad(acct, aid, ad["name"], creative, pixel_id=d.get("pixel_id"))
             except Exception as e:
@@ -352,10 +392,15 @@ def parse_ads_only(file_bytes, filename, creatives, defaults):
             problems.append(f"Ad '{name}': '{cf}' is a video — browser uploads cap at ~4.5MB, "
                             f"so videos go through the CLI.")
         ad = {"name": name, "creative": have.get(key, cf)}
-        for k in ("body", "headline", "description", "cta", "link",
-                  "url_tags", "page_id", "instagram_user_id"):
+        for k in ("cta", "link", "url_tags", "page_id", "instagram_user_id"):
             if r.get(k):
                 ad[k] = r[k]
+        for src, many in (("body", "bodies"), ("headline", "headlines"),
+                          ("description", "descriptions")):
+            vs = _variants(r.get(src))
+            if vs:
+                ad[src] = vs[0]
+                ad[many] = vs
         if not (ad.get("link") or defaults.get("link")):
             problems.append(f"Ad '{name}': no link, and no default on the account")
         if not (ad.get("page_id") or defaults.get("page_id")):
@@ -384,7 +429,8 @@ def add_ads_to_adset(acct, adset_id, ads, creatives, defaults, log):
             pick("page_id"), media[key], link=pick("link"), body=ad.get("body", ""),
             headline=ad.get("headline", ""), description=ad.get("description"),
             cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
-            url_tags=pick("url_tags"))
+            url_tags=pick("url_tags"), bodies=ad.get("bodies"),
+            headlines=ad.get("headlines"), descriptions=ad.get("descriptions"))
         ad_id = meta.create_ad(acct, adset_id, ad["name"], creative,
                                pixel_id=defaults.get("pixel_id"))
         created.append({"id": ad_id, "name": ad["name"]})

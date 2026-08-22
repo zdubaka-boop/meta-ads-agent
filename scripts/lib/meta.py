@@ -276,7 +276,16 @@ def wait_for_video(video_id, max_wait=900):
 
 def image_creative(page_id, image_hash, link, body, headline, description=None,
                    cta="LEARN_MORE", ig_user_id=None, url_tags=None,
-                   enhancements_off=True, multi_advertiser_off=True):
+                   enhancements_off=True, multi_advertiser_off=True,
+                   bodies=None, headlines=None, descriptions=None):
+    """Build a single-image creative.
+
+    bodies / headlines / descriptions: optional lists. When any has more than
+    one entry, an asset_feed_spec is attached so Meta rotates the variants
+    within one ad (what Ads Manager calls multiple primary texts / headlines).
+    Meta accepts at most 5 of each. This is separate from the creative
+    enhancements, which stay opted out.
+    """
     ld = {"link": link, "image_hash": image_hash, "message": body, "name": headline,
           "call_to_action": {"type": cta, "value": {"link": link}}}
     if description:
@@ -285,6 +294,21 @@ def image_creative(page_id, image_hash, link, body, headline, description=None,
     if ig_user_id:
         oss["instagram_user_id"] = ig_user_id
     c = {"object_story_spec": oss}
+
+    bodies = [b for b in (bodies or []) if b][:5]
+    headlines = [h for h in (headlines or []) if h][:5]
+    descriptions = [d for d in (descriptions or []) if d][:5]
+    if len(bodies) > 1 or len(headlines) > 1 or len(descriptions) > 1:
+        feed = {"optimization_type": "DEGREES_OF_FREEDOM",
+                "ad_formats": ["SINGLE_IMAGE"],
+                "images": [{"hash": image_hash}],
+                "bodies": [{"text": b} for b in (bodies or [body])],
+                "titles": [{"text": h} for h in (headlines or [headline])],
+                "call_to_action_types": [cta],
+                "link_urls": [{"website_url": link}]}
+        if descriptions:
+            feed["descriptions"] = [{"text": d} for d in descriptions]
+        c["asset_feed_spec"] = feed
     if enhancements_off:
         c["degrees_of_freedom_spec"] = DOF_OFF
     if multi_advertiser_off:
