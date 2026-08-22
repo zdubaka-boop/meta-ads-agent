@@ -81,6 +81,26 @@ mode, targeting, destination URL, creatives and copy. Run `discover.py` first
 so you can offer the account's real Pages and pixels instead of asking them to
 find IDs.
 
+### Do they need to send image files at all?
+
+Only for creatives Meta has never seen. Anything already in the ad account can
+be named in `creative_file` and needs no file — that is how a campaign becomes
+a single .xlsx, and it is the only route that works for video.
+
+If they are sending the same creatives repeatedly, push the folder into the
+account's library once:
+
+```bash
+python3 scripts/upload_creatives.py act_<id> ~/path/to/creatives --dry-run
+python3 scripts/upload_creatives.py act_<id> ~/path/to/creatives
+```
+
+After that every future sheet is one file. Offer this the first time someone
+attaches a folder of images.
+
+There is never a README or any other file to send — only the workbook, plus
+images if they are new.
+
 ### Then, for all three paths
 
 ```bash
