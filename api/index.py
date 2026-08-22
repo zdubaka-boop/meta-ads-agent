@@ -352,6 +352,7 @@ class handler(BaseHTTPRequestHandler):
                 "Upload is too large. Vercel caps a serverless request at ~4.5MB. "
                 "Send fewer or smaller images, or use the CLI for this batch."})
         fields, files = multipart.parse(self.rfile.read(n), self.headers.get("Content-Type"))
+        files = unpack_zip(files)   # a dropped .zip is expanded here
 
         book = next(((k, v) for k, v in files.items() if k.lower().endswith((".xlsx", ".xlsm"))), None)
         if not book:
