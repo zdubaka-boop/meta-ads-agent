@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build PREFILL</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build REUSE</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -294,9 +294,12 @@ function q1(replay){
      </div>
    </div>
 
-   <h3 style="margin:0 0 4px;font-size:15px">2 · Fill it in, and gather your images</h3>
-   <p class="sub">Every filename in the <b>creative_file</b> column must match an image
-     you drop in below.</p>
+   <h3 style="margin:0 0 4px;font-size:15px">2 · Fill it in</h3>
+   <p class="sub"><b>creative_file</b> accepts any of these:<br>
+     • a filename of an image you drop in below<br>
+     • the <b>name of an image or video already in this ad account</b> — nothing to attach,
+       no size limit, and videos work<br>
+     • several names separated by <b>|</b> — you get one ad per creative, sharing the copy</p>
 
    <h3 style="margin:18px 0 8px;font-size:15px">3 · Drop it all here</h3>
    <div class="drop" id="dz">
@@ -468,14 +471,20 @@ async function q2(replay){
             <th class="sortable" onclick="sortBy('tCamp',0)">Name</th>
             <th>Budget</th>
             ${C.map((c,n)=>`<th class="num sortable" onclick="sortBy('tCamp',${2+n},true)">${c[1]}</th>`).join("")}
-            <th>Status</th></tr></thead><tbody>`+
+            <th>Status</th><th></th></tr></thead><tbody>`+
           d.campaigns.map(c=>{const st=c.stats||{};return `
             <tr class="pick" onclick="pickCamp('${c.id}','${esc(c.name).replace(/'/g,"")}')">
             <td>${esc(c.name)}<div class="mono">${c.id}</div></td>
             <td>${c.budget_mode}</td>
             ${C.map(x=>`<td class="num" data-v="${st[x[0]]??-1}">${fmtStat(st[x[0]],x[0])}</td>`).join("")}
             <td><span class="tag ${/ACTIVE/.test(c.effective_status)?"ok":"warn"}">${esc(c.effective_status||c.status)}</span></td>
-          </tr>`;}).join("")+`</tbody></table>`
+            <td><a href="/api/export?campaign=${c.id}" download onclick="event.stopPropagation()">
+              <button class="ghost" style="padding:4px 9px;font-size:12px">Copy to sheet</button></a></td>
+          </tr>`;}).join("")+`</tbody></table>
+          <div class="note"><b>Copy to sheet</b> downloads that campaign as a workbook with its
+            targeting, copy and creatives already filled in. Change what you want and upload it
+            as a new campaign — the creatives come out as Meta image IDs, so there are
+            <b>no image files to attach</b>.</div>`
         : "<p class='sub'>No campaigns in this account yet.</p>");
     if(d.campaigns.length) filterRows("qCamp","tCamp");
   }catch(e){ err(e.message); }

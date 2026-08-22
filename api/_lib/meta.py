@@ -405,3 +405,29 @@ def upload_image_bytes(acct, data, filename, name=None):
     if "images" not in r:
         raise MetaError("upload_image", {"message": json.dumps(r)[:300]})
     return list(r["images"].values())[0]["hash"]
+
+
+# ---------------------------------------------- existing account creatives
+# Meta keeps every image and video ever uploaded to an ad account. Referencing
+# those costs no upload, has no request-size limit, and works for video.
+
+def account_images(acct):
+    """{lowercased name: hash} for every image already in the ad account."""
+    out = {}
+    for im in get_all(f"{account(acct)}/adimages", "hash,name", cap=5000):
+        if im.get("name"):
+            out.setdefault(im["name"].strip().lower(), im["hash"])
+            stem = im["name"].rsplit(".", 1)[0].strip().lower()
+            out.setdefault(stem, im["hash"])
+    return out
+
+
+def account_videos(acct):
+    """{lowercased name: video id} for every video already in the ad account."""
+    out = {}
+    for v in get_all(f"{account(acct)}/advideos", "id,title", cap=2000):
+        t = (v.get("title") or "").strip().lower()
+        if t:
+            out.setdefault(t, v["id"])
+            out.setdefault(t.rsplit(".", 1)[0], v["id"])
+    return out

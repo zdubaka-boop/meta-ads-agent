@@ -190,6 +190,11 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, (PUBLIC / "index.html").read_bytes(),
                                   "text/html; charset=utf-8",
                                   no_cache=True)
+            if p.path == "/api/export":
+                if not self._need_auth():
+                    return
+                return self._export_campaign((parse_qs(p.query).get("campaign") or [""])[0])
+
             if p.path == "/api/template" and (parse_qs(p.query).get("account") or [None])[0]:
                 if not self._need_auth():
                     return
@@ -304,6 +309,116 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             traceback.print_exc()
             return self._send(500, {"error": f"{type(e).__name__}: {e}"})
+
+    def _export_campaign(self, campaign_id):
+        """Write an existing campaign back out as a workbook.
+
+        Copying a winner and changing the copy is how buyers actually work, and
+        it is Meta's own export/re-import pattern. Creatives come out as image
+        hashes, so the re-upload needs no image files at all.
+        """
+        import io
+        from openpyxl import load_workbook
+        from openpyxl.styles import Font
+
+        camp = meta.get(campaign_id, "name,objective,status,daily_budget,lifetime_budget,"
+                                     "account_id,special_ad_categories")
+        acct = meta.account(camp.get("account_id"))
+        cbo = bool(camp.get("daily_budget") or camp.get("lifetime_budget"))
+        locales = {v: k for k, v in (meta.load_locales() or {}).items()}
+
+        wb = load_workbook(Path(__file__).parent / "_lib" / "CAMPAIGN-TEMPLATE.xlsx")
+        blue = Font(name="Arial", size=10, color="0000FF")
+        put = lambda ws, r, c, v: ws.cell(row=r, column=c, value=v).__setattr__("font", blue)
+
+        c = wb["Campaign"]
+        for row in range(2, 27):
+            c.cell(row=row, column=2).value = None
+        put(c, 2, 2, acct)
+        put(c, 3, 2, f"{camp.get('name')} (copy)")
+        put(c, 4, 2, camp.get("objective"))
+        put(c, 6, 2, "CBO" if cbo else "ABO")
+        if camp.get("daily_budget"):
+            put(c, 7, 2, int(camp["daily_budget"]))
+        if camp.get("lifetime_budget"):
+            put(c, 8, 2, int(camp["lifetime_budget"]))
+
+        a = wb["Ad Sets"]
+        for row in range(2, 12):
+            for col in range(1, 30):
+                a.cell(row=row, column=col).value = None
+        ads_ws = wb["Ads"]
+        for row in range(2, 12):
+            for col in range(1, 13):
+                ads_ws.cell(row=row, column=col).value = None
+
+        page_seen, ar, dr = None, 2, 2
+        for aset in meta.get_all(f"{campaign_id}/adsets",
+                "id,name,daily_budget,lifetime_budget,optimization_goal,billing_event,"
+                "targeting,promoted_object,dsa_beneficiary", cap=200):
+            t = aset.get("targeting") or {}
+            geo = t.get("geo_locations") or {}
+            countries = list(geo.get("countries") or [])
+            if geo.get("country_groups"):
+                countries = ["worldwide"] + countries
+            put(a, ar, 1, aset.get("name"))
+            if not cbo and aset.get("daily_budget"):
+                put(a, ar, 2, int(aset["daily_budget"]))
+            put(a, ar, 4, aset.get("optimization_goal"))
+            put(a, ar, 5, aset.get("billing_event"))
+            put(a, ar, 8, ",".join(countries))
+            excl = ((t.get("excluded_geo_locations") or {}).get("countries") or [])
+            if excl:
+                put(a, ar, 9, ",".join(excl))
+            names = [locales.get(x) for x in (t.get("locales") or []) if locales.get(x)]
+            if names:
+                put(a, ar, 13, ",".join(names))
+            g = t.get("genders") or []
+            put(a, ar, 14, "Men" if g == [1] else "Women" if g == [2] else "All")
+            put(a, ar, 15, t.get("age_min")); put(a, ar, 16, t.get("age_max"))
+            if t.get("publisher_platforms"):
+                put(a, ar, 23, ",".join(t["publisher_platforms"]))
+            if (aset.get("promoted_object") or {}).get("custom_event_type"):
+                put(a, ar, 26, aset["promoted_object"]["custom_event_type"])
+            if aset.get("dsa_beneficiary"):
+                put(a, ar, 29, aset["dsa_beneficiary"])
+
+            for ad in meta.get_all(f"{aset['id']}/ads",
+                    "name,creative{object_story_spec,asset_feed_spec}", cap=500):
+                cr = ad.get("creative") or {}
+                oss = cr.get("object_story_spec") or {}
+                ld = oss.get("link_data") or oss.get("video_data") or {}
+                feed = cr.get("asset_feed_spec") or {}
+                page_seen = page_seen or oss.get("page_id")
+                bodies = [b["text"] for b in feed.get("bodies", [])] or \
+                         ([ld.get("message")] if ld.get("message") else [])
+                titles = [x["text"] for x in feed.get("titles", [])] or \
+                         ([ld.get("name") or ld.get("title")] if (ld.get("name") or ld.get("title")) else [])
+                cta = ((ld.get("call_to_action") or {}).get("type"))
+                link = ld.get("link") or ((ld.get("call_to_action") or {})
+                                          .get("value") or {}).get("link")
+                put(ads_ws, dr, 1, aset.get("name"))
+                put(ads_ws, dr, 2, ad.get("name"))
+                put(ads_ws, dr, 3, ld.get("image_hash") or "")   # hash: no file needed
+                put(ads_ws, dr, 4, " | ".join(x for x in bodies if x))
+                put(ads_ws, dr, 5, " | ".join(x for x in titles if x))
+                put(ads_ws, dr, 6, ld.get("description") or "")
+                put(ads_ws, dr, 7, cta); put(ads_ws, dr, 8, link)
+                dr += 1
+            ar += 1
+
+        if page_seen:
+            put(c, 17, 2, page_seen)
+
+        buf = io.BytesIO(); wb.save(buf); data = buf.getvalue()
+        safe = "".join(ch if ch.isalnum() else "-" for ch in (camp.get("name") or "campaign"))[:48]
+        self.send_response(200)
+        self.send_header("Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.send_header("Content-Disposition", f'attachment; filename="{safe}.xlsx"')
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def _prefilled_template(self, acct):
         """Hand back the workbook already filled in for THIS ad account.

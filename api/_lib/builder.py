@@ -252,6 +252,36 @@ def parse_workbook(xlsx_bytes, creatives):
                 a[k] = str(r[k]).strip()
         adsets.append(a); by_name[name] = a
 
+    # Lazily fetched: only pay for the listing if a row needs it.
+    lib = {"img": None, "vid": None}
+
+    def resolve_creative(cf, problems, who):
+        """-> ('upload', filename) | ('hash', h) | ('video', id) | (None, None)"""
+        key = Path(cf).name.strip().lower()
+        if key in have:
+            if Path(key).suffix in VIDEO_EXT:
+                problems.append(f"{who}: '{cf}' is a video. Upload it to the ad account "
+                                f"once, then reference it by name here — browser uploads "
+                                f"cap at ~4.5MB.")
+                return None, None
+            return "upload", have[key]
+        if len(cf.strip()) == 32 and all(ch in "0123456789abcdef" for ch in cf.strip().lower()):
+            return "hash", cf.strip().lower()          # an image hash, pasted directly
+        if lib["img"] is None:
+            try:
+                lib["img"] = meta.account_images(acct)
+                lib["vid"] = meta.account_videos(acct)
+            except Exception:
+                lib["img"], lib["vid"] = {}, {}
+        stem = key.rsplit(".", 1)[0]
+        if key in lib["img"] or stem in lib["img"]:
+            return "hash", lib["img"].get(key) or lib["img"][stem]
+        if key in lib["vid"] or stem in lib["vid"]:
+            return "video", lib["vid"].get(key) or lib["vid"][stem]
+        problems.append(f"{who}: '{cf}' is neither among the files you dropped in nor "
+                        f"an image or video already in this ad account.")
+        return None, None
+
     seen = set()
     ad_rows = [r for r in xlsx.table(sheets["Ads"])
                if str(r.get("ad_name", "")).strip() and str(r.get("adset_name", "")).strip()]
@@ -360,15 +390,22 @@ def build(spec, creatives, log):
         log(f"  ad set {aid}  {a['name']}")
 
         for ad in a["ads"]:
-            blob = creatives.get(ad["creative"])
-            if blob is None:
-                result["skipped"].append(f"{ad['name']} (creative missing)"); continue
-            key = hashlib.sha256(blob).hexdigest()[:16]
-            if key not in media:
-                media[key] = meta.upload_image_bytes(acct, blob, ad["creative"], ad["name"])
+            kind = ad.get("_kind")
+            if kind == "hash":
+                img_hash = ad["_ref"]
+            elif kind == "video":
+                result["skipped"].append(f"{ad['name']} (video ads not built yet)"); continue
+            else:
+                blob = creatives.get(ad["creative"])
+                if blob is None:
+                    result["skipped"].append(f"{ad['name']} (creative missing)"); continue
+                key = hashlib.sha256(blob).hexdigest()[:16]
+                if key not in media:
+                    media[key] = meta.upload_image_bytes(acct, blob, ad["creative"], ad["name"])
+                img_hash = media[key]
             pick = lambda k, dv=None: ad.get(k) or d.get(k) or dv
             creative = meta.image_creative(
-                pick("page_id"), media[key], link=pick("link"), body=ad.get("body", ""),
+                pick("page_id"), img_hash, link=pick("link"), body=ad.get("body", ""),
                 headline=ad.get("headline", ""), description=ad.get("description"),
                 cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
                 url_tags=pick("url_tags"), bodies=ad.get("bodies"),
