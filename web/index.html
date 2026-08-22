@@ -101,7 +101,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build 0822-1615</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build 0822-1620</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -261,7 +261,7 @@ function pickAcct(id,name){ ACCT=id; ACCT_NAME=name;
   $("acctName").textContent=name+" ("+id+")"; nav("menu"); }
 
 /* ---------- history: Back steps back one screen, not to the start ----------
-   Each screen pushes a state carrying everything needed to rebuild 0822-1615, so
+   Each screen pushes a state carrying everything needed to rebuild 0822-1620, so
    the browser Back button lands on the previous screen with the same
    account/campaign/ad set already selected. */
 function nav(view, extra){
@@ -510,7 +510,7 @@ async function q2(replay){
             a fresh clone of a winner.<br>
             <b>To add to a campaign that is already running, open it instead</b> — you can
             append new ad sets there, or open an ad set and append ads. Those only create what
-            is new and never rebuild 0822-1615 is delivering.</div>`
+            is new and never rebuild 0822-1620 is delivering.</div>`
         : "<p class='sub'>No campaigns in this account yet.</p>");
     if(d.campaigns.length) filterRows("qCamp","tCamp");
   }catch(e){ err(e.message); }
@@ -1169,6 +1169,6 @@ function crumb(extra){
   if(extra && extra.camp) h+=` · <a onclick="nav('adsets',{camp:CAMP,campName:CAMP_NAME})">${esc(CAMP_NAME)}</a>`;
   return h+`</div>`;
 }
-window.BUILD="0822-1615";
+window.BUILD="0822-1620";
 boot().catch(e=>err(e.message));
 </script></body></html>

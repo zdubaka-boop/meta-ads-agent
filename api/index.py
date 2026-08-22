@@ -27,7 +27,7 @@ TTL = 30 * 24 * 3600      # 30 days; only Sign out ends a session
 PUBLIC = Path(__file__).resolve().parent.parent / "public"
 
 
-BUILD_ID = "0822-1615"
+BUILD_ID = "0822-1620"
 
 SIG_LEN = 32          # sha256 HMAC, always exactly 32 bytes
 
@@ -255,6 +255,14 @@ class handler(BaseHTTPRequestHandler):
                         continue
                 if data is None:
                     return self._send(500, {"error": "template file is missing from the deployment"})
+                try:
+                    import io as _io
+                    from openpyxl import load_workbook as _lw
+                    from aitab import add_ai_tab as _ai
+                    _wb = _lw(_io.BytesIO(data)); _ai(_wb, scope="campaign")
+                    _b = _io.BytesIO(); _wb.save(_b); data = _b.getvalue()
+                except Exception:
+                    pass
                 self.send_response(200)
                 self.send_header("Content-Type",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -475,6 +483,18 @@ class handler(BaseHTTPRequestHandler):
             put(ads_ws, 3, 1, "one row per ad, matching an Ad Sets row above", grey)
             fname = f"ADD-ADSETS-{(camp.get('name') or 'campaign')[:32]}.xlsx"
 
+        from aitab import add_ai_tab
+        if scope == "ads":
+            add_ai_tab(wb, scope="ads", context={
+                "target ad set": aset.get("name"),
+                "adset_name column": f"must be exactly: {aset.get('name')}",
+                "campaign": (camp or {}).get("name")})
+        else:
+            add_ai_tab(wb, scope="adsets", context={
+                "target campaign": camp.get("name"),
+                "budget_mode": "CBO" if cbo else "ABO",
+                "objective": camp.get("objective"),
+                "Campaign tab": "already filled from the live campaign — do not change it"})
         buf = io.BytesIO(); wb.save(buf); data = buf.getvalue()
         safe = "".join(ch if (ch.isalnum() or ch in "-_.") else "-" for ch in fname)
         self.send_response(200)
@@ -592,6 +612,15 @@ class handler(BaseHTTPRequestHandler):
         if default_cta:
             put(c, 23, 2, default_cta)
 
+        from aitab import add_ai_tab
+        add_ai_tab(wb, scope="campaign", context={
+            "account_id": acct,
+            "this sheet is": "an EXPORT of a live campaign. Uploading it creates a NEW "
+                             "campaign; it does not edit the original.",
+            "campaign_name": "already suffixed '(copy)' — rename it if you want something else",
+            "creative_file": "these are image hashes from this account. Leave them as they "
+                             "are and no image files are needed.",
+            "page_id": page_seen or "ASK"})
         buf = io.BytesIO(); wb.save(buf); data = buf.getvalue()
         safe = "".join(ch if ch.isalnum() else "-" for ch in (camp.get("name") or "campaign"))[:48]
         self.send_response(200)
@@ -665,6 +694,15 @@ class handler(BaseHTTPRequestHandler):
                 (", page_id" if len(pages) == 1 else "") +
                 (", pixel_id" if len(pixels) == 1 else ""))
 
+        from aitab import add_ai_tab
+        add_ai_tab(wb, scope="campaign", context={
+            "account_id": meta.account(acct),
+            "page_id": pages[0]["id"] if len(pages) == 1 else
+                       "; ".join(f'{x["id"]} = {x.get("name","")}' for x in pages) or "ASK",
+            "pixel_id": "; ".join(f'{x["id"]} = {x.get("name","")}' for x in pixels) or "none",
+            "currency": info.get("currency"),
+            "minimum daily budget (minor units)": info.get("min_daily_budget"),
+        })
         buf = io.BytesIO(); wb.save(buf); data = buf.getvalue()
         self.send_response(200)
         self.send_header("Content-Type",
