@@ -298,6 +298,14 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, {"campaigns": camps, "preset": preset,
                                         "has_stats": bool(stats)})
 
+            if p.path == "/api/account-meta":
+                if not self._need_auth():
+                    return
+                i = meta.get(meta.account(one("account")), "name,currency,min_daily_budget")
+                return self._send(200, {"currency": i.get("currency"),
+                                        "min_daily_budget": i.get("min_daily_budget"),
+                                        "name": i.get("name")})
+
             if p.path == "/api/adsets":
                 if not self._need_auth():
                     return
@@ -318,6 +326,13 @@ class handler(BaseHTTPRequestHandler):
                     a["stats"] = stats.get(a["id"])
                 return self._send(200, {"adsets": sets_, "preset": preset,
                                         "has_stats": bool(stats)})
+
+            if p.path == "/api/countries":
+                f = Path(__file__).parent / "_lib" / "reference" / "data" / "countries.json"
+                try:
+                    return self._send(200, {"countries": json.loads(f.read_text())})
+                except OSError:
+                    return self._send(200, {"countries": []})
 
             if p.path == "/api/ad-defaults":
                 # Copy from an ad already in this ad set, so "same copy, new
@@ -672,7 +687,7 @@ class handler(BaseHTTPRequestHandler):
         if not src or not name:
             return self._send(400, {"error": "ad set and new name are required"})
 
-        info = meta.get(src, "name,campaign_id,daily_budget,targeting")
+        info = meta.get(src, "name,campaign_id,daily_budget,targeting,account_id")
         try:
             new_id = meta.copy_object(src, "adset",
                                       campaign_id=info.get("campaign_id"),

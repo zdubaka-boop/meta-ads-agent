@@ -55,6 +55,16 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:
 .crumb{color:var(--dim);font-size:13px;margin-bottom:14px}
 .crumb a{color:var(--accent);cursor:pointer;text-decoration:none}
 .hide{display:none}
+.picker{position:relative}
+.plist{position:absolute;z-index:20;left:0;right:0;top:100%;max-height:210px;overflow:auto;
+  background:var(--panel);border:1px solid var(--accent);border-radius:8px;margin-top:3px}
+.plist div{padding:7px 11px;cursor:pointer;font-size:13.5px}
+.plist div:hover,.plist div.on{background:var(--panel2)}
+.plist .code{color:var(--dim);font-family:ui-monospace,monospace;font-size:11.5px;float:right}
+.picked{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.picked .chip{cursor:pointer;border-color:var(--accent);color:var(--accent)}
+.picked .chip:hover{border-color:var(--bad);color:var(--bad)}
+.hint{color:var(--dim);font-size:12px;margin-top:4px}
 .search{width:100%;max-width:340px;padding:8px 12px;font-size:14px;margin:0 0 12px}
 .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .bar .sp{flex:1}
@@ -87,7 +97,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build NOSHEET</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build PICKER</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -697,6 +707,48 @@ async function pickAdset(id,name,replay){
   }catch(e){ err(e.message); }
 }
 
+let COUNTRIES=[], PICKED=[], ACCT_CUR="", ACCT_MIN=0;
+async function loadCountries(){
+  if(COUNTRIES.length) return;
+  try{ COUNTRIES=(await api("/api/countries")).countries||[]; }catch(e){}
+}
+async function loadAccountMeta(){
+  try{ const m=await api("/api/account-meta?account="+encodeURIComponent(ACCT));
+       ACCT_CUR=m.currency||""; ACCT_MIN=m.min_daily_budget||0; }catch(e){}
+}
+function cSearch(){
+  const q=($("dCountries").value||"").toLowerCase().trim();
+  const hits=(q?COUNTRIES.filter(c=>c.n.toLowerCase().includes(q)||c.c.toLowerCase()===q)
+               :COUNTRIES).slice(0,60);
+  $("cList").innerHTML=hits.map(c=>
+    `<div onclick="cPick('${c.c}')" class="${PICKED.includes(c.c)?'on':''}">${esc(c.n)}
+      <span class="code">${c.c}</span></div>`).join("") ||
+    `<div class="sub" style="padding:9px 11px">No country matches that</div>`;
+  $("cList").classList.remove("hide");
+}
+function cPick(code){
+  if(!PICKED.includes(code)) PICKED.push(code);
+  $("dCountries").value=""; cRender(); cSearch();
+}
+function cRender(){
+  const byCode=Object.fromEntries(COUNTRIES.map(c=>[c.c,c.n]));
+  $("cPicked").innerHTML=PICKED.map(c=>
+    `<span class="chip" onclick="cDrop('${c}')">${esc(byCode[c]||c)} · ${c} ✕</span>`).join("");
+}
+function cDrop(code){ PICKED=PICKED.filter(x=>x!==code); cRender(); }
+function budgetHint(){
+  const v=parseFloat(($("dBudget").value||"").replace(",","."));
+  if(isNaN(v)){ $("dBudgetHint").textContent=""; return; }
+  const minor=Math.round(v*100);
+  let msg=`= ${minor} minor units sent to Meta`;
+  if(ACCT_MIN && minor<ACCT_MIN)
+    msg+=` — below this account's minimum of ${(ACCT_MIN/100).toFixed(2)} ${ACCT_CUR}`;
+  $("dBudgetHint").textContent=msg;
+}
+document.addEventListener("click",e=>{
+  if(!e.target.closest(".picker")) { const l=$("cList"); if(l) l.classList.add("hide"); }
+});
+
 function dupAdset(id,name){
   $("dupbox").innerHTML=`<div class="card" style="background:var(--panel2);margin:14px 0">
     <h3 style="margin:0 0 4px;font-size:15px">Duplicate "${esc(name)}"</h3>
@@ -705,11 +757,20 @@ function dupAdset(id,name){
     <label>New ad set name</label>
     <input id="dName" value="${esc(name)} — copy">
     <div style="height:8px"></div>
-    <div class="row">
-      <div style="flex:1;min-width:200px"><label>Countries <span class="sub">(blank = keep the same)</span></label>
-        <input id="dCountries" placeholder="e.g. DE,AT"></div>
-      <div style="flex:1;min-width:180px"><label>Daily budget in cents <span class="sub">(blank = keep)</span></label>
-        <input id="dBudget" placeholder="e.g. 2000 = 20.00"></div>
+    <div class="row" style="align-items:flex-start">
+      <div style="flex:1;min-width:240px" class="picker">
+        <label>Countries <span class="sub">(leave empty to keep the same)</span></label>
+        <input id="dCountries" placeholder="Type a country name…" autocomplete="off"
+               oninput="cSearch()" onfocus="cSearch()">
+        <div id="cList" class="plist hide"></div>
+        <div id="cPicked" class="picked"></div>
+        <div class="hint">Click a chip to remove it. Codes are filled in for you.</div>
+      </div>
+      <div style="flex:1;min-width:190px">
+        <label>Daily budget <span class="sub" id="dCur">(blank = keep)</span></label>
+        <input id="dBudget" placeholder="20" oninput="budgetHint()">
+        <div class="hint" id="dBudgetHint"></div>
+      </div>
     </div>
     <label style="margin-top:10px"><input type="checkbox" id="dAds" checked style="width:auto">
       Copy its ads too</label>
@@ -717,14 +778,22 @@ function dupAdset(id,name){
       <button onclick="dupGo('${id}')">Create the duplicate</button>
       <button class="ghost" onclick="$('dupbox').innerHTML=''">Cancel</button>
     </div><div id="dOut"></div></div>`;
+  PICKED=[];
+  loadCountries().then(cRender);
+  loadAccountMeta().then(()=>{
+    if(ACCT_CUR) $("dCur").textContent=`in ${ACCT_CUR} — blank keeps the current budget`;
+    if(ACCT_MIN) $("dBudget").placeholder=(ACCT_MIN/100).toFixed(2);
+  });
   $("dupbox").scrollIntoView({behavior:"smooth",block:"center"});
 }
 async function dupGo(id){
   $("dOut").innerHTML='<p class="spin">Copying…</p>';
   try{
     const d=await api("/api/duplicate-adset",{method:"POST",body:JSON.stringify({
-      adset:id, name:$("dName").value, countries:$("dCountries").value,
-      daily_budget_minor:$("dBudget").value, with_ads:$("dAds").checked})});
+      adset:id, name:$("dName").value, countries:PICKED.join(","),
+      daily_budget_minor:(()=>{const v=parseFloat(($("dBudget").value||"").replace(",","."));
+        return isNaN(v)?"":Math.round(v*100);})(),
+      with_ads:$("dAds").checked})});
     alert(`Created "${d.name}" (${d.status}).\n\n`+d.changed.join("\n")+
       (d.warnings&&d.warnings.length?"\n\n"+d.warnings.join("\n"):""));
     $("dupbox").innerHTML=""; pickCamp(CAMP,CAMP_NAME,true);
