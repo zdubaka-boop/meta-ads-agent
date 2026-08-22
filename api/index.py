@@ -23,7 +23,7 @@ import meta  # noqa: E402
 
 SECRET = os.getenv("META_SESSION_SECRET", "")
 CODE = os.getenv("META_WEB_ACCESS_CODE", "")
-TTL = 8 * 3600
+TTL = 30 * 24 * 3600      # 30 days; only Sign out ends a session
 PUBLIC = Path(__file__).resolve().parent.parent / "public"
 
 
@@ -108,6 +108,10 @@ class handler(BaseHTTPRequestHandler):
         if no_cache:
             self.send_header("Cache-Control", "no-store, must-revalidate")
             self.send_header("Pragma", "no-cache")
+        if not cookie and getattr(self, "_renew", None):
+            exp = int(time.time()) + TTL
+            cookie = (f"ms={sign(str(exp) + '|' + self._renew)}; Path=/; HttpOnly; Secure; "
+                      f"SameSite=Lax; Max-Age={TTL}")
         if cookie:
             self.send_header("Set-Cookie", cookie)
         self.end_headers()
@@ -118,18 +122,29 @@ class handler(BaseHTTPRequestHandler):
         return verify(m.group(1)) if m else None
 
     def _need_auth(self):
-        """Load this person's own Meta token from the encrypted store."""
+        """Load this person's own Meta token from the encrypted store.
+
+        A storage blip returns 503, never 401: only a genuinely absent record
+        should ever end someone's session.
+        """
         code = self._code()
         if not code:
             self._send(401, {"error": "not signed in"})
             return False
         import store
-        rec = store.load(code)
+        try:
+            rec = store.load(code)
+        except store.StoreUnavailable as e:
+            self._send(503, {"error": "Storage is briefly unavailable — you are still "
+                                      "signed in, try that again in a moment.",
+                             "transient": True, "detail": str(e)[:120]})
+            return False
         if not rec:
             self._send(401, {"error": "your session is no longer valid — sign in again"})
             return False
         os.environ["META_ACCESS_TOKEN"] = rec["token"]
         self._who = rec.get("who")
+        self._renew = code
         return True
 
     def _body(self):
@@ -173,12 +188,17 @@ class handler(BaseHTTPRequestHandler):
 
             if p.path == "/api/session":
                 code = self._code()
-                who = None
+                who, degraded = None, False
                 if code:
                     import store
-                    rec = store.load(code)
-                    who = rec.get("who") if rec else None
-                return self._send(200, {"signed_in": bool(who), "mode": "code", "who": who})
+                    try:
+                        rec = store.load(code)
+                        who = rec.get("who") if rec else None
+                    except store.StoreUnavailable:
+                        # Cookie is valid and signed; storage is just slow.
+                        who, degraded = "signed in", True
+                return self._send(200, {"signed_in": bool(code and who), "mode": "code",
+                                        "who": who, "degraded": degraded})
             q = parse_qs(p.query)
             one = lambda k: (q.get(k) or [None])[0]
 
@@ -366,7 +386,7 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, {"ok": True, "code": code, "who": me.get("name"),
                                         "expires_at": d.get("expires_at", 0)},
                     cookie=f"ms={sign(str(exp) + '|' + code)}; Path=/; HttpOnly; Secure; "
-                           f"SameSite=Strict; Max-Age={TTL}")
+                           f"SameSite=Lax; Max-Age={TTL}")
 
             if p.path == "/api/login":
                 if not SECRET:
@@ -381,11 +401,11 @@ class handler(BaseHTTPRequestHandler):
                 exp = int(time.time()) + TTL
                 return self._send(200, {"ok": True, "who": rec.get("who")},
                     cookie=f"ms={sign(str(exp) + '|' + code)}; Path=/; HttpOnly; Secure; "
-                           f"SameSite=Strict; Max-Age={TTL}")
+                           f"SameSite=Lax; Max-Age={TTL}")
 
             if p.path == "/api/logout":
                 return self._send(200, {"ok": True},
-                                  cookie="ms=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0")
+                                  cookie="ms=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0")
 
             if p.path in ("/api/add-preview", "/api/add-create"):
                 if not self._need_auth():

@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build 1505</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build 1512</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -167,14 +167,25 @@ function clearErr(){ $("err").classList.add("hide"); }
 async function api(path,opts){
   const r=await fetch(path,Object.assign({headers:{"Content-Type":"application/json"}},opts||{}));
   const d=await r.json().catch(()=>({error:"bad response from server"}));
-  if(!r.ok) throw new Error(d.error||("HTTP "+r.status));
+  if(!r.ok){
+    // 503 means storage hiccuped, not that the session died. Retry once
+    // rather than bouncing someone to the login screen.
+    if(r.status===503 && d.transient && !(opts||{}).retried){
+      await new Promise(x=>setTimeout(x,900));
+      return api(path,Object.assign({},opts,{retried:true}));
+    }
+    const e=new Error(d.error||("HTTP "+r.status)); e.status=r.status; throw e;
+  }
   return d;
 }
 
 async function boot(){
   const s=await api("/api/session"); MODE=s.mode;
-  if(s.signed_in){ $("who").textContent=s.who||""; $("out").classList.remove("hide"); toAccounts(); }
-  else show("login");
+  if(s.signed_in){
+    $("who").textContent = s.degraded ? "signed in" : (s.who||"");
+    $("out").classList.remove("hide");
+    toAccounts();
+  } else show("login");
 }
 
 function showReg(){ clearErr(); show("reg"); }
