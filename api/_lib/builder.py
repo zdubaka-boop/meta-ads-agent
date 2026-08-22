@@ -295,34 +295,43 @@ def parse_workbook(xlsx_bytes, creatives):
         if adn in seen:
             problems.append(f"Duplicate ad name '{adn}' — ad names must be unique")
         seen.add(adn)
-        cf = str(r.get("creative_file", "")).strip()
-        key = Path(cf).name.lower()
-        if not cf:
+        creatives_cell = _variants(r.get("creative_file"))
+        if not creatives_cell:
             problems.append(f"Ad '{adn}': creative_file is empty")
-        elif key not in have:
-            problems.append(f"Ad '{adn}': '{cf}' was not among the files you dropped in")
-        elif Path(key).suffix in VIDEO_EXT:
-            problems.append(f"Ad '{adn}': '{cf}' is a video. Serverless uploads cap at ~4.5MB, "
-                            f"so videos must go through the CLI for now.")
-        ad = {"name": adn, "creative": have.get(key, cf)}
+
+        base = {}
         for k in ("cta", "link", "url_tags", "page_id", "instagram_user_id"):
             v = str(r.get(k, "")).strip()
             if v:
-                ad[k] = v
+                base[k] = v
         for src, many in (("body", "bodies"), ("headline", "headlines"),
                           ("description", "descriptions")):
             vs = _variants(r.get(src))
             if vs:
-                ad[src] = vs[0]
-                ad[many] = vs
-        if len(ad.get("bodies", [])) > 5 or len(ad.get("headlines", [])) > 5:
+                base[src] = vs[0]
+                base[many] = vs
+        if len(base.get("bodies", [])) > 5 or len(base.get("headlines", [])) > 5:
             problems.append(f"Ad '{adn}': Meta accepts at most 5 primary texts and "
                             f"5 headlines per ad.")
-        if not (ad.get("link") or defaults.get("link")):
+        if not (base.get("link") or defaults.get("link")):
             problems.append(f"Ad '{adn}': no link, and no Campaign-tab default")
-        if not (ad.get("page_id") or defaults.get("page_id")):
+        if not (base.get("page_id") or defaults.get("page_id")):
             problems.append(f"Ad '{adn}': no page_id, and no Campaign-tab default")
-        by_name[an]["ads"].append(ad)
+
+        # Several creatives in one row = one ad each, sharing the copy. Text
+        # variants rotate inside an ad, so only creatives need separate ads.
+        multi = len(creatives_cell) > 1
+        for idx, cf in enumerate(creatives_cell, start=1):
+            kind, ref = resolve_creative(cf, problems, f"Ad '{adn}'")
+            nm = adn if not multi else f"{adn} {idx:02d}"[:80]
+            if nm in seen:
+                problems.append(f"Duplicate ad name '{nm}' — ad names must be unique")
+            seen.add(nm)
+            ad = dict(base)
+            ad["name"] = nm
+            ad["creative"] = ref if kind == "upload" else cf
+            ad["_kind"], ad["_ref"] = kind, ref
+            by_name[an]["ads"].append(ad)
 
     for a in adsets:
         if not a["ads"]:

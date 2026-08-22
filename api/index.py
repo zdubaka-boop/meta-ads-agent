@@ -353,6 +353,7 @@ class handler(BaseHTTPRequestHandler):
                 ads_ws.cell(row=row, column=col).value = None
 
         page_seen, ar, dr = None, 2, 2
+        default_cta = default_link = None
         for aset in meta.get_all(f"{campaign_id}/adsets",
                 "id,name,daily_budget,lifetime_budget,optimization_goal,billing_event,"
                 "targeting,promoted_object,dsa_beneficiary", cap=200):
@@ -404,11 +405,17 @@ class handler(BaseHTTPRequestHandler):
                 put(ads_ws, dr, 5, " | ".join(x for x in titles if x))
                 put(ads_ws, dr, 6, ld.get("description") or "")
                 put(ads_ws, dr, 7, cta); put(ads_ws, dr, 8, link)
+                default_cta = default_cta or cta
+                default_link = default_link or link
                 dr += 1
             ar += 1
 
         if page_seen:
             put(c, 17, 2, page_seen)
+        if default_link:
+            put(c, 21, 2, default_link)
+        if default_cta:
+            put(c, 23, 2, default_cta)
 
         buf = io.BytesIO(); wb.save(buf); data = buf.getvalue()
         safe = "".join(ch if ch.isalnum() else "-" for ch in (camp.get("name") or "campaign"))[:48]
