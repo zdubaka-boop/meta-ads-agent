@@ -30,6 +30,35 @@ PUBLIC = Path(__file__).resolve().parent.parent / "public"
 SIG_LEN = 32          # sha256 HMAC, always exactly 32 bytes
 
 
+def _session_key():
+    """Key for sealing the session payload. Derived from the server secret
+    only — the browser never has it, so a stolen cookie is inert."""
+    import base64 as _b64, hashlib as _h
+    return _b64.urlsafe_b64encode(_h.sha256(("sess|" + SECRET).encode()).digest())
+
+
+def seal(token, who, exp):
+    """Encrypt the Meta token into the cookie.
+
+    Reading the token out of blob storage on EVERY request made the whole app
+    depend on that storage being up and un-throttled; a single blip logged
+    people out mid-task. The token now travels in the cookie, encrypted with
+    a server-only key, so storage is touched at login and registration only.
+    """
+    from cryptography.fernet import Fernet
+    payload = json.dumps({"t": token, "w": who, "e": exp})
+    return Fernet(_session_key()).encrypt(payload.encode()).decode()
+
+
+def unseal(blob):
+    from cryptography.fernet import Fernet, InvalidToken
+    try:
+        d = json.loads(Fernet(_session_key()).decrypt(blob.encode()))
+    except (InvalidToken, ValueError, TypeError):
+        return None
+    return d if d.get("e", 0) > time.time() else None
+
+
 def sign(payload):
     """Sign a session payload.
 
@@ -147,8 +176,9 @@ class handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store, must-revalidate")
             self.send_header("Pragma", "no-cache")
         if not cookie and getattr(self, "_renew", None):
+            r = self._renew
             exp = int(time.time()) + TTL
-            cookie = (f"ms={sign(str(exp) + '|' + self._renew)}; Path=/; HttpOnly; Secure; "
+            cookie = (f"ms={seal(r['t'], r.get('w'), exp)}; Path=/; HttpOnly; Secure; "
                       f"SameSite=Lax; Max-Age={TTL}")
         if cookie:
             self.send_header("Set-Cookie", cookie)
@@ -158,35 +188,21 @@ class handler(BaseHTTPRequestHandler):
     def _fresh(self):
         self._renew = None
 
-    def _code(self):
+    def _sess(self):
+        """The signed-in session straight from the cookie. No network."""
         self._fresh()
-        m = re.search(r"ms=([A-Za-z0-9_\-]+)", self.headers.get("Cookie", "") or "")
-        return verify(m.group(1)) if m else None
+        m = re.search(r"ms=([A-Za-z0-9_\-=]+)", self.headers.get("Cookie", "") or "")
+        return unseal(m.group(1)) if m else None
 
     def _need_auth(self):
-        """Load this person's own Meta token from the encrypted store.
-
-        A storage blip returns 503, never 401: only a genuinely absent record
-        should ever end someone's session.
-        """
-        code = self._code()
-        if not code:
+        """Take the Meta token from the sealed cookie. Touches no storage."""
+        sess = self._sess()
+        if not sess:
             self._send(401, {"error": "not signed in"})
             return False
-        import store
-        try:
-            rec = store.load(code)
-        except store.StoreUnavailable as e:
-            self._send(503, {"error": "Storage is briefly unavailable — you are still "
-                                      "signed in, try that again in a moment.",
-                             "transient": True, "detail": str(e)[:120]})
-            return False
-        if not rec:
-            self._send(401, {"error": "your session is no longer valid — sign in again"})
-            return False
-        os.environ["META_ACCESS_TOKEN"] = rec["token"]
-        self._who = rec.get("who")
-        self._renew = code
+        os.environ["META_ACCESS_TOKEN"] = sess["t"]
+        self._who = sess.get("w")
+        self._renew = sess
         return True
 
     def _body(self):
@@ -239,18 +255,9 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             if p.path == "/api/session":
-                code = self._code()
-                who, degraded = None, False
-                if code:
-                    import store
-                    try:
-                        rec = store.load(code)
-                        who = rec.get("who") if rec else None
-                    except store.StoreUnavailable:
-                        # Cookie is valid and signed; storage is just slow.
-                        who, degraded = "signed in", True
-                return self._send(200, {"signed_in": bool(code and who), "mode": "code",
-                                        "who": who, "degraded": degraded})
+                sess = self._sess()
+                return self._send(200, {"signed_in": bool(sess), "mode": "code",
+                                        "who": (sess or {}).get("w")})
             q = parse_qs(p.query)
             one = lambda k: (q.get(k) or [None])[0]
 
@@ -629,7 +636,7 @@ class handler(BaseHTTPRequestHandler):
                 exp = int(time.time()) + TTL
                 return self._send(200, {"ok": True, "code": code, "who": me.get("name"),
                                         "expires_at": d.get("expires_at", 0)},
-                    cookie=f"ms={sign(str(exp) + '|' + code)}; Path=/; HttpOnly; Secure; "
+                    cookie=f"ms={seal(token, me.get('name'), exp)}; Path=/; HttpOnly; Secure; "
                            f"SameSite=Lax; Max-Age={TTL}")
 
             if p.path == "/api/login":
@@ -644,8 +651,8 @@ class handler(BaseHTTPRequestHandler):
                                                      "If this is your first time, register instead."})
                 exp = int(time.time()) + TTL
                 return self._send(200, {"ok": True, "who": rec.get("who")},
-                    cookie=f"ms={sign(str(exp) + '|' + code)}; Path=/; HttpOnly; Secure; "
-                           f"SameSite=Lax; Max-Age={TTL}")
+                    cookie=f"ms={seal(rec['token'], rec.get('who'), exp)}; Path=/; HttpOnly; "
+                           f"Secure; SameSite=Lax; Max-Age={TTL}")
 
             if p.path == "/api/logout":
                 return self._send(200, {"ok": True},
