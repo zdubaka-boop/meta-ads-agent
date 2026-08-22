@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build 1512</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build ZIP1</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -299,12 +299,11 @@ function q1(replay){
    <h3 style="margin:18px 0 8px;font-size:15px">3 · Drop it all here</h3>
    <div class="drop" id="dz">
      <h3>Drop your files here</h3>
-     <p>Drag the <b>whole folder</b> — that is the easy way.<br>
-        Or the <b>.xlsx</b> and <b>every image</b> together (Cmd-click to multi-select).<br>
-        Or click to choose them.</p>
+     <p><b>Easiest:</b> right-click your campaign folder → Compress → drop the <b>.zip</b>.<br>
+        Or drag the whole folder. Or the .xlsx and every image together.</p>
    </div>
    <input type="file" id="fi" multiple class="hide"
-          accept=".xlsx,.xlsm,image/png,image/jpeg,image/gif,image/webp">
+          accept=".zip,.xlsx,.xlsm,image/png,image/jpeg,image/gif,image/webp">
    <div class="files" id="chips"></div>
    <div class="row" style="margin-top:16px">
      <button id="go" disabled onclick="preview()">Check the workbook</button>
@@ -340,6 +339,7 @@ async function takeDrop(e, sink){
 }
 function addFiles(list){
   for(const f of list){ if(!FILES.some(x=>x.name===f.name)) FILES.push(f); }
+  const zips=FILES.filter(f=>/\.zip$/i.test(f.name));
   const book=FILES.filter(f=>/\.xlsx?$|\.xlsm$/i.test(f.name));
   $("chips").innerHTML=FILES.map(f=>{
     const isBook=/\.xlsx?$|\.xlsm$/i.test(f.name);
@@ -347,9 +347,11 @@ function addFiles(list){
   }).join("");
   const total=FILES.reduce((a,f)=>a+f.size,0);
   const imgs=FILES.filter(f=>!/\.(xlsx|xlsm|csv)$/i.test(f.name)).length;
-  $("go").disabled = book.length!==1;
+  $("go").disabled = !(book.length===1 || zips.length===1);
   let msg="";
-  if(book.length===0) msg="Add the .xlsx workbook.";
+  if(zips.length===1 && !book.length) msg=`Ready: ${FILES[0].name} — the workbook and images `+
+    `will be read from inside it.`;
+  else if(book.length===0) msg="Add the .xlsx workbook, or a .zip of the whole folder.";
   else if(book.length>1) msg="Only one workbook at a time.";
   else if(!imgs) msg="Workbook loaded, but no images yet. Drag the images in too — "+
                      "or drop the whole folder.";

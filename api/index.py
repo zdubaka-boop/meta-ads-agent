@@ -49,6 +49,32 @@ def verify(cookie):
         return None
 
 
+def unpack_zip(files):
+    """A .zip is one drag instead of many. Expand it so a folder can be zipped
+    and dropped as a single file, and flatten paths so 'creatives/gold.png'
+    still matches a workbook that just says 'gold.png'."""
+    import io, zipfile
+    out = {}
+    for name, blob in files.items():
+        if not name.lower().endswith(".zip"):
+            out[name] = blob
+            continue
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(blob))
+        except zipfile.BadZipFile:
+            continue
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            base = info.filename.rsplit("/", 1)[-1]
+            if base.startswith(".") or "__MACOSX" in info.filename:
+                continue
+            if info.file_size > 12_000_000:
+                continue
+            out[base] = zf.read(info)
+    return out
+
+
 def _geo_label(targeting):
     """Human label for a targeting block. Worldwide targets carry no
     'countries' key, so this must not assume one."""
@@ -282,6 +308,7 @@ class handler(BaseHTTPRequestHandler):
             return self._send(413, {"error": "Upload is too large (Vercel caps a request at "
                                              "~4.5MB). Send fewer or smaller images."})
         fields, files = multipart.parse(self.rfile.read(n), self.headers.get("Content-Type"))
+        files = unpack_zip(files)
         adset_id = (fields.get("adset") or "").strip()
         acct = (fields.get("account") or "").strip()
         if not adset_id or not acct:
