@@ -288,7 +288,8 @@ function q1(replay){
    <h3 style="margin:18px 0 8px;font-size:15px">3 · Drop it all here</h3>
    <div class="drop" id="dz">
      <h3>Drop your files here</h3>
-     <p>One <b>.xlsx</b> workbook, plus every image it references.<br>
+     <p>Drag the <b>whole folder</b> — that is the easy way.<br>
+        Or the <b>.xlsx</b> and <b>every image</b> together (Cmd-click to multi-select).<br>
         Or click to choose them.</p>
    </div>
    <input type="file" id="fi" multiple class="hide"
@@ -305,7 +306,26 @@ function q1(replay){
     e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
   ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
     e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
-  dz.addEventListener("drop",e=>addFiles(e.dataTransfer.files));
+  dz.addEventListener("drop",e=>takeDrop(e,addFiles));
+  fi.setAttribute("webkitdirectory-hint","");
+}
+
+/* Dragging a FOLDER gives directory entries, not files. Walk them so people
+   can drop the whole campaign folder instead of hand-picking every image. */
+async function takeDrop(e, sink){
+  const items=[...(e.dataTransfer.items||[])];
+  const entries=items.map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);
+  if(!entries.length) return sink(e.dataTransfer.files);
+  const out=[];
+  const walk = entry => new Promise(res=>{
+    if(entry.isFile) return entry.file(f=>{out.push(f);res();});
+    if(entry.isDirectory){
+      const rd=entry.createReader();
+      rd.readEntries(async es=>{ for(const c of es) await walk(c); res(); });
+    } else res();
+  });
+  for(const en of entries) await walk(en);
+  sink(out);
 }
 function addFiles(list){
   for(const f of list){ if(!FILES.some(x=>x.name===f.name)) FILES.push(f); }
@@ -315,11 +335,15 @@ function addFiles(list){
     return `<span class="chip ${isBook?"book":""}">${esc(f.name)} · ${(f.size/1024).toFixed(0)}kB</span>`;
   }).join("");
   const total=FILES.reduce((a,f)=>a+f.size,0);
+  const imgs=FILES.filter(f=>!/\.(xlsx|xlsm|csv)$/i.test(f.name)).length;
   $("go").disabled = book.length!==1;
   let msg="";
   if(book.length===0) msg="Add the .xlsx workbook.";
   else if(book.length>1) msg="Only one workbook at a time.";
+  else if(!imgs) msg="Workbook loaded, but no images yet. Drag the images in too — "+
+                     "or drop the whole folder.";
   else if(total>4.2e6) msg="Total is over ~4.2MB — Vercel will reject it. Use fewer/smaller images.";
+  else msg = `Ready: 1 workbook + ${imgs} image(s).`;
   $("out").innerHTML = msg?`<div class="note">${esc(msg)}</div>`:"";
 }
 function formData(){ const fd=new FormData(); FILES.forEach(f=>fd.append("f",f,f.name)); return fd; }
@@ -333,8 +357,25 @@ async function preview(){
     if(!r.ok){ $("out").innerHTML=`<div class="err">${esc(d.error||"upload failed")}</div>`;
                $("go").disabled=false; return; }
     if(!d.ok){
-      $("out").innerHTML=`<div class="err">${d.problems.length} problem(s) — nothing was created:\n\n`+
-        d.problems.map(x=>"• "+esc(x)).join("\n")+`</div>`;
+      const miss=[...new Set(d.problems.map(x=>{
+        const m=x.match(/'([^']+)' was not among the files/); return m?m[1]:null;}).filter(Boolean))];
+      const other=d.problems.filter(x=>!/was not among the files/.test(x));
+      let h="";
+      if(miss.length){
+        h+=`<div class="note" style="border-color:#5a4a12;background:#241f10">
+          <b>${miss.length} image(s) still missing.</b> Your workbook is still loaded —
+          just drop these in and press the button again, no need to start over:
+          <div class="files" style="margin-top:8px">
+            ${miss.map(m=>`<span class="chip">${esc(m)}</span>`).join("")}
+          </div>
+          <div class="sub" style="margin-top:8px">Tip: drag the whole folder onto the
+            box above and everything goes in at once.</div></div>`;
+      }
+      if(other.length){
+        h+=`<div class="err">${other.length} problem(s):\n\n`+
+           other.map(x=>"• "+esc(x)).join("\n")+`</div>`;
+      }
+      $("out").innerHTML=h;
       $("go").disabled=false; return;
     }
     $("out").innerHTML=`
@@ -559,7 +600,7 @@ function wireDrop2(){
     e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
   ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
     e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
-  dz.addEventListener("drop",e=>add2(e.dataTransfer.files));
+  dz.addEventListener("drop",e=>takeDrop(e,add2));
 }
 function add2(list){
   for(const f of list){ if(!FILES2.some(x=>x.name===f.name)) FILES2.push(f); }
