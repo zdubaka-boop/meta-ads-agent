@@ -509,3 +509,59 @@ def add_ads_to_adset(acct, adset_id, ads, creatives, defaults, log):
         created.append({"id": ad_id, "name": ad["name"]})
         log(f"ad {ad_id}  {ad['name']}")
     return {"created": created, "skipped": skipped}
+
+
+def add_adsets_to_campaign(acct, campaign_id, spec, creatives, log):
+    """Create ONLY new ad sets (and their ads) inside a campaign that exists.
+
+    Nothing about the campaign or its existing ad sets is touched. Ad sets
+    whose name is already in the campaign are skipped, so this is safe to
+    re-run and never duplicates. Existing ad sets keep delivering and keep
+    their learning — only the new ones start from zero, which is unavoidable
+    for anything genuinely new.
+    """
+    camp = meta.get(campaign_id, "id,name,daily_budget,lifetime_budget,objective")
+    cbo = bool(camp.get("daily_budget") or camp.get("lifetime_budget"))
+    d = spec.get("defaults", {})
+    existing = {a.get("name") for a in
+                meta.get_all(f"{campaign_id}/adsets", "id,name", cap=500)}
+
+    result = {"campaign": {"id": campaign_id, "name": camp.get("name")},
+              "adsets": [], "ads": [], "skipped": []}
+    problems = []
+    todo = []
+    for a in spec.get("adsets", []):
+        if a["name"] in existing:
+            result["skipped"].append(f"ad set '{a['name']}' (already in this campaign)")
+            continue
+        if cbo and a.get("daily_budget_minor"):
+            problems.append(f"Ad set '{a['name']}': this campaign holds the budget (CBO), "
+                            f"so the ad set must not have one — clear daily_budget_minor.")
+        if not cbo and not a.get("daily_budget_minor"):
+            problems.append(f"Ad set '{a['name']}': this campaign uses ad-set budgets (ABO), "
+                            f"so a budget is required — it is never guessed.")
+        todo.append(a)
+    if problems:
+        raise PartialBuild(" / ".join(problems), result)
+    if not todo:
+        return result
+
+    for a in todo:
+        try:
+            aid = meta.create_adset(
+                acct, campaign_id, a["name"], a["targeting"],
+                budget_minor=a.get("daily_budget_minor"),
+                optimization_goal=a.get("optimization_goal", "LINK_CLICKS"),
+                billing_event=a.get("billing_event", "IMPRESSIONS"),
+                promoted_object=a.get("promoted_object"),
+                dsa_beneficiary=a.get("dsa_beneficiary") or d.get("dsa_beneficiary"),
+                dsa_payor=a.get("dsa_payor") or d.get("dsa_payor"),
+                start_time=a.get("start_time"), end_time=a.get("end_time"))
+        except Exception as e:
+            raise PartialBuild(f"Failed creating ad set '{a['name']}': {e}", result)
+        result["adsets"].append({"id": aid, "name": a["name"]})
+        log(f"ad set {aid}  {a['name']}")
+        res = add_ads_to_adset(acct, aid, a.get("ads", []), creatives, d, log)
+        result["ads"].extend(res["created"])
+        result["skipped"].extend(res["skipped"])
+    return result

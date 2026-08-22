@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build SEALED</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build APPEND</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -481,10 +481,15 @@ async function q2(replay){
             <td><a href="/api/export?campaign=${c.id}" download onclick="event.stopPropagation()">
               <button class="ghost" style="padding:4px 9px;font-size:12px">Copy to sheet</button></a></td>
           </tr>`;}).join("")+`</tbody></table>
-          <div class="note"><b>Copy to sheet</b> downloads that campaign as a workbook with its
-            targeting, copy and creatives already filled in. Change what you want and upload it
-            as a new campaign — the creatives come out as Meta image IDs, so there are
-            <b>no image files to attach</b>.</div>`
+          <div class="note"><b>Copy to sheet</b> downloads a campaign as a workbook —
+            targeting, copy and creatives already filled in, creatives as Meta image IDs so
+            there are <b>no image files to attach</b>.<br><br>
+            <b>Uploading that file back through "Create a NEW campaign" builds a brand new
+            campaign</b>, which starts its own learning from zero. That is right when you want
+            a fresh clone of a winner.<br>
+            <b>To add to a campaign that is already running, open it instead</b> — you can
+            append new ad sets there, or open an ad set and append ads. Those only create what
+            is new and never rebuild what is delivering.</div>`
         : "<p class='sub'>No campaigns in this account yet.</p>");
     if(d.campaigns.length) filterRows("qCamp","tCamp");
   }catch(e){ err(e.message); }
@@ -516,8 +521,24 @@ async function pickCamp(id,name,replay){
         <td><span class="tag ${/ACTIVE/.test(a.effective_status)?"ok":"warn"}">${esc(a.effective_status||a.status)}</span></td>
       </tr>`;}).join("")+`</tbody></table>
       <div class="note">Click an ad set to see its ads, add more ads to it, or switch
-        ads on and off.</div>`;
-    filterRows("qSet","tSet");
+        ads on and off.</div>
+
+      <h3 style="margin:26px 0 6px;font-size:15px">Add new ad sets to this campaign</h3>
+      <p class="sub">Only the new ad sets are created. The campaign and every ad set
+        already running are left exactly as they are — nothing is rebuilt, so nothing
+        loses its learning phase.</p>
+      <div class="drop" id="dz3" style="padding:22px">
+        <h3 style="font-size:15px">Drop a workbook here</h3>
+        <p>Its <b>Ad Sets</b> and <b>Ads</b> tabs are used. The Campaign tab is ignored —
+          this campaign is the target.</p>
+      </div>
+      <input type="file" id="fi3" multiple class="hide">
+      <div class="files" id="chips3"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="go3" disabled onclick="setsPreview()">Check the ad sets</button>
+      </div>
+      <div id="out3"></div>`;
+    filterRows("qSet","tSet"); wireDrop3();
   }catch(e){ err(e.message); }
 }
 function fmtStat(v,k){
@@ -613,6 +634,59 @@ async function pickAdset(id,name,replay){
         (purchase, lead, or link click).</div>`;
     filterRows("qAd","tAd"); refreshBulk(); wireDrop2();
   }catch(e){ err(e.message); }
+}
+
+let FILES3=[];
+function wireDrop3(){
+  const dz=$("dz3"), fi=$("fi3"); if(!dz) return;
+  FILES3=[];
+  dz.onclick=()=>fi.click();
+  fi.onchange=e=>add3(e.target.files);
+  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
+  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
+  dz.addEventListener("drop",e=>takeDrop(e,add3));
+}
+function add3(list){
+  for(const f of list){ if(!FILES3.some(x=>x.name===f.name)) FILES3.push(f); }
+  const sheet=FILES3.filter(f=>/\.(xlsx|xlsm|zip)$/i.test(f.name));
+  $("chips3").innerHTML=FILES3.map(f=>`<span class="chip ${/\.(xlsx|xlsm|zip)$/i.test(f.name)?"book":""}">${esc(f.name)}</span>`).join("");
+  $("go3").disabled = sheet.length!==1;
+}
+function fd3(){ const fd=new FormData();
+  FILES3.forEach(f=>fd.append("f",f,f.name)); fd.append("campaign",CAMP); return fd; }
+async function setsPreview(){
+  $("go3").disabled=true; $("out3").innerHTML='<p class="spin">Checking…</p>';
+  try{
+    const r=await fetch("/api/adsets-preview",{method:"POST",body:fd3()});
+    const d=await r.json();
+    if(!r.ok||!d.ok){
+      $("out3").innerHTML=`<div class="err">`+(d.problems||[d.error]).map(esc).join("\n")+`</div>`;
+      $("go3").disabled=false; return; }
+    if(!d.counts.adsets){
+      $("out3").innerHTML=`<div class="note">Nothing new — every ad set in that workbook is
+        already in this campaign.</div>`; $("go3").disabled=false; return; }
+    $("out3").innerHTML=`<div class="note"><b>Will ADD to "${esc(d.campaign)}":</b><br>
+      ${d.adsets.map(a=>`• ${esc(a.name)} — ${(a.countries||[]).join(", ")} — ${a.ads.length} ad(s)`).join("<br>")}
+      ${d.skipped.length?`<br><br>Skipped (already there): ${d.skipped.map(esc).join(", ")}`:""}
+      <br><br>Everything already in this campaign stays untouched.
+      New objects are created <b>PAUSED</b>.
+      <div class="row" style="margin-top:10px">
+        <button onclick="setsCreate()">Add ${d.counts.adsets} ad set(s), ${d.counts.ads} ad(s)</button>
+      </div></div>`;
+  }catch(e){ $("out3").innerHTML=`<div class="err">${esc(e.message)}</div>`; $("go3").disabled=false; }
+}
+async function setsCreate(){
+  $("out3").innerHTML='<p class="spin">Creating the new ad sets…</p>';
+  try{
+    const r=await fetch("/api/adsets-create",{method:"POST",body:fd3()});
+    const d=await r.json();
+    if(!d.ok){ $("out3").innerHTML=`<div class="err">`+(d.problems||[d.error]).map(esc).join("\n")+`</div>`; return; }
+    FILES3=[];
+    alert(`Added ${d.result.adsets.length} ad set(s) and ${d.result.ads.length} ad(s), paused.`);
+    pickCamp(CAMP,CAMP_NAME,true);
+  }catch(e){ $("out3").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 
 let FILES2=[];

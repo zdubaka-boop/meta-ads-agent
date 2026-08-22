@@ -523,6 +523,60 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _add_adsets(self, do_create):
+        """Add new ad sets into a campaign that already exists.
+
+        Deliberately separate from /api/create: that builds a whole new
+        campaign, this only appends. Nothing existing is recreated, so no
+        running ad set loses its learning.
+        """
+        import multipart, builder
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 4_300_000:
+            return self._send(413, {"error": "Upload too large (~4.5MB cap). Reference "
+                                             "creatives already in the account instead."})
+        fields, files = multipart.parse(self.rfile.read(n), self.headers.get("Content-Type"))
+        files = unpack_zip(files)
+        campaign_id = (fields.get("campaign") or "").strip()
+        if not campaign_id:
+            return self._send(400, {"error": "missing campaign"})
+
+        book = next(((k, v) for k, v in files.items()
+                     if k.lower().endswith((".xlsx", ".xlsm"))), None)
+        if not book:
+            return self._send(400, {"error": "Drop in the workbook describing the new ad set(s)."})
+        creatives = {k: v for k, v in files.items() if k != book[0]}
+
+        spec, problems, resolved = builder.parse_workbook(book[1], creatives)
+        if problems:
+            return self._send(200, {"ok": False, "problems": problems, "resolved": resolved})
+
+        camp = meta.get(campaign_id, "name,daily_budget,lifetime_budget")
+        existing = {a.get("name") for a in
+                    meta.get_all(f"{campaign_id}/adsets", "id,name", cap=500)}
+        fresh = [a for a in spec["adsets"] if a["name"] not in existing]
+        dupes = [a["name"] for a in spec["adsets"] if a["name"] in existing]
+
+        if not do_create:
+            return self._send(200, {"ok": True, "preview": True, "resolved": resolved,
+                "campaign": camp.get("name"),
+                "adsets": [{"name": a["name"],
+                            "countries": _geo_label(a["targeting"]),
+                            "ads": [x["name"] for x in a["ads"]]} for a in fresh],
+                "skipped": dupes,
+                "counts": {"adsets": len(fresh),
+                           "ads": sum(len(a["ads"]) for a in fresh)}})
+        log = []
+        try:
+            res = builder.add_adsets_to_campaign(
+                spec["account_id"], campaign_id, spec, creatives, log.append)
+        except builder.PartialBuild as e:
+            return self._send(400, {"ok": False, "problems": [str(e)],
+                                    "log": log, "partial": e.result})
+        except Exception as e:
+            return self._send(400, {"ok": False, "problems": [str(e)], "log": log})
+        return self._send(200, {"ok": True, "created": True, "result": res, "log": log})
+
     def _add_ads(self, do_create):
         """Add ads into an ad set that already exists."""
         import multipart, builder
@@ -657,6 +711,11 @@ class handler(BaseHTTPRequestHandler):
             if p.path == "/api/logout":
                 return self._send(200, {"ok": True},
                                   cookie="ms=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0")
+
+            if p.path in ("/api/adsets-preview", "/api/adsets-create"):
+                if not self._need_auth():
+                    return
+                return self._add_adsets(p.path.endswith("create"))
 
             if p.path in ("/api/add-preview", "/api/add-create"):
                 if not self._need_auth():
