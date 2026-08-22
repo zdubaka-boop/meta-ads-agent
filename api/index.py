@@ -27,10 +27,20 @@ TTL = 30 * 24 * 3600      # 30 days; only Sign out ends a session
 PUBLIC = Path(__file__).resolve().parent.parent / "public"
 
 
+SIG_LEN = 32          # sha256 HMAC, always exactly 32 bytes
+
+
 def sign(payload):
+    """Sign a session payload.
+
+    The signature is 32 RAW bytes and can contain any byte value, including
+    b'.', so it must never be separated from the payload by a delimiter -
+    that made roughly one cookie in nine fail its own check. The length is
+    fixed, so the split is by position.
+    """
     msg = payload.encode() if isinstance(payload, str) else str(payload).encode()
     sig = hmac.new(SECRET.encode(), msg, hashlib.sha256).digest()
-    return base64.urlsafe_b64encode(msg + b"." + sig).decode().rstrip("=")
+    return base64.urlsafe_b64encode(msg + sig).decode().rstrip("=")
 
 
 def verify(cookie):
@@ -39,7 +49,9 @@ def verify(cookie):
         return None
     try:
         raw = base64.urlsafe_b64decode(cookie + "=" * (-len(cookie) % 4))
-        msg, sig = raw.rsplit(b".", 1)
+        if len(raw) <= SIG_LEN:
+            return None
+        msg, sig = raw[:-SIG_LEN], raw[-SIG_LEN:]
         good = hmac.new(SECRET.encode(), msg, hashlib.sha256).digest()
         if not hmac.compare_digest(sig, good):
             return None
@@ -143,7 +155,11 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _fresh(self):
+        self._renew = None
+
     def _code(self):
+        self._fresh()
         m = re.search(r"ms=([A-Za-z0-9_\-]+)", self.headers.get("Cookie", "") or "")
         return verify(m.group(1)) if m else None
 
