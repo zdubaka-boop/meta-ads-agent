@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent</h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build 1505</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -754,5 +754,6 @@ function crumb(extra){
   if(extra && extra.camp) h+=` · <a onclick="nav('adsets',{camp:CAMP,campName:CAMP_NAME})">${esc(CAMP_NAME)}</a>`;
   return h+`</div>`;
 }
+window.BUILD="1505";
 boot().catch(e=>err(e.message));
 </script></body></html>
