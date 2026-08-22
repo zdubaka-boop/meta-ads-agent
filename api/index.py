@@ -27,6 +27,8 @@ TTL = 30 * 24 * 3600      # 30 days; only Sign out ends a session
 PUBLIC = Path(__file__).resolve().parent.parent / "public"
 
 
+BUILD_ID = "0822-1615"
+
 SIG_LEN = 32          # sha256 HMAC, always exactly 32 bytes
 
 
@@ -266,7 +268,8 @@ class handler(BaseHTTPRequestHandler):
             if p.path == "/api/session":
                 sess = self._sess()
                 return self._send(200, {"signed_in": bool(sess), "mode": "code",
-                                        "who": (sess or {}).get("w")})
+                                        "who": (sess or {}).get("w"),
+                                        "build": BUILD_ID})
             q = parse_qs(p.query)
             one = lambda k: (q.get(k) or [None])[0]
 
