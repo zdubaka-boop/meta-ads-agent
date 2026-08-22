@@ -84,11 +84,19 @@ def read_ads(path):
         name = r.get("ad_name") or r.get("name")
         if not name or not r.get("creative_file", r.get("creative", "")):
             continue
+        def _var(v):
+            raw = str(v or "")
+            parts = raw.split("\n") if "\n" in raw else raw.split("|")
+            return [x.strip() for x in parts if x.strip()][:5]
+        b, h, dsc = _var(r.get("body")), _var(r.get("headline")), _var(r.get("description"))
         out.append({
             "name": name,
             "creative": r.get("creative_file") or r.get("creative"),
-            "body": r.get("body", ""), "headline": r.get("headline", ""),
-            "description": r.get("description", ""), "cta": r.get("cta", ""),
+            "body": b[0] if b else "", "headline": h[0] if h else "",
+            **({"bodies": b} if len(b) > 1 else {}),
+            **({"headlines": h} if len(h) > 1 else {}),
+            **({"descriptions": dsc} if len(dsc) > 1 else {}),
+            "description": dsc[0] if dsc else "", "cta": r.get("cta", ""),
             "link": r.get("link", ""), "url_tags": r.get("url_tags", ""),
             "page_id": r.get("page_id", ""), "instagram_user_id": r.get("instagram_user_id", ""),
         })
@@ -168,7 +176,9 @@ def add_ads(acct, adset_id, ads, execute, defaults):
         pick = lambda k, d=None: ad.get(k) or defaults.get(k) or d
         common = dict(link=pick("link"), body=ad.get("body", ""), headline=ad.get("headline", ""),
                       description=ad.get("description") or None, cta=pick("cta", "LEARN_MORE"),
-                      ig_user_id=pick("instagram_user_id"), url_tags=pick("url_tags"))
+                      ig_user_id=pick("instagram_user_id"), url_tags=pick("url_tags"),
+                      bodies=ad.get("bodies"), headlines=ad.get("headlines"),
+                      descriptions=ad.get("descriptions"))
         creative = (meta.video_creative(pick("page_id"), m["video_id"], m["thumb"], **common)
                     if is_video else meta.image_creative(pick("page_id"), m["hash"], **common))
         ad_id = meta.create_ad(acct, adset_id, ad["name"], creative, pixel_id=defaults.get("pixel_id"))

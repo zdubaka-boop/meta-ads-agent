@@ -240,7 +240,9 @@ def main():
                           headline=ad.get("headline", ""), description=ad.get("description"),
                           cta=resolve(ad, d, "cta", "LEARN_MORE"),
                           ig_user_id=resolve(ad, d, "instagram_user_id"),
-                          url_tags=resolve(ad, d, "url_tags"))
+                          url_tags=resolve(ad, d, "url_tags"),
+                          bodies=ad.get("bodies"), headlines=ad.get("headlines"),
+                          descriptions=ad.get("descriptions"))
             page = resolve(ad, d, "page_id")
             creative = (meta.video_creative(page, m["video_id"], m["thumb"], **common)
                         if is_video else meta.image_creative(page, m["hash"], **common))
