@@ -66,7 +66,7 @@ def account(acct=None):
     return a if str(a).startswith("act_") else f"act_{a}"
 
 
-def _request(path, params, post, op, retries=4):
+def _request(path, params, post, op, retries=5):
     params = dict(params)
     params["access_token"] = token()
     body = urllib.parse.urlencode(params).encode()
@@ -82,9 +82,19 @@ def _request(path, params, post, op, retries=4):
                 err = json.loads(e.read()).get("error", {})
             except Exception:
                 err = {"message": f"HTTP {e.code}"}
-            transient = err.get("is_transient") or e.code in (429, 500, 502, 503, 504)
+            # Meta's rate limits (4 app-level, 17 account-level, 32, 613) are not
+            # flagged is_transient but always clear on their own. They need a much
+            # longer wait than a normal blip.
+            rate_limited = err.get("code") in (4, 17, 32, 613)
+            transient = (err.get("is_transient") or rate_limited
+                         or e.code in (429, 500, 502, 503, 504))
             if transient and attempt < retries:
-                time.sleep(min(60, 5 * 2 ** (attempt - 1)))
+                wait = (min(300, 45 * 2 ** (attempt - 1)) if rate_limited
+                        else min(60, 5 * 2 ** (attempt - 1)))
+                if rate_limited:
+                    print(f"  Meta rate limit on this ad account. Waiting {wait}s "
+                          f"(attempt {attempt}/{retries})…")
+                time.sleep(wait)
                 continue
             raise MetaError(op, err)
         except urllib.error.URLError:
