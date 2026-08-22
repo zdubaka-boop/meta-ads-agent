@@ -58,8 +58,17 @@ def _minor(v, where, problems):
     return int(f)
 
 
-def parse_workbook(xlsx_bytes, creatives):
-    """-> (spec, problems, resolved). Never writes anything to Meta."""
+def parse_workbook(xlsx_bytes, creatives, mode="campaign", inherit=None):
+    """-> (spec, problems, resolved). Never writes anything to Meta.
+
+    mode="campaign": building a new campaign, so the Campaign tab is required.
+    mode="append":   adding into a campaign that already exists. The campaign's
+                     own name / objective / budget mode come from Meta, so those
+                     cells are ignored, and a blank page_id / link / cta is
+                     inherited from the ads already in that campaign rather than
+                     demanded again. One template serves both.
+    """
+    inherit = inherit or {}
     import io, tempfile, os
     fd, tmp = tempfile.mkstemp(suffix=".xlsx")
     try:
@@ -82,19 +91,36 @@ def parse_workbook(xlsx_bytes, creatives):
             kv[str(row[0]).strip()] = str(row[1]).strip() if row[1] != "" else ""
     g = lambda k: (kv.get(k) or "").strip()
 
-    for req in ("account_id", "campaign_name", "objective", "budget_mode", "page_id", "link", "cta"):
-        if not g(req):
-            problems.append(f"Campaign tab: '{req}' is empty and is required")
-    mode = g("budget_mode").upper()
-    if mode not in ("CBO", "ABO"):
-        problems.append("Campaign tab: budget_mode must be CBO or ABO")
-    camp_budget = _minor(g("daily_budget_minor"), "Campaign daily_budget_minor", problems)
-    if mode == "CBO" and not camp_budget:
-        problems.append("Campaign tab: daily_budget_minor is required for CBO (e.g. 20000 = 200.00)")
+    appending = (mode == "append")
+    required = ("account_id", "page_id", "link", "cta") if appending else \
+               ("account_id", "campaign_name", "objective", "budget_mode",
+                "page_id", "link", "cta")
 
     defaults = {k: g(k) for k in ("page_id", "instagram_user_id", "pixel_id", "link", "cta",
                                   "url_tags", "dsa_beneficiary", "dsa_payor", "display_link") if g(k)}
-    acct = g("account_id")
+    acct = g("account_id") or inherit.get("account_id", "")
+    if appending:
+        # Anything the sheet leaves blank comes from the campaign being added to.
+        for k in ("page_id", "link", "cta", "pixel_id", "instagram_user_id",
+                  "url_tags", "dsa_beneficiary"):
+            if not defaults.get(k) and inherit.get(k):
+                defaults[k] = inherit[k]
+
+    for req in required:
+        have_it = acct if req == "account_id" else defaults.get(req)
+        if not have_it:
+            problems.append(
+                f"Campaign tab: '{req}' is empty and is required"
+                if not appending else
+                f"'{req}' is missing — put it on the Campaign tab, or set it on each ad row")
+
+    mode_budget = (g("budget_mode") or (inherit.get("budget_mode") if appending else "")).upper()
+    if not appending and mode_budget not in ("CBO", "ABO"):
+        problems.append("Campaign tab: budget_mode must be CBO or ABO")
+    camp_budget = _minor(g("daily_budget_minor"), "Campaign daily_budget_minor", problems)
+    if not appending and mode_budget == "CBO" and not camp_budget:
+        problems.append("Campaign tab: daily_budget_minor is required for CBO (e.g. 20000 = 200.00)")
+    mode = mode_budget
     LOC = _locales()
 
     # Validate the identities against the real account. These are the fields

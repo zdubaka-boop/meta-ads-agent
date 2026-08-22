@@ -547,11 +547,39 @@ class handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "Drop in the workbook describing the new ad set(s)."})
         creatives = {k: v for k, v in files.items() if k != book[0]}
 
-        spec, problems, resolved = builder.parse_workbook(book[1], creatives)
+        # Everything the sheet does not say is taken from the campaign it is
+        # being added to, so the Campaign tab can be left entirely blank.
+        camp = meta.get(campaign_id, "name,daily_budget,lifetime_budget,account_id")
+        inherit = {"account_id": meta.account(camp.get("account_id")),
+                   "budget_mode": "CBO" if (camp.get("daily_budget")
+                                            or camp.get("lifetime_budget")) else "ABO"}
+        try:
+            for aset in meta.get_all(f"{campaign_id}/adsets", "id,dsa_beneficiary", cap=5):
+                if aset.get("dsa_beneficiary"):
+                    inherit["dsa_beneficiary"] = aset["dsa_beneficiary"]
+                for ad in meta.get_all(f"{aset['id']}/ads",
+                                       "creative{object_story_spec,url_tags}", cap=1):
+                    cr = ad.get("creative") or {}
+                    oss = cr.get("object_story_spec") or {}
+                    ld = oss.get("link_data") or oss.get("video_data") or {}
+                    inherit.setdefault("page_id", oss.get("page_id"))
+                    cta = (ld.get("call_to_action") or {})
+                    inherit.setdefault("cta", cta.get("type"))
+                    inherit.setdefault("link", ld.get("link")
+                                       or (cta.get("value") or {}).get("link"))
+                    if cr.get("url_tags"):
+                        inherit.setdefault("url_tags", cr["url_tags"])
+                if inherit.get("page_id"):
+                    break
+        except Exception:
+            pass
+        inherit = {k: v for k, v in inherit.items() if v}
+
+        spec, problems, resolved = builder.parse_workbook(
+            book[1], creatives, mode="append", inherit=inherit)
         if problems:
             return self._send(200, {"ok": False, "problems": problems, "resolved": resolved})
 
-        camp = meta.get(campaign_id, "name,daily_budget,lifetime_budget")
         existing = {a.get("name") for a in
                     meta.get_all(f"{campaign_id}/adsets", "id,name", cap=500)}
         fresh = [a for a in spec["adsets"] if a["name"] not in existing]

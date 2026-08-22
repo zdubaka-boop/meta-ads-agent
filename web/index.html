@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build APPEND</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build ONESHEET</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -529,8 +529,9 @@ async function pickCamp(id,name,replay){
         loses its learning phase.</p>
       <div class="drop" id="dz3" style="padding:22px">
         <h3 style="font-size:15px">Drop a workbook here</h3>
-        <p>Its <b>Ad Sets</b> and <b>Ads</b> tabs are used. The Campaign tab is ignored —
-          this campaign is the target.</p>
+        <p>Same template as everywhere else. Only its <b>Ad Sets</b> and <b>Ads</b> tabs
+          are read — <b>you can leave the Campaign tab completely blank</b>. The Page, link,
+          CTA and budget mode are taken from this campaign.</p>
       </div>
       <input type="file" id="fi3" multiple class="hide">
       <div class="files" id="chips3"></div>
