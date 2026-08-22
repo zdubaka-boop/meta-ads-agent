@@ -65,6 +65,10 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:
 .picked .chip{cursor:pointer;border-color:var(--accent);color:var(--accent)}
 .picked .chip:hover{border-color:var(--bad);color:var(--bad)}
 .hint{color:var(--dim);font-size:12px;margin-top:4px}
+.done{background:#12241a;border:1px solid #1c5c33;border-radius:9px;padding:14px 16px;
+  margin-top:14px;font-size:14px}
+.done b{color:var(--ok)}
+.done ul{margin:8px 0 0;padding-left:18px;color:var(--dim);font-size:13px}
 .search{width:100%;max-width:340px;padding:8px 12px;font-size:14px;margin:0 0 12px}
 .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .bar .sp{flex:1}
@@ -97,7 +101,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build PICKER</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build FIELDS</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -650,22 +654,31 @@ async function pickAdset(id,name,replay){
         <div class="files" id="chipsq"></div>
 
         <div style="margin-top:14px">
-          <label>Primary text <span class="sub">— several variants? separate with |</span></label>
-          <input id="qBody" placeholder="loading the copy from an existing ad…">
-          <div style="height:8px"></div>
-          <label>Headline <span class="sub">— several variants? separate with |</span></label>
-          <input id="qHead">
-          <div style="height:8px"></div>
+          <label>Primary text</label>
+          <div id="qBodies"></div>
+          <button class="ghost" style="margin-top:6px;padding:5px 11px;font-size:12.5px"
+                  onclick="addField('qBodies','Primary text')">+ Add another primary text</button>
+
+          <div style="height:14px"></div>
+          <label>Headline</label>
+          <div id="qHeads"></div>
+          <button class="ghost" style="margin-top:6px;padding:5px 11px;font-size:12.5px"
+                  onclick="addField('qHeads','Headline')">+ Add another headline</button>
+
+          <div class="hint" style="margin-top:8px">Add more than one and Meta rotates them
+            inside each ad, showing whichever performs best. Up to 5 of each.</div>
+
+          <div style="height:16px"></div>
           <div class="row">
-            <div style="flex:2;min-width:220px"><label>Destination link</label>
+            <div style="flex:2;min-width:230px"><label>Destination link</label>
               <input id="qLink"></div>
-            <div style="flex:1;min-width:140px"><label>Button</label>
-              <select id="qCta">${["LEARN_MORE","SHOP_NOW","SIGN_UP","SUBSCRIBE","GET_OFFER",
-                 "BUY_NOW","ORDER_NOW","GET_STARTED","DOWNLOAD","APPLY_NOW"]
-                 .map(x=>`<option>${x}</option>`).join("")}</select></div>
-            <div style="flex:1;min-width:140px"><label>Name prefix</label>
-              <input id="qPrefix" value="new"></div>
+            <div style="flex:1;min-width:160px"><label>Button</label>
+              <select id="qCta"></select></div>
           </div>
+          <div style="height:12px"></div>
+          <label>Name these ads <span class="sub">— a number and the image name are added</span></label>
+          <input id="qPrefix" value="new" oninput="nameHint()">
+          <div class="hint" id="qNameHint"></div>
           <div class="sub" id="qFrom" style="margin-top:8px"></div>
           <div class="row" style="margin-top:12px">
             <button id="goq" disabled onclick="quickPreview()">Check these ads</button>
@@ -749,6 +762,12 @@ document.addEventListener("click",e=>{
   if(!e.target.closest(".picker")) { const l=$("cList"); if(l) l.classList.add("hide"); }
 });
 
+function done(target, title, lines, extra){
+  $(target).innerHTML = `<div class="done"><b>✓ ${esc(title)}</b>` +
+    (lines && lines.length ? `<ul>${lines.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : "") +
+    (extra || "") + `</div>`;
+}
+
 function dupAdset(id,name){
   $("dupbox").innerHTML=`<div class="card" style="background:var(--panel2);margin:14px 0">
     <h3 style="margin:0 0 4px;font-size:15px">Duplicate "${esc(name)}"</h3>
@@ -794,13 +813,50 @@ async function dupGo(id){
       daily_budget_minor:(()=>{const v=parseFloat(($("dBudget").value||"").replace(",","."));
         return isNaN(v)?"":Math.round(v*100);})(),
       with_ads:$("dAds").checked})});
-    alert(`Created "${d.name}" (${d.status}).\n\n`+d.changed.join("\n")+
-      (d.warnings&&d.warnings.length?"\n\n"+d.warnings.join("\n"):""));
-    $("dupbox").innerHTML=""; pickCamp(CAMP,CAMP_NAME,true);
+    done("dOut", `Created "${d.name}" — PAUSED, not spending`,
+         (d.changed||[]).concat(d.warnings||[]),
+         `<div class="sub" style="margin-top:8px">Ad set ID ${d.id}. It will appear in the
+          list in a moment.</div>`);
+    setTimeout(()=>{ $("dupbox").innerHTML=""; pickCamp(CAMP,CAMP_NAME,true); }, 2200);
   }catch(e){ $("dOut").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 
 let FILESQ=[];
+const CTAS=["LEARN_MORE","SHOP_NOW","SIGN_UP","SUBSCRIBE","GET_OFFER","BUY_NOW",
+            "ORDER_NOW","GET_STARTED","DOWNLOAD","APPLY_NOW","CONTACT_US","BOOK_TRAVEL"];
+
+function addField(boxId, label, value){
+  const box=$(boxId);
+  if(box.children.length>=5) return;
+  const row=document.createElement("div");
+  row.className="row"; row.style.marginTop = box.children.length?"6px":"0";
+  const inp=document.createElement("input");
+  inp.type="text"; inp.value=value||"";
+  inp.placeholder=`${label} ${box.children.length+1}`;
+  inp.style.flex="1";
+  row.appendChild(inp);
+  if(box.children.length){          // the first one is never removable
+    const x=document.createElement("button");
+    x.className="ghost"; x.textContent="✕";
+    x.style.padding="8px 12px";
+    x.onclick=()=>{ row.remove(); };
+    row.appendChild(x);
+  }
+  box.appendChild(row);
+  return inp;
+}
+function fieldValues(boxId){
+  return [...$(boxId).querySelectorAll("input")].map(i=>i.value.trim()).filter(Boolean);
+}
+function nameHint(){
+  const pre=($("qPrefix").value||"ad").trim()||"ad";
+  const names=FILESQ.slice(0,3).map((f,i)=>
+    `${pre} ${String(i+1).padStart(2,"0")} ${f.name.replace(/\.[^.]+$/,"")}`);
+  $("qNameHint").textContent = names.length
+    ? "Will be named: " + names.join(", ") + (FILESQ.length>3?" …":"")
+    : "Drop images above and the names appear here.";
+}
+
 function wireQuick(){
   const dz=$("dzq"), fi=$("fiq"); if(!dz) return;
   FILESQ=[];
@@ -811,25 +867,43 @@ function wireQuick(){
   ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
     e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
   dz.addEventListener("drop",e=>takeDrop(e,addQ));
-  // Pre-fill the copy from an ad already in this ad set.
+
+  // The dropdown is built here, not in a nested template literal — that is
+  // what left it rendering empty.
+  const sel=$("qCta");
+  sel.innerHTML="";
+  CTAS.forEach(x=>{ const o=document.createElement("option"); o.value=o.textContent=x;
+                    sel.appendChild(o); });
+
+  $("qBodies").innerHTML=""; $("qHeads").innerHTML="";
+  addField("qBodies","Primary text"); addField("qHeads","Headline");
+  nameHint();
+
+  // Pre-fill from an ad already in this ad set: one field per variant.
   api("/api/ad-defaults?adset="+encodeURIComponent(CUR_ADSET)).then(d=>{
-    if(d.from_ad){
-      $("qBody").value=d.body||""; $("qHead").value=d.headline||"";
-      $("qLink").value=d.link||""; if(d.cta) $("qCta").value=d.cta;
-      $("qFrom").textContent=`Copy pre-filled from "${d.from_ad}". Edit it or leave as is.`;
-    } else { $("qBody").placeholder="Type the primary text"; }
+    if(!d.from_ad) return;
+    const bodies=(d.body||"").split("|").map(x=>x.trim()).filter(Boolean);
+    const heads =(d.headline||"").split("|").map(x=>x.trim()).filter(Boolean);
+    $("qBodies").innerHTML=""; $("qHeads").innerHTML="";
+    (bodies.length?bodies:[""]).forEach(v=>addField("qBodies","Primary text",v));
+    (heads.length?heads:[""]).forEach(v=>addField("qHeads","Headline",v));
+    $("qLink").value=d.link||"";
+    if(d.cta && CTAS.includes(d.cta)) sel.value=d.cta;
+    $("qFrom").textContent=`Copy pre-filled from "${d.from_ad}". Edit it or leave as is.`;
   }).catch(()=>{});
 }
 function addQ(list){
   for(const f of list){ if(/^image\//.test(f.type) && !FILESQ.some(x=>x.name===f.name)) FILESQ.push(f); }
   $("chipsq").innerHTML=FILESQ.map(f=>`<span class="chip">${esc(f.name)}</span>`).join("");
   $("goq").disabled = !FILESQ.length;
+  nameHint();
 }
 function fdq(mode){
   const fd=new FormData();
   FILESQ.forEach(f=>fd.append("f",f,f.name));
   fd.append("adset",CUR_ADSET); fd.append("account",ACCT);
-  fd.append("body",$("qBody").value); fd.append("headline",$("qHead").value);
+  fd.append("body",fieldValues("qBodies").join(" | "));
+  fd.append("headline",fieldValues("qHeads").join(" | "));
   fd.append("link",$("qLink").value); fd.append("cta",$("qCta").value);
   fd.append("prefix",$("qPrefix").value); if(mode) fd.append("mode",mode);
   return fd;
@@ -854,9 +928,10 @@ async function quickCreate(){
     const d=await r.json();
     if(!d.ok){ $("outq").innerHTML=`<div class="err">`+(d.problems||[d.error]).map(esc).join("\n")+`</div>`; return; }
     FILESQ=[];
-    alert(`Created ${d.created.length} ad(s), paused.`+
-      (d.skipped.length?`\nSkipped: ${d.skipped.join(", ")}`:""));
-    pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
+    done("outq", `Created ${d.created.length} ad(s) — PAUSED, not spending`,
+         d.created.map(a=>a.name).concat(
+           d.skipped.length?[`Skipped (already here): ${d.skipped.join(", ")}`]:[]));
+    setTimeout(()=>pickAdset(CUR_ADSET,CUR_ADSET_NAME,true), 2200);
   }catch(e){ $("outq").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 
@@ -908,8 +983,10 @@ async function setsCreate(){
     const d=await r.json();
     if(!d.ok){ $("out3").innerHTML=`<div class="err">`+(d.problems||[d.error]).map(esc).join("\n")+`</div>`; return; }
     FILES3=[];
-    alert(`Added ${d.result.adsets.length} ad set(s) and ${d.result.ads.length} ad(s), paused.`);
-    pickCamp(CAMP,CAMP_NAME,true);
+    done("out3", `Added ${d.result.adsets.length} ad set(s) and ${d.result.ads.length} ad(s) `+
+                 `— PAUSED, not spending`,
+         d.result.adsets.map(a=>a.name));
+    setTimeout(()=>pickCamp(CAMP,CAMP_NAME,true), 2200);
   }catch(e){ $("out3").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 
@@ -962,9 +1039,10 @@ async function addCreate(){
     if(!d.ok){ $("out2").innerHTML=`<div class="err">`+
       (d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`; return; }
     FILES2=[];
-    alert(`Created ${d.created.length} ad(s), paused.`+
-      (d.skipped.length?`\nSkipped (already there): ${d.skipped.join(", ")}`:""));
-    pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
+    done("out2", `Created ${d.created.length} ad(s) — PAUSED, not spending`,
+         d.created.map(a=>a.name).concat(
+           d.skipped.length?[`Skipped: ${d.skipped.join(", ")}`]:[]));
+    setTimeout(()=>pickAdset(CUR_ADSET,CUR_ADSET_NAME,true), 2200);
   }catch(e){ $("out2").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 
