@@ -222,6 +222,15 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, (PUBLIC / "index.html").read_bytes(),
                                   "text/html; charset=utf-8",
                                   no_cache=True)
+            if p.path == "/api/sheet":
+                # A sheet scoped to where the user is standing, so "which
+                # template?" never has to be answered.
+                if not self._need_auth():
+                    return
+                q2 = parse_qs(p.query)
+                return self._scoped_sheet((q2.get("scope") or [""])[0],
+                                          (q2.get("id") or [""])[0])
+
             if p.path == "/api/export":
                 if not self._need_auth():
                     return
@@ -359,6 +368,104 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             traceback.print_exc()
             return self._send(500, {"error": f"{type(e).__name__}: {e}"})
+
+    def _scoped_sheet(self, scope, oid):
+        """A workbook pre-scoped to one campaign or one ad set.
+
+        scope="adsets": for adding ad sets to campaign `oid`. Its existing ad
+        sets are listed so the pattern is visible; re-uploading them is
+        harmless because duplicates are skipped.
+        scope="ads": for adding ads to ad set `oid`. The adset_name column is
+        already filled in.
+        """
+        import io
+        from openpyxl import load_workbook
+        from openpyxl.styles import Font, PatternFill
+
+        wb = load_workbook(Path(__file__).parent / "_lib" / "CAMPAIGN-TEMPLATE.xlsx")
+        blue = Font(name="Arial", size=10, color="0000FF")
+        grey = Font(name="Arial", size=10, color="9A9A9A", italic=True)
+        note = Font(name="Arial", size=11, bold=True, color="C00000")
+        locales = {v: k for k, v in (meta.load_locales() or {}).items()}
+        put = lambda ws, r, c, v, f=blue: ws.cell(row=r, column=c, value=v).__setattr__("font", f)
+
+        c = wb["Campaign"]
+        for row in range(2, 27):
+            c.cell(row=row, column=2).value = None
+
+        a, ads_ws = wb["Ad Sets"], wb["Ads"]
+        for row in range(2, 12):
+            for col in range(1, 30):
+                a.cell(row=row, column=col).value = None
+            for col in range(1, 13):
+                ads_ws.cell(row=row, column=col).value = None
+
+        if scope == "ads":
+            aset = meta.get(oid, "name,campaign{id,name}")
+            camp = aset.get("campaign") or {}
+            put(c, 2, 2, meta.account((meta.get(camp.get("id"), "account_id") or {})
+                                      .get("account_id", "")))
+            put(a, 2, 1, aset.get("name"), grey)
+            put(a, 3, 1, "^ this ad set already exists — do not change this name", grey)
+            existing = meta.get_all(f"{oid}/ads", "name", cap=200)
+            r = 2
+            for ad in existing[:5]:
+                put(ads_ws, r, 1, aset.get("name"), grey)
+                put(ads_ws, r, 2, ad.get("name"), grey)
+                put(ads_ws, r, 3, "(already live — will be skipped)", grey)
+                r += 1
+            for _ in range(10):
+                put(ads_ws, r, 1, aset.get("name"))
+                r += 1
+            put(ads_ws, r + 1, 1,
+                "Fill the rows above: ad_name, creative_file, body, headline, cta, link.", note)
+            put(ads_ws, r + 2, 1,
+                "creative_file = a filename you upload, OR the name of an image already "
+                "in this ad account.", grey)
+            fname = f"ADD-ADS-{(aset.get('name') or 'adset')[:32]}.xlsx"
+
+        else:
+            camp = meta.get(oid, "name,account_id,daily_budget,lifetime_budget,objective")
+            put(c, 2, 2, meta.account(camp.get("account_id")))
+            put(c, 3, 2, camp.get("name"))
+            put(c, 4, 2, camp.get("objective"))
+            cbo = bool(camp.get("daily_budget") or camp.get("lifetime_budget"))
+            put(c, 6, 2, "CBO" if cbo else "ABO")
+            put(c, 16, 2, "Leave the rest blank — taken from the live campaign", grey)
+            r = 2
+            for aset in meta.get_all(f"{oid}/adsets",
+                    "name,daily_budget,optimization_goal,billing_event,targeting", cap=20):
+                t = aset.get("targeting") or {}
+                geo = (t.get("geo_locations") or {})
+                put(a, r, 1, aset.get("name"), grey)
+                if aset.get("daily_budget"):
+                    put(a, r, 2, int(aset["daily_budget"]), grey)
+                put(a, r, 4, aset.get("optimization_goal"), grey)
+                put(a, r, 5, aset.get("billing_event"), grey)
+                put(a, r, 8, ",".join(geo.get("countries") or
+                                      (["worldwide"] if geo.get("country_groups") else [])), grey)
+                names = [locales.get(x) for x in (t.get("locales") or []) if locales.get(x)]
+                if names:
+                    put(a, r, 13, ",".join(names), grey)
+                put(a, r, 15, t.get("age_min"), grey); put(a, r, 16, t.get("age_max"), grey)
+                r += 1
+            put(a, r + 1, 1, "^ ad sets above already exist and will be skipped. "
+                             "Add YOUR new ad sets in the rows below.", note)
+            r += 2
+            put(a, r, 1, "")           # first blank row for them
+            put(ads_ws, 2, 1, "<- put the new ad set's name here")
+            put(ads_ws, 3, 1, "one row per ad, matching an Ad Sets row above", grey)
+            fname = f"ADD-ADSETS-{(camp.get('name') or 'campaign')[:32]}.xlsx"
+
+        buf = io.BytesIO(); wb.save(buf); data = buf.getvalue()
+        safe = "".join(ch if (ch.isalnum() or ch in "-_.") else "-" for ch in fname)
+        self.send_response(200)
+        self.send_header("Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.send_header("Content-Disposition", f'attachment; filename="{safe}"')
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def _export_campaign(self, campaign_id):
         """Write an existing campaign back out as a workbook.

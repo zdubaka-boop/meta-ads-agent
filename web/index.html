@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build QUICK</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build CLEAR</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -520,18 +520,31 @@ async function pickCamp(id,name,replay){
         ${C.map(x=>`<td class="num" data-v="${st[x[0]]??-1}">${fmtStat(st[x[0]],x[0])}</td>`).join("")}
         <td><span class="tag ${/ACTIVE/.test(a.effective_status)?"ok":"warn"}">${esc(a.effective_status||a.status)}</span></td>
       </tr>`;}).join("")+`</tbody></table>
-      <div class="note">Click an ad set to see its ads, add more ads to it, or switch
-        ads on and off.</div>
+      <div class="note"><b>Want to add ADS?</b> Click an ad set above. You can drop images
+        straight in there — no spreadsheet at all. The section below is only for adding a
+        whole new <b>ad set</b>.</div>
 
       <h3 style="margin:26px 0 6px;font-size:15px">Add new ad sets to this campaign</h3>
-      <p class="sub">Only the new ad sets are created. The campaign and every ad set
-        already running are left exactly as they are — nothing is rebuilt, so nothing
-        loses its learning phase.</p>
+      <p class="sub">Only the new ad sets are created. The campaign and every ad set already
+        running are left exactly as they are — nothing is rebuilt, so nothing loses its
+        learning phase.</p>
+
+      <div class="card" style="background:var(--panel2);margin:0 0 12px">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <h3 style="margin:0 0 4px;font-size:15px">Step 1 — get the sheet for THIS campaign</h3>
+            <p class="sub" style="margin:0">It comes with this campaign's existing ad sets
+              already listed as examples. Add your new ones underneath and save.</p>
+          </div>
+          <a href="/api/sheet?scope=adsets&id=${CAMP}" download>
+            <button>Download sheet</button></a>
+        </div>
+      </div>
+
+      <h3 style="margin:0 0 6px;font-size:15px">Step 2 — drop it back here</h3>
       <div class="drop" id="dz3" style="padding:22px">
-        <h3 style="font-size:15px">Drop a workbook here</h3>
-        <p>Same template as everywhere else. Only its <b>Ad Sets</b> and <b>Ads</b> tabs
-          are read — <b>you can leave the Campaign tab completely blank</b>. The Page, link,
-          CTA and budget mode are taken from this campaign.</p>
+        <h3 style="font-size:15px">Drop the filled-in sheet here</h3>
+        <p>Plus any images it names. The existing ad sets in it are skipped automatically.</p>
       </div>
       <input type="file" id="fi3" multiple class="hide">
       <div class="files" id="chips3"></div>
@@ -655,8 +668,19 @@ async function pickAdset(id,name,replay){
 
       <details><summary class="sub" style="cursor:pointer">Or upload a spreadsheet instead
         (for bigger batches with different copy per ad)</summary>
-      <p class="sub" style="margin-top:10px">Drop a CSV (or a workbook — its <b>Ads</b> tab is
-        used) plus the images it names. Ads already here are skipped.</p>
+      <div class="card" style="background:var(--panel2);margin:10px 0">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <h3 style="margin:0 0 4px;font-size:15px">Get the sheet for THIS ad set</h3>
+            <p class="sub" style="margin:0">The ad set name is already filled in on every row.
+              Just add ad_name, creative_file and the copy.</p>
+          </div>
+          <a href="/api/sheet?scope=ads&id=${CUR_ADSET}" download>
+            <button class="ghost">Download sheet</button></a>
+        </div>
+      </div>
+      <p class="sub">Then drop it back below, with the images it names. Ads already here
+        are skipped.</p>
       <div class="drop" id="dz2" style="padding:24px">
         <h3 style="font-size:15px">Drop the ad list and images here</h3>
         <p>Columns: ad_name, creative_file, body, headline, description, cta, link</p>
