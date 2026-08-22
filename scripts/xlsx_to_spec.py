@@ -17,12 +17,27 @@ import meta
 
 meta.load_env()
 
-EXAMPLE_MARKERS = ("Q3 — UK", "Q3 - UK", "act_1234567890", "example.com", "Example Ltd")
+# The template ships example rows that must be ignored if left in. Match them
+# by their EXACT names, never by substrings of their content: "example.com" is
+# a perfectly ordinary landing page, and blocklisting it silently deleted every
+# ad in a real sheet.
+EXAMPLE_ADSET_NAMES = {
+    "q3 uk broad 18-45", "q3 uk retarget 30d", "q3 spanish speakers ww",
+    "example — lt — broad", "example — lt — 25-44",
+}
+EXAMPLE_AD_NAMES = {
+    "q3-uk-01-price", "q3-uk-02-ugc", "q3-uk-03-offer", "q3-uk-01", "q3-uk-02",
+    "ex-01-yellow", "ex-02-red", "ex-03-blue", "ex-04-black",
+}
 
 
 def is_example(row):
-    blob = " ".join(str(v) for v in row.values())
-    return any(m in blob for m in EXAMPLE_MARKERS)
+    """True only for the template's own demo rows, matched by exact name."""
+    name = str(row.get("adset_name") or "").strip().lower()
+    ad = str(row.get("ad_name") or "").strip().lower()
+    if ad:
+        return ad in EXAMPLE_AD_NAMES
+    return name in EXAMPLE_ADSET_NAMES
 
 
 def main():
