@@ -1,0 +1,350 @@
+{
+ "account_id": "act_973728230254183",
+ "campaign": {
+  "name": "Spring 2026 | EU | Traffic",
+  "objective": "OUTCOME_TRAFFIC",
+  "budget_mode": "CBO",
+  "daily_budget_minor": 5000,
+  "special_ad_categories": []
+ },
+ "defaults": {
+  "page_id": "580708115120419",
+  "link": "https://www.oriano.app",
+  "cta": "SHOP_NOW",
+  "url_tags": "utm_source=facebook&utm_medium=paid&utm_campaign=spring26",
+  "dsa_beneficiary": "Bakadu"
+ },
+ "adsets": [
+  {
+   "name": "Spring26 | LT | Broad 18-65",
+   "optimization_goal": "LINK_CLICKS",
+   "billing_event": "IMPRESSIONS",
+   "targeting": {
+    "geo_locations": {
+     "countries": [
+      "LT"
+     ],
+     "location_types": [
+      "home",
+      "recent"
+     ]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "locales": [
+     40
+    ]
+   },
+   "ads": [
+    {
+     "name": "SPR26-LT-01-price",
+     "creative": "creatives/lt-price.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=lt",
+     "body": "Pavasario išpardavimas prasidėjo.",
+     "bodies": [
+      "Pavasario išpardavimas prasidėjo.",
+      "Viskas su 30% nuolaida šią savaitę.",
+      "Tik iki sekmadienio."
+     ],
+     "headline": "Apsipirkti dabar",
+     "headlines": [
+      "Apsipirkti dabar",
+      "30% nuolaida"
+     ]
+    },
+    {
+     "name": "SPR26-LT-02-proof",
+     "creative": "creatives/lt-proof.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=lt",
+     "body": "Daugiau nei 12 000 penkių žvaigždučių įvertinimų.",
+     "headline": "Patikrinta klientų"
+    },
+    {
+     "name": "SPR26-LT-03-ugc",
+     "creative": "creatives/lt-ugc.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=lt",
+     "body": "Išbandžiau viską prieš tai. Šeši mėnesiai – pati pamatykite.",
+     "bodies": [
+      "Išbandžiau viską prieš tai. Šeši mėnesiai – pati pamatykite.",
+      "Rezultatai per savaitę."
+     ],
+     "headline": "Tikri rezultatai"
+    },
+    {
+     "name": "SPR26-LT-04-offer",
+     "creative": "creatives/lt-offer.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=lt",
+     "body": "Nemokamas pristatymas visiems užsakymams.",
+     "headline": "Nemokamas pristatymas",
+     "headlines": [
+      "Nemokamas pristatymas",
+      "Užsisakyk šiandien"
+     ]
+    }
+   ],
+   "dsa_beneficiary": "Bakadu"
+  },
+  {
+   "name": "Spring26 | LV | Broad 18-65",
+   "optimization_goal": "LINK_CLICKS",
+   "billing_event": "IMPRESSIONS",
+   "targeting": {
+    "geo_locations": {
+     "countries": [
+      "LV"
+     ],
+     "location_types": [
+      "home",
+      "recent"
+     ]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "locales": [
+     78
+    ]
+   },
+   "ads": [
+    {
+     "name": "SPR26-LV-01-price",
+     "creative": "creatives/lv-price.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=lv",
+     "body": "Pavasara izpārdošana ir sākusies.",
+     "bodies": [
+      "Pavasara izpārdošana ir sākusies.",
+      "Viss ar 30% atlaidi šonedēļ."
+     ],
+     "headline": "Iepirkties tagad",
+     "headlines": [
+      "Iepirkties tagad",
+      "30% atlaide"
+     ]
+    },
+    {
+     "name": "SPR26-LV-02-proof",
+     "creative": "creatives/lv-proof.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=lv",
+     "body": "Vairāk nekā 12 000 piecu zvaigžņu atsauksmju.",
+     "headline": "Pārbaudīts"
+    },
+    {
+     "name": "SPR26-LV-03-ugc",
+     "creative": "creatives/lv-ugc.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=lv",
+     "body": "Es izmēģināju visu pirms tam. Seši mēneši vēlāk.",
+     "headline": "Īsti rezultāti"
+    },
+    {
+     "name": "SPR26-LV-04-offer",
+     "creative": "creatives/lv-offer.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=lv",
+     "body": "Bezmaksas piegāde visiem pasūtījumiem.",
+     "headline": "Bezmaksas piegāde"
+    }
+   ],
+   "dsa_beneficiary": "Bakadu"
+  },
+  {
+   "name": "Spring26 | PL | Broad 18-65",
+   "optimization_goal": "LINK_CLICKS",
+   "billing_event": "IMPRESSIONS",
+   "targeting": {
+    "geo_locations": {
+     "countries": [
+      "PL"
+     ],
+     "location_types": [
+      "home",
+      "recent"
+     ]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "locales": [
+     15
+    ]
+   },
+   "ads": [
+    {
+     "name": "SPR26-PL-01-price",
+     "creative": "creatives/pl-price.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=pl",
+     "body": "Wyprzedaż wiosenna już trwa.",
+     "bodies": [
+      "Wyprzedaż wiosenna już trwa.",
+      "Wszystko 30% taniej w tym tygodniu.",
+      "Tylko do niedzieli."
+     ],
+     "headline": "Kup teraz,30% taniej"
+    },
+    {
+     "name": "SPR26-PL-02-proof",
+     "creative": "creatives/pl-proof.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=pl",
+     "body": "Ponad 12 000 pięciogwiazdkowych opinii.",
+     "headline": "Sprawdzone przez klientów"
+    },
+    {
+     "name": "SPR26-PL-03-ugc",
+     "creative": "creatives/pl-ugc.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=pl",
+     "body": "Próbowałam wszystkiego. Sześć miesięcy później.",
+     "headline": "Prawdziwe efekty"
+    },
+    {
+     "name": "SPR26-PL-04-offer",
+     "creative": "creatives/pl-offer.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=pl",
+     "body": "Darmowa dostawa do każdego zamówienia.",
+     "headline": "Darmowa dostawa",
+     "headlines": [
+      "Darmowa dostawa",
+      "Zamów dziś"
+     ]
+    }
+   ],
+   "dsa_beneficiary": "Bakadu"
+  },
+  {
+   "name": "Spring26 | DE | Broad 18-65",
+   "optimization_goal": "LINK_CLICKS",
+   "billing_event": "IMPRESSIONS",
+   "targeting": {
+    "geo_locations": {
+     "countries": [
+      "DE"
+     ],
+     "location_types": [
+      "home",
+      "recent"
+     ]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "locales": [
+     5
+    ]
+   },
+   "ads": [
+    {
+     "name": "SPR26-DE-01-price",
+     "creative": "creatives/de-price.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=de",
+     "body": "Der Frühlingssale hat begonnen.",
+     "bodies": [
+      "Der Frühlingssale hat begonnen.",
+      "Diese Woche alles 30% günstiger."
+     ],
+     "headline": "Jetzt shoppen",
+     "headlines": [
+      "Jetzt shoppen",
+      "30% Rabatt"
+     ]
+    },
+    {
+     "name": "SPR26-DE-02-proof",
+     "creative": "creatives/de-proof.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=de",
+     "body": "Über 12.000 Fünf-Sterne-Bewertungen.",
+     "headline": "Von Kunden geprüft"
+    },
+    {
+     "name": "SPR26-DE-03-ugc",
+     "creative": "creatives/de-ugc.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=de",
+     "body": "Ich habe alles ausprobiert. Sechs Monate später.",
+     "headline": "Echte Ergebnisse"
+    },
+    {
+     "name": "SPR26-DE-04-offer",
+     "creative": "creatives/de-offer.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=de",
+     "body": "Kostenloser Versand für alle Bestellungen.",
+     "headline": "Gratis Versand"
+    }
+   ],
+   "dsa_beneficiary": "Bakadu"
+  },
+  {
+   "name": "Spring26 | ES | Broad 18-65",
+   "optimization_goal": "LINK_CLICKS",
+   "billing_event": "IMPRESSIONS",
+   "targeting": {
+    "geo_locations": {
+     "countries": [
+      "ES"
+     ],
+     "location_types": [
+      "home",
+      "recent"
+     ]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "locales": [
+     7
+    ]
+   },
+   "ads": [
+    {
+     "name": "SPR26-ES-01-price",
+     "creative": "creatives/es-price.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=es",
+     "body": "Las rebajas de primavera ya están aquí.",
+     "bodies": [
+      "Las rebajas de primavera ya están aquí.",
+      "Todo con un 30% de descuento esta semana.",
+      "Solo hasta el domingo."
+     ],
+     "headline": "Comprar ahora",
+     "headlines": [
+      "Comprar ahora",
+      "30% de descuento"
+     ]
+    },
+    {
+     "name": "SPR26-ES-02-proof",
+     "creative": "creatives/es-proof.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=es",
+     "body": "Más de 12.000 valoraciones de cinco estrellas.",
+     "headline": "Verificado por clientes"
+    },
+    {
+     "name": "SPR26-ES-03-ugc",
+     "creative": "creatives/es-ugc.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=es",
+     "body": "Lo probé todo antes. Seis meses después.",
+     "headline": "Resultados reales"
+    },
+    {
+     "name": "SPR26-ES-04-offer",
+     "creative": "creatives/es-offer.png",
+     "cta": "SHOP_NOW",
+     "link": "https://www.oriano.app/?market=es",
+     "body": "Envío gratis en todos los pedidos.",
+     "headline": "Envío gratis,Pide hoy"
+    }
+   ],
+   "dsa_beneficiary": "Bakadu"
+  }
+ ]
+}

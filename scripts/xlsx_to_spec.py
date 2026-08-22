@@ -109,6 +109,17 @@ def main():
     def csv_list(v):
         return [x.strip() for x in str(v or "").split(",") if x.strip()]
 
+    def variants(v):
+        """Split a copy cell into its variants.
+
+        A pipe (or a newline) separates several primary texts / headlines that
+        Meta rotates inside one ad. Commas are NOT separators - ad copy is full
+        of them. Max 5, which is Meta's limit.
+        """
+        raw = str(v or "")
+        parts = raw.replace("\r", "").split("\n") if "\n" in raw else raw.split("|")
+        return [x.strip() for x in parts if x.strip()][:5]
+
     adsets, by_name = [], {}
     for r in adset_rows:
         name = str(r["adset_name"]).strip()
@@ -297,13 +308,19 @@ def main():
         if not cre:
             problems.append(f"Ads tab: ad '{adn}' has no creative_file")
         ad = {"name": adn, "creative": f"creatives/{cre}" if cre and "/" not in cre else cre}
-        for src, dst in [("body", "body"), ("headline", "headline"), ("description", "description"),
-                         ("cta", "cta"), ("link", "link"), ("url_tags", "url_tags"),
+        for src, dst in [("cta", "cta"), ("link", "link"), ("url_tags", "url_tags"),
                          ("page_id", "page_id"), ("display_link", "display_link"),
                          ("instagram_user_id", "instagram_user_id")]:
             v = str(r.get(src, "")).strip()
             if v:
                 ad[dst] = v
+        for src, many in (("body", "bodies"), ("headline", "headlines"),
+                          ("description", "descriptions")):
+            vs = variants(r.get(src))
+            if vs:
+                ad[src] = vs[0]          # the single-variant fallback
+                if len(vs) > 1:
+                    ad[many] = vs        # rotated inside the ad by Meta
         by_name[an]["ads"].append(ad)
         csv_rows.append({"adset": an, "ad_name": adn, "creative": ad["creative"],
                          "body": ad.get("body", ""), "headline": ad.get("headline", ""),
