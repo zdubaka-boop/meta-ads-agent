@@ -1,1 +1,2 @@
 cryptography>=42
+openpyxl>=3.1

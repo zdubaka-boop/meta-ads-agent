@@ -190,6 +190,11 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, (PUBLIC / "index.html").read_bytes(),
                                   "text/html; charset=utf-8",
                                   no_cache=True)
+            if p.path == "/api/template" and (parse_qs(p.query).get("account") or [None])[0]:
+                if not self._need_auth():
+                    return
+                return self._prefilled_template((parse_qs(p.query)["account"])[0])
+
             if p.path in ("/api/template", "/CAMPAIGN-TEMPLATE.xlsx"):
                 # Read BEFORE sending any header: a read failure after the
                 # status line is written kills the whole invocation.
@@ -299,6 +304,79 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             traceback.print_exc()
             return self._send(500, {"error": f"{type(e).__name__}: {e}"})
+
+    def _prefilled_template(self, acct):
+        """Hand back the workbook already filled in for THIS ad account.
+
+        Hunting for account / Page / pixel IDs is the slowest part of filling
+        the sheet in, and getting one wrong is the commonest failure. So they
+        are written in, and the account's real Pages and pixels are listed on
+        their own tab instead of leaving people to guess.
+        """
+        import io
+        from openpyxl import load_workbook
+        from openpyxl.styles import Font, PatternFill
+
+        base = Path(__file__).parent / "_lib" / "CAMPAIGN-TEMPLATE.xlsx"
+        wb = load_workbook(base)
+        blue = Font(name="Arial", size=10, color="0000FF")
+
+        info = meta.get(meta.account(acct), "name,currency,timezone_name")
+        assets = meta.account_assets(acct)
+        pages = assets.get("pages") if isinstance(assets.get("pages"), list) else []
+        pixels = assets.get("pixels") if isinstance(assets.get("pixels"), list) else []
+        igs = assets.get("instagram") if isinstance(assets.get("instagram"), list) else []
+
+        c = wb["Campaign"]
+        c.cell(row=2, column=2, value=meta.account(acct)).font = blue
+        c.cell(row=3, column=2).value = None                      # they name the campaign
+        if len(pages) == 1:
+            c.cell(row=17, column=2, value=pages[0]["id"]).font = blue
+        else:
+            c.cell(row=17, column=2).value = None
+        c.cell(row=18, column=2).value = igs[0]["id"] if len(igs) == 1 else None
+        c.cell(row=19, column=2).value = pixels[0]["id"] if len(pixels) == 1 else None
+        for row in (20, 21, 22, 24, 25, 26):                      # clear example copy
+            c.cell(row=row, column=2).value = None
+
+        ws = wb.create_sheet("Your account", 1)
+        ws.column_dimensions["A"].width = 26
+        ws.column_dimensions["B"].width = 30
+        ws.column_dimensions["C"].width = 46
+        hdr = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+        fill = PatternFill("solid", fgColor="1F3864")
+        for i, t in enumerate(["What", "ID (copy this)", "Name"], start=1):
+            cell = ws.cell(row=1, column=i, value=t); cell.font = hdr; cell.fill = fill
+        r = 2
+        ws.cell(row=r, column=1, value="Ad account"); ws.cell(row=r, column=2, value=meta.account(acct))
+        ws.cell(row=r, column=3, value=f"{info.get('name')}  ({info.get('currency')}, "
+                                       f"{info.get('timezone_name')})"); r += 2
+        for label, rows_ in (("Page", pages), ("Instagram", igs), ("Pixel", pixels)):
+            for x in rows_:
+                ws.cell(row=r, column=1, value=label)
+                ws.cell(row=r, column=2, value=x["id"])
+                ws.cell(row=r, column=3, value=x.get("name") or x.get("username") or "")
+                r += 1
+            if not rows_:
+                ws.cell(row=r, column=1, value=label)
+                ws.cell(row=r, column=3, value="(none on this account)"); r += 1
+            r += 1
+        ws.cell(row=r, column=1, value="Budgets are in CENTS")
+        ws.cell(row=r, column=3, value="2000 = 20.00 " + (info.get("currency") or "")); r += 1
+        ws.cell(row=r, column=1, value="Already filled in")
+        ws.cell(row=r, column=3, value="account_id" +
+                (", page_id" if len(pages) == 1 else "") +
+                (", pixel_id" if len(pixels) == 1 else ""))
+
+        buf = io.BytesIO(); wb.save(buf); data = buf.getvalue()
+        self.send_response(200)
+        self.send_header("Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.send_header("Content-Disposition",
+            f'attachment; filename="CAMPAIGN-{meta.account(acct)}.xlsx"')
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def _add_ads(self, do_create):
         """Add ads into an ad set that already exists."""

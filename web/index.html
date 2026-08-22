@@ -87,7 +87,7 @@ select.mini{width:auto;padding:7px 10px;font-size:13px}
 </style></head><body>
 
 <header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build ZIP1</span></h1><span class="sp"></span>
+  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build PREFILL</span></h1><span class="sp"></span>
   <span class="who" id="who"></span>
   <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
 </header>
@@ -285,10 +285,12 @@ function q1(replay){
      <div class="row" style="justify-content:space-between">
        <div>
          <h3 style="margin:0 0 4px;font-size:15px">1 · Get the template</h3>
-         <p class="sub" style="margin:0">An Excel workbook with a Campaign, Ad Sets and
-           Ads tab. Fill it in, delete the grey example rows, keep the yellow cells.</p>
+         <p class="sub" style="margin:0">Pre-filled for <b>${esc(ACCT_NAME)}</b> — the account,
+           Page and pixel IDs are already in it, and a <b>Your account</b> tab lists every
+           ID you might need. You fill in the copy.</p>
        </div>
-       <a href="/api/template" download><button>Download the template</button></a>
+       <a href="/api/template?account=${encodeURIComponent(ACCT)}" download>
+         <button>Download template for this account</button></a>
      </div>
    </div>
 
