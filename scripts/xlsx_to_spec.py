@@ -301,31 +301,42 @@ def main():
         if an not in by_name:
             problems.append(f"Ads tab: ad '{adn}' references adset '{an}' which is not on the Ad Sets tab")
             continue
-        if adn in seen:
-            problems.append(f"Ads tab: duplicate ad_name '{adn}' — ad names must be unique")
-        seen.add(adn)
-        cre = str(r.get("creative_file", "")).strip()
-        if not cre:
+        # Several creatives in one cell = one ad each, sharing the copy.
+        # Text variants rotate inside an ad; only creatives need separate ads.
+        creatives_cell = variants(r.get("creative_file"))
+        if not creatives_cell:
             problems.append(f"Ads tab: ad '{adn}' has no creative_file")
-        ad = {"name": adn, "creative": f"creatives/{cre}" if cre and "/" not in cre else cre}
+
+        base = {}
         for src, dst in [("cta", "cta"), ("link", "link"), ("url_tags", "url_tags"),
                          ("page_id", "page_id"), ("display_link", "display_link"),
                          ("instagram_user_id", "instagram_user_id")]:
             v = str(r.get(src, "")).strip()
             if v:
-                ad[dst] = v
+                base[dst] = v
         for src, many in (("body", "bodies"), ("headline", "headlines"),
                           ("description", "descriptions")):
             vs = variants(r.get(src))
             if vs:
-                ad[src] = vs[0]          # the single-variant fallback
+                base[src] = vs[0]
                 if len(vs) > 1:
-                    ad[many] = vs        # rotated inside the ad by Meta
-        by_name[an]["ads"].append(ad)
-        csv_rows.append({"adset": an, "ad_name": adn, "creative": ad["creative"],
-                         "body": ad.get("body", ""), "headline": ad.get("headline", ""),
-                         "description": ad.get("description", ""), "cta": ad.get("cta", ""),
-                         "link": ad.get("link", "")})
+                    base[many] = vs
+
+        multi = len(creatives_cell) > 1
+        for idx, cre in enumerate(creatives_cell, start=1):
+            nm = adn if not multi else f"{adn} {idx:02d}"[:80]
+            if nm in seen:
+                problems.append(f"Ads tab: duplicate ad_name '{nm}' — ad names must be unique")
+            seen.add(nm)
+            ad = dict(base)
+            ad["name"] = nm
+            ad["creative"] = f"creatives/{cre}" if cre and "/" not in cre else cre
+            by_name[an]["ads"].append(ad)
+            csv_rows.append({"adset": an, "ad_name": nm, "creative": ad["creative"],
+                             "body": ad.get("body", ""), "headline": ad.get("headline", ""),
+                             "description": ad.get("description", ""),
+                             "cta": ad.get("cta", ""), "link": ad.get("link", "")})
+
 
     for a in adsets:
         if not a["ads"]:
