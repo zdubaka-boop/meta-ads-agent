@@ -14,6 +14,11 @@ import meta, xlsx
 LOCALES_PATH = Path(__file__).parent / "reference" / "data" / "locales.json"
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".avi")
 
+# Countries Meta will not deliver to without a signed Universal Ads
+# Declaration on the ad account. Worldwide targeting includes them, so a
+# buyer must either sign the declaration in Business Manager or exclude them.
+DECLARATION_COUNTRIES = {"Taiwan": "TW", "Singapore": "SG"}
+
 
 def _locales():
     try:
@@ -167,6 +172,16 @@ def parse_workbook(xlsx_bytes, creatives):
                                 f"{hit.get('region') or ''} {hit.get('country_code') or ''}")
             if out:
                 geo[key] = out
+
+        if geo.get("country_groups"):
+            missing = [iso for iso in DECLARATION_COUNTRIES.values()
+                       if iso not in [c.upper() for c in _csv(r.get("excluded_countries"))]]
+            if missing:
+                problems.append(
+                    f"Ad set '{name}': worldwide targeting includes "
+                    f"{', '.join(missing)}, which Meta will not deliver to without a signed "
+                    f"Universal Ads Declaration. Put {','.join(missing)} in "
+                    f"excluded_countries, or list your countries explicitly.")
 
         t = {"geo_locations": geo,
              "age_min": int(r["age_min"]) if str(r.get("age_min", "")).strip() else 18,
@@ -331,10 +346,14 @@ def build(spec, creatives, log):
                                 start_time=a.get("start_time"), end_time=a.get("end_time"))
       except Exception as e:
         msg = str(e)
-        if "Taiwan" in msg:
-            msg = (f"Ad set '{a['name']}': Meta requires a Taiwan Universal Ads Declaration "
-                   f"before anyone can target worldwide. Either list the countries you want "
-                   f"explicitly, or put TW in excluded_countries.")
+        import re as _re
+        m = _re.search(r"No ([A-Za-z ]+) Universal Ads Declaration", msg)
+        if m:
+            msg = (f"Ad set '{a['name']}': {m.group(1)} requires a Universal Ads Declaration "
+                   f"that this ad account has not signed, and worldwide targeting includes it. "
+                   f"Add {DECLARATION_COUNTRIES.get(m.group(1).strip(), '')} to "
+                   f"excluded_countries (currently known: TW, SG), or list the countries you "
+                   f"want explicitly instead of targeting worldwide.")
         raise PartialBuild(msg, result)
       else:
         result["adsets"].append({"id": aid, "name": a["name"]})
