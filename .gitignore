@@ -17,8 +17,10 @@ creatives/*
 *.jpeg
 *.png
 
-# Team specs may contain account IDs and URLs — commit deliberately
-specs/*.local.json
+# Campaign specs carry real ad account IDs, Page IDs, landing pages and ad
+# copy. Never commit them — the example lives in spec/examples/ instead.
+specs/*
+!specs/.gitkeep
 
 __pycache__/
 *.pyc
