@@ -154,6 +154,75 @@ Build `extra.json` yourself from what they tell you. Read the campaign's
 CBO/ABO mode off the live campaign — a budget on an ad set under a CBO
 campaign is rejected, and a missing one under ABO is rejected. Never guess it.
 
+## Day-to-day management
+
+Launching is the small part. Most of the job is looking at numbers and turning
+things off.
+
+**See performance** — read-only, run it freely:
+
+```bash
+python3 scripts/report.py act_<id> --days 7
+python3 scripts/report.py act_<id> --level ad --campaign <id> --days 30
+python3 scripts/report.py act_<id> --level ad --sort cpa --worst 10 --min-spend 20
+```
+
+`--worst` with `--min-spend` is the kill list: the worst performers that have
+spent enough for the number to mean anything.
+
+**Turn things off** — never costs anything, always reversible:
+
+```bash
+python3 scripts/set_status.py --off --ads <id>,<id>
+python3 scripts/set_status.py --off --adset <id> --execute
+```
+
+**Change a budget** — the figure always comes from the user, never from you:
+
+```bash
+python3 scripts/set_budget.py <campaign_or_adset_id> --daily 25.00
+python3 scripts/set_budget.py <campaign_or_adset_id> --daily 25.00 --execute
+```
+
+It warns when a change over ±30% would reset the learning phase, and refuses
+anything below the account minimum.
+
+**Duplicate an ad set** — "same thing, different country":
+
+```bash
+python3 scripts/duplicate_adset.py <adset_id> --name "..." --countries CZ,SK --execute
+```
+
+## Launching — the only thing here that spends money
+
+Everything this repo creates is PAUSED. Going live means switching on the
+campaign, its ad sets AND its ads, because Meta only delivers when all three
+are active.
+
+```bash
+python3 scripts/set_status.py --launch --campaign <id>          # shows the tree + daily cost
+python3 scripts/set_status.py --launch --campaign <id> --execute --authorise-daily 50.00
+```
+
+**Never run the second command on your own initiative.** The user must ask to
+launch, in those words, in that turn. "Build it" and "add these ads" are not
+permission to launch, and neither is having approved a build earlier.
+
+The `--authorise-daily` figure must match what the campaign actually holds, or
+Meta is never called. Show the user the dry run first — it prints the daily,
+weekly and monthly spend — and let **them** tell you the number to authorise.
+Do not read it off the dry run and pass it back yourself; the whole point is
+that a human states the amount independently.
+
+If anything fails partway, ads are switched on before ad sets and the campaign
+last, so a failure leaves the campaign off and nothing delivering.
+
+To stop everything immediately:
+
+```bash
+python3 scripts/set_status.py --off --campaign <id> --execute
+```
+
 ## 3 — See what's running
 
 ```bash
