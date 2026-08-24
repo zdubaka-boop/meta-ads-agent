@@ -1,0 +1,452 @@
+<title>Campaign Brief Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F4F5F7; --panel:#FFFFFF; --sunk:#EDEFF3; --line:#D9DDE4;
+  --ink:#171C24; --dim:#5F6980; --faint:#8B95A8;
+  --accent:#5C6B12; --accent-ink:#FFFFFF; --accent-soft:#E9EDCB;
+  --ok:#1A7F37; --warn:#8A6100; --bad:#B32D24;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F1319; --panel:#171C24; --sunk:#11161D; --line:#2A313E;
+    --ink:#E6EAF1; --dim:#95A0B4; --faint:#6B7688;
+    --accent:#C8D94E; --accent-ink:#12160B; --accent-soft:#2A3016;
+    --ok:#3FB950; --warn:#D29922; --bad:#F85149;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0F1319; --panel:#171C24; --sunk:#11161D; --line:#2A313E;
+  --ink:#E6EAF1; --dim:#95A0B4; --faint:#6B7688;
+  --accent:#C8D94E; --accent-ink:#12160B; --accent-soft:#2A3016;
+  --ok:#3FB950; --warn:#D29922; --bad:#F85149;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.5}
+h1,h2,h3{font-family:Archivo,system-ui,sans-serif;margin:0;text-wrap:balance}
+main{max-width:1000px;margin:0 auto;padding:28px 22px 150px}
+
+header{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:24px}
+h1{font-size:26px;font-weight:700;letter-spacing:-.015em}
+header p{color:var(--dim);margin:6px 0 0;max-width:62ch;font-size:14px}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;margin-bottom:16px}
+.card>h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--dim);margin-bottom:14px}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px;font-weight:500}
+input,select,textarea{width:100%;background:var(--sunk);border:1px solid var(--line);
+  color:var(--ink);border-radius:7px;padding:9px 11px;font:inherit;font-size:14px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;
+  border-color:transparent}
+textarea{resize:vertical;min-height:64px;line-height:1.45}
+
+button{font:inherit;font-size:13.5px;font-weight:600;border-radius:7px;padding:8px 14px;
+  border:1px solid transparent;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+button:hover{filter:brightness(1.06)}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+button.ghost{background:transparent;border-color:var(--line);color:var(--ink);font-weight:500}
+button.ghost:hover{border-color:var(--accent);color:var(--accent)}
+button.mini{padding:4px 9px;font-size:12px}
+button.danger:hover{border-color:var(--bad);color:var(--bad)}
+
+.adset{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
+  margin-bottom:14px;overflow:hidden}
+.adset>header{display:flex;align-items:center;gap:10px;padding:12px 16px;margin:0;border:0;
+  border-bottom:1px solid var(--line);background:var(--sunk)}
+.adset>header .n{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent);
+  background:var(--accent-soft);padding:2px 7px;border-radius:20px;font-weight:500}
+.adset>header h3{font-size:14.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.adset .body{padding:16px}
+
+.ad{border:1px solid var(--line);border-radius:8px;padding:13px;margin-top:11px;background:var(--sunk)}
+.ad .top{display:flex;gap:9px;align-items:flex-end;margin-bottom:11px}
+.ad .top>div{flex:1}
+.stack{display:flex;flex-direction:column;gap:6px}
+.stack .row{display:flex;gap:6px}
+.stack .row input{flex:1}
+
+.picker{position:relative}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:var(--accent-soft);
+  color:var(--accent);border-radius:5px;padding:3px 7px;cursor:pointer;border:1px solid transparent}
+.chip:hover{border-color:var(--bad);color:var(--bad)}
+.menu{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:4px;max-height:200px;
+  overflow:auto;background:var(--panel);border:1px solid var(--accent);border-radius:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.menu div{padding:7px 11px;cursor:pointer;font-size:13.5px;display:flex;justify-content:space-between}
+.menu div:hover{background:var(--sunk)}
+.menu .code{font-family:"IBM Plex Mono",monospace;color:var(--faint);font-size:11.5px}
+
+.issues{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;
+  padding:12px 14px;margin-bottom:16px;background:var(--panel)}
+.issues b{color:var(--warn);font-size:13px}
+.issues ul{margin:7px 0 0;padding-left:18px;color:var(--dim);font-size:13.5px}
+.issues li{margin:3px 0}
+
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--panel);
+  border-top:1px solid var(--line);padding:12px 22px;display:flex;gap:14px;align-items:center;
+  flex-wrap:wrap;box-shadow:0 -4px 20px rgba(0,0,0,.10)}
+.bar .stats{display:flex;gap:20px;font-family:"IBM Plex Mono",monospace;font-size:13px;
+  font-variant-numeric:tabular-nums}
+.bar .stats span b{color:var(--accent);font-weight:500}
+.bar .sp{flex:1}
+.hint{color:var(--faint);font-size:12px;margin-top:5px}
+.out{font-family:"IBM Plex Mono",monospace;font-size:12.5px;white-space:pre-wrap;
+  background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:14px;
+  max-height:340px;overflow:auto;margin-top:12px}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);
+  padding:20px;max-width:min(760px,92vw);width:100%}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.mono{font-family:"IBM Plex Mono",monospace}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<main>
+<header>
+  <h1>Campaign Brief Builder</h1>
+  <p>Fill this in, copy the brief, paste it into Claude. It writes the spreadsheet and builds
+     the campaign — paused. Country codes and language names come from Meta's own lists, so
+     they're always spelled the way Meta accepts.</p>
+</header>
+
+<div id="issues"></div>
+
+<section class="card">
+  <h2>Campaign</h2>
+  <div class="grid g2">
+    <div><label for="cName">Campaign name</label>
+      <input id="cName" placeholder="Spring 2026 | EU | Traffic"></div>
+    <div><label for="cAcct">Ad account</label>
+      <input id="cAcct" class="mono" placeholder="act_1234567890"></div>
+  </div>
+  <div class="grid g3" style="margin-top:12px">
+    <div><label for="cObj">Goal</label><select id="cObj"></select></div>
+    <div><label for="cMode">Budget sits on</label><select id="cMode">
+      <option value="CBO">The campaign — Meta splits it</option>
+      <option value="ABO">Each ad set separately</option></select></div>
+    <div><label for="cBudget">Daily budget</label>
+      <input id="cBudget" placeholder="50" inputmode="decimal">
+      <div class="hint" id="budgetHint">Normal amount, e.g. 50 for fifty.</div></div>
+  </div>
+  <div class="grid g2" style="margin-top:12px">
+    <div><label for="cLink">Where clicks go</label>
+      <input id="cLink" placeholder="https://example.com/spring"></div>
+    <div><label for="cCta">Button</label><select id="cCta"></select></div>
+  </div>
+  <div class="grid g2" style="margin-top:12px">
+    <div><label for="cPage">Facebook Page</label>
+      <input id="cPage" class="mono" placeholder="Page ID, or leave blank and Claude will ask">
+    </div>
+    <div><label for="cDsa">Advertiser name <span style="color:var(--warn)">— needed for EU</span></label>
+      <input id="cDsa" placeholder="Your company's legal name"></div>
+  </div>
+</section>
+
+<div id="sets"></div>
+<button class="ghost" onclick="addSet()">+ Add an ad set</button>
+
+<dialog id="outDlg">
+  <h2 style="font-size:17px;margin-bottom:4px">Your brief</h2>
+  <p style="color:var(--dim);font-size:13.5px;margin:0">Paste this into Claude, and drop your
+    image files in with it.</p>
+  <div class="out" id="outText"></div>
+  <div style="display:flex;gap:10px;margin-top:14px">
+    <button onclick="copyOut(this)">Copy it</button>
+    <button class="ghost" onclick="outDlg.close()">Back</button>
+  </div>
+</dialog>
+</main>
+
+<div class="bar">
+  <div class="stats">
+    <span><b id="nSets">0</b> ad sets</span>
+    <span><b id="nAds">0</b> ads</span>
+    <span><b id="nCre">0</b> images needed</span>
+  </div>
+  <span class="sp"></span>
+  <button class="ghost mini" onclick="loadExample()">Load an example</button>
+  <button onclick="showOut()">Build the brief</button>
+</div>
+
+<script>
+const COUNTRIES=[{"c":"AF","n":"Afghanistan"},{"c":"AX","n":"Aland Islands"},{"c":"AL","n":"Albania"},{"c":"DZ","n":"Algeria"},{"c":"AS","n":"American Samoa"},{"c":"AD","n":"Andorra"},{"c":"AO","n":"Angola"},{"c":"AI","n":"Anguilla"},{"c":"AQ","n":"Antarctica"},{"c":"AG","n":"Antigua"},{"c":"AR","n":"Argentina"},{"c":"AM","n":"Armenia"},{"c":"AW","n":"Aruba"},{"c":"AU","n":"Australia"},{"c":"AT","n":"Austria"},{"c":"AZ","n":"Azerbaijan"},{"c":"BH","n":"Bahrain"},{"c":"BD","n":"Bangladesh"},{"c":"BB","n":"Barbados"},{"c":"BY","n":"Belarus"},{"c":"BE","n":"Belgium"},{"c":"BZ","n":"Belize"},{"c":"BJ","n":"Benin"},{"c":"BM","n":"Bermuda"},{"c":"BT","n":"Bhutan"},{"c":"BO","n":"Bolivia"},{"c":"BQ","n":"Bonaire, Sint Eustatius and Saba"},{"c":"BA","n":"Bosnia and Herzegovina"},{"c":"BW","n":"Botswana"},{"c":"BV","n":"Bouvet Island"},{"c":"BR","n":"Brazil"},{"c":"IO","n":"British Indian Ocean Territory"},{"c":"VG","n":"British Virgin Islands"},{"c":"BN","n":"Brunei"},{"c":"BG","n":"Bulgaria"},{"c":"BF","n":"Burkina Faso"},{"c":"BI","n":"Burundi"},{"c":"KH","n":"Cambodia"},{"c":"CM","n":"Cameroon"},{"c":"CA","n":"Canada"},{"c":"CV","n":"Cape Verde"},{"c":"KY","n":"Cayman Islands"},{"c":"CF","n":"Central African Republic"},{"c":"TD","n":"Chad"},{"c":"CL","n":"Chile"},{"c":"CN","n":"China"},{"c":"CX","n":"Christmas Island"},{"c":"CC","n":"Cocos (Keeling) Islands"},{"c":"CO","n":"Colombia"},{"c":"KM","n":"Comoros"},{"c":"CK","n":"Cook Islands"},{"c":"CR","n":"Costa Rica"},{"c":"HR","n":"Croatia"},{"c":"CW","n":"Curaçao"},{"c":"CY","n":"Cyprus"},{"c":"CZ","n":"Czech Republic"},{"c":"CI","n":"Côte d'Ivoire"},{"c":"CD","n":"Democratic Republic of the Congo"},{"c":"DK","n":"Denmark"},{"c":"DJ","n":"Djibouti"},{"c":"DM","n":"Dominica"},{"c":"DO","n":"Dominican Republic"},{"c":"EC","n":"Ecuador"},{"c":"EG","n":"Egypt"},{"c":"SV","n":"El Salvador"},{"c":"GQ","n":"Equatorial Guinea"},{"c":"ER","n":"Eritrea"},{"c":"EE","n":"Estonia"},{"c":"SZ","n":"Eswatini"},{"c":"ET","n":"Ethiopia"},{"c":"FK","n":"Falkland Islands"},{"c":"FO","n":"Faroe Islands"},{"c":"FM","n":"Federated States of Micronesia"},{"c":"FJ","n":"Fiji"},{"c":"FI","n":"Finland"},{"c":"FR","n":"France"},{"c":"GF","n":"French Guiana"},{"c":"PF","n":"French Polynesia"},{"c":"TF","n":"French Southern Territories"},{"c":"GA","n":"Gabon"},{"c":"GE","n":"Georgia"},{"c":"DE","n":"Germany"},{"c":"GH","n":"Ghana"},{"c":"GI","n":"Gibraltar"},{"c":"GR","n":"Greece"},{"c":"GL","n":"Greenland"},{"c":"GD","n":"Grenada"},{"c":"GP","n":"Guadeloupe"},{"c":"GU","n":"Guam"},{"c":"GT","n":"Guatemala"},{"c":"GG","n":"Guernsey"},{"c":"GN","n":"Guinea"},{"c":"GW","n":"Guinea-Bissau"},{"c":"GY","n":"Guyana"},{"c":"HT","n":"Haiti"},{"c":"HM","n":"Heard Island and McDonald Islands"},{"c":"HN","n":"Honduras"},{"c":"HK","n":"Hong Kong"},{"c":"HU","n":"Hungary"},{"c":"IS","n":"Iceland"},{"c":"IN","n":"India"},{"c":"ID","n":"Indonesia"},{"c":"IQ","n":"Iraq"},{"c":"IE","n":"Ireland"},{"c":"IM","n":"Isle Of Man"},{"c":"IL","n":"Israel"},{"c":"IT","n":"Italy"},{"c":"JM","n":"Jamaica"},{"c":"JP","n":"Japan"},{"c":"JE","n":"Jersey"},{"c":"JO","n":"Jordan"},{"c":"KZ","n":"Kazakhstan"},{"c":"KE","n":"Kenya"},{"c":"KI","n":"Kiribati"},{"c":"XK","n":"Kosovo"},{"c":"KW","n":"Kuwait"},{"c":"KG","n":"Kyrgyzstan"},{"c":"LA","n":"Laos"},{"c":"LV","n":"Latvia"},{"c":"LB","n":"Lebanon"},{"c":"LS","n":"Lesotho"},{"c":"LR","n":"Liberia"},{"c":"LY","n":"Libya"},{"c":"LI","n":"Liechtenstein"},{"c":"LT","n":"Lithuania"},{"c":"LU","n":"Luxembourg"},{"c":"MO","n":"Macau"},{"c":"MG","n":"Madagascar"},{"c":"MW","n":"Malawi"},{"c":"MY","n":"Malaysia"},{"c":"MV","n":"Maldives"},{"c":"ML","n":"Mali"},{"c":"MT","n":"Malta"},{"c":"MH","n":"Marshall Islands"},{"c":"MQ","n":"Martinique"},{"c":"MR","n":"Mauritania"},{"c":"MU","n":"Mauritius"},{"c":"YT","n":"Mayotte"},{"c":"MX","n":"Mexico"},{"c":"MD","n":"Moldova"},{"c":"MC","n":"Monaco"},{"c":"MN","n":"Mongolia"},{"c":"ME","n":"Montenegro"},{"c":"MS","n":"Montserrat"},{"c":"MA","n":"Morocco"},{"c":"MZ","n":"Mozambique"},{"c":"MM","n":"Myanmar"},{"c":"NA","n":"Namibia"},{"c":"NR","n":"Nauru"},{"c":"NP","n":"Nepal"},{"c":"NL","n":"Netherlands"},{"c":"AN","n":"Netherlands Antilles"},{"c":"NC","n":"New Caledonia"},{"c":"NZ","n":"New Zealand"},{"c":"NI","n":"Nicaragua"},{"c":"NE","n":"Niger"},{"c":"NG","n":"Nigeria"},{"c":"NU","n":"Niue"},{"c":"NF","n":"Norfolk Island"},{"c":"MK","n":"North Macedonia"},{"c":"MP","n":"Northern Mariana Islands"},{"c":"NO","n":"Norway"},{"c":"OM","n":"Oman"},{"c":"PK","n":"Pakistan"},{"c":"PW","n":"Palau"},{"c":"PS","n":"Palestine"},{"c":"PA","n":"Panama"},{"c":"PG","n":"Papua New Guinea"},{"c":"PY","n":"Paraguay"},{"c":"PE","n":"Peru"},{"c":"PH","n":"Philippines"},{"c":"PN","n":"Pitcairn"},{"c":"PL","n":"Poland"},{"c":"PT","n":"Portugal"},{"c":"PR","n":"Puerto Rico"},{"c":"QA","n":"Qatar"},{"c":"CG","n":"Republic of the Congo"},{"c":"RO","n":"Romania"},{"c":"RU","n":"Russia"},{"c":"RW","n":"Rwanda"},{"c":"RE","n":"Réunion"},{"c":"BL","n":"Saint Barthélemy"},{"c":"SH","n":"Saint Helena"},{"c":"KN","n":"Saint Kitts and Nevis"},{"c":"MF","n":"Saint Martin"},{"c":"PM","n":"Saint Pierre and Miquelon"},{"c":"VC","n":"Saint Vincent and the Grenadines"},{"c":"WS","n":"Samoa"},{"c":"SM","n":"San Marino"},{"c":"ST","n":"Sao Tome and Principe"},{"c":"SA","n":"Saudi Arabia"},{"c":"SN","n":"Senegal"},{"c":"RS","n":"Serbia"},{"c":"SC","n":"Seychelles"},{"c":"SL","n":"Sierra Leone"},{"c":"SG","n":"Singapore"},{"c":"SX","n":"Sint Maarten"},{"c":"SK","n":"Slovakia"},{"c":"SI","n":"Slovenia"},{"c":"SB","n":"Solomon Islands"},{"c":"SO","n":"Somalia"},{"c":"ZA","n":"South Africa"},{"c":"GS","n":"South Georgia and the South Sandwich Islands"},{"c":"KR","n":"South Korea"},{"c":"SS","n":"South Sudan"},{"c":"ES","n":"Spain"},{"c":"LK","n":"Sri Lanka"},{"c":"LC","n":"St. Lucia"},{"c":"SR","n":"Suriname"},{"c":"SJ","n":"Svalbard and Jan Mayen"},{"c":"SE","n":"Sweden"},{"c":"CH","n":"Switzerland"},{"c":"SY","n":"Syria"},{"c":"TW","n":"Taiwan"},{"c":"TJ","n":"Tajikistan"},{"c":"TZ","n":"Tanzania"},{"c":"TH","n":"Thailand"},{"c":"BS","n":"The Bahamas"},{"c":"GM","n":"The Gambia"},{"c":"TL","n":"Timor-Leste"},{"c":"TG","n":"Togo"},{"c":"TK","n":"Tokelau"},{"c":"TO","n":"Tonga"},{"c":"TT","n":"Trinidad and Tobago"},{"c":"TN","n":"Tunisia"},{"c":"TR","n":"Turkey"},{"c":"TM","n":"Turkmenistan"},{"c":"TC","n":"Turks and Caicos Islands"},{"c":"TV","n":"Tuvalu"},{"c":"VI","n":"US Virgin Islands"},{"c":"UG","n":"Uganda"},{"c":"UA","n":"Ukraine"},{"c":"AE","n":"United Arab Emirates"},{"c":"GB","n":"United Kingdom"},{"c":"US","n":"United States"},{"c":"UM","n":"United States Minor Outlying Islands"},{"c":"UY","n":"Uruguay"},{"c":"UZ","n":"Uzbekistan"},{"c":"VU","n":"Vanuatu"},{"c":"VA","n":"Vatican City"},{"c":"VE","n":"Venezuela"},{"c":"VN","n":"Vietnam"},{"c":"WF","n":"Wallis and Futuna"},{"c":"EH","n":"Western Sahara"},{"c":"YE","n":"Yemen"},{"c":"ZM","n":"Zambia"},{"c":"ZW","n":"Zimbabwe"}];
+const LANGS=[["Afrikaans",36],["Albanian",87],["Arabic",28],["Armenian",68],["Azerbaijani",53],["Basque",59],["Belarusian",54],["Bengali",45],["Bosnian",55],["Bulgarian",37],["Catalan",1],["Cebuano",56],["Chinese (All)",1004],["Croatian",38],["Czech",2],["Danish",4],["Dutch",14],["English (All)",1001],["English (UK)",24],["English (US)",6],["Esperanto",57],["Estonian",58],["Faroese",62],["Filipino",26],["Finnish",8],["Flemish",83],["French (All)",1003],["French (Canada)",44],["French (France)",9],["Frisian",63],["Galician",65],["Georgian",72],["German",5],["Greek",39],["Guarani",66],["Gujarati",67],["Hebrew",29],["Hindi",46],["Hungarian",30],["Icelandic",69],["Indonesian",25],["Irish",64],["Italian",10],["Japanese",11],["Japanese (Kansai)",70],["Javanese",71],["Kannada",75],["Kazakh",73],["Khmer",74],["Korean",12],["Latvian",78],["Lithuanian",40],["Macedonian",79],["Malay",41],["Malayalam",50],["Marathi",81],["Mongolian",80],["Nepali",82],["Northern Kurdish (Kurmanji)",76],["Norwegian (bokmal)",13],["Norwegian (nynorsk)",84],["Pashto",85],["Persian",60],["Polish",15],["Portuguese (All)",1005],["Portuguese (Brazil)",16],["Portuguese (Portugal)",31],["Punjabi",47],["Romanian",32],["Russian",17],["Serbian",42],["Simplified Chinese (China)",20],["Sinhala",86],["Slovak",33],["Slovenian",34],["Spanish",23],["Spanish (All)",1002],["Spanish (Spain)",7],["Swahili",88],["Swedish",18],["Tajik",89],["Tamil",48],["Telugu",49],["Thai",35],["Traditional Chinese (Hong Kong)",21],["Traditional Chinese (Taiwan)",22],["Turkish",19],["Ukrainian",52],["Urdu",90],["Uzbek",91],["Vietnamese",27],["Welsh",3]];
+const OBJECTIVES=[["OUTCOME_TRAFFIC","Traffic — clicks to a website"],
+ ["OUTCOME_SALES","Sales — needs a pixel"],["OUTCOME_LEADS","Leads"],
+ ["OUTCOME_ENGAGEMENT","Engagement"],["OUTCOME_AWARENESS","Awareness"],
+ ["OUTCOME_APP_PROMOTION","App promotion"]];
+const CTAS=["SHOP_NOW","LEARN_MORE","SIGN_UP","SUBSCRIBE","GET_OFFER","BUY_NOW","ORDER_NOW",
+ "GET_STARTED","DOWNLOAD","APPLY_NOW","CONTACT_US","BOOK_TRAVEL"];
+const EU=new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT",
+ "LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let sets=[], uid=0;
+
+/* ---------- setup ---------- */
+OBJECTIVES.forEach(([v,l])=>{const o=document.createElement("option");o.value=v;o.textContent=l;$("cObj").appendChild(o);});
+CTAS.forEach(v=>{const o=document.createElement("option");o.value=o.textContent=v;$("cCta").appendChild(o);});
+$("cCta").value="SHOP_NOW";
+
+/* ---------- ad sets & ads ---------- */
+function addSet(seed){
+  sets.push(Object.assign({id:++uid,name:"",countries:[],langs:[],ageMin:18,ageMax:65,
+    gender:"All",budget:"",ads:[]},seed||{}));
+  if(!sets[sets.length-1].ads.length) addAd(sets[sets.length-1].id,null,true);
+  render();
+}
+function delSet(id){ sets=sets.filter(s=>s.id!==id); render(); }
+function addAd(setId,seed,quiet){
+  const s=sets.find(x=>x.id===setId); if(!s) return;
+  s.ads.push(Object.assign({id:++uid,name:"",file:"",bodies:[""],heads:[""]},seed||{}));
+  if(!quiet) render();
+}
+function delAd(setId,adId){
+  const s=sets.find(x=>x.id===setId); s.ads=s.ads.filter(a=>a.id!==adId); render();
+}
+const setOf=id=>sets.find(s=>s.id===id);
+const adOf=(sid,aid)=>setOf(sid).ads.find(a=>a.id===aid);
+
+function field(sid,key,v){ setOf(sid)[key]=v; tally(); }
+function adField(sid,aid,key,v){ adOf(sid,aid)[key]=v; tally(); }
+function listSet(sid,aid,key,i,v){ adOf(sid,aid)[key][i]=v; tally(); }
+function listAdd(sid,aid,key){ const a=adOf(sid,aid); if(a[key].length<5){a[key].push("");render();} }
+function listDel(sid,aid,key,i){ const a=adOf(sid,aid); a[key].splice(i,1); render(); }
+
+/* ---------- country / language pickers ---------- */
+let openMenu=null;
+function pick(sid,kind){
+  const s=setOf(sid), q=($(`q${kind}${sid}`).value||"").toLowerCase().trim();
+  const src = kind==="C" ? COUNTRIES.filter(c=>!q||c.n.toLowerCase().includes(q)||c.c.toLowerCase()===q)
+                         : LANGS.filter(l=>!q||l[0].toLowerCase().includes(q));
+  const box=$(`m${kind}${sid}`);
+  box.innerHTML=src.slice(0,80).map(x=>{
+    const [label,code]= kind==="C" ? [x.n,x.c] : [x[0],""];
+    return `<div onmousedown="choose(${sid},'${kind}',${JSON.stringify(label).replace(/"/g,"&quot;")},'${code}')">
+      <span>${esc(label)}</span><span class="code">${esc(code)}</span></div>`;}).join("")
+    || `<div style="color:var(--faint)">Nothing matches that</div>`;
+  box.style.display="block"; openMenu=box;
+}
+function choose(sid,kind,label,code){
+  const s=setOf(sid), arr = kind==="C" ? s.countries : s.langs, val = kind==="C" ? code : label;
+  if(!arr.includes(val)) arr.push(val);
+  $(`q${kind}${sid}`).value=""; render();
+  setTimeout(()=>{const el=$(`q${kind}${sid}`); if(el) el.focus();},0);
+}
+function unpick(sid,kind,val){
+  const s=setOf(sid);
+  if(kind==="C") s.countries=s.countries.filter(x=>x!==val); else s.langs=s.langs.filter(x=>x!==val);
+  render();
+}
+document.addEventListener("mousedown",e=>{
+  if(openMenu && !e.target.closest(".picker")){ openMenu.style.display="none"; openMenu=null; }
+});
+
+/* ---------- render ---------- */
+function render(){
+  $("sets").innerHTML = sets.map((s,i)=>{
+    const cName=Object.fromEntries(COUNTRIES.map(c=>[c.c,c.n]));
+    return `<section class="adset">
+      <header>
+        <span class="n">${String(i+1).padStart(2,"0")}</span>
+        <h3>${esc(s.name||"Untitled ad set")}</h3>
+        <button class="ghost mini danger" onclick="delSet(${s.id})">Remove</button>
+      </header>
+      <div class="body">
+        <div class="grid g2">
+          <div><label>Ad set name</label>
+            <input value="${esc(s.name)}" placeholder="Spring | LT | 18-65"
+              oninput="field(${s.id},'name',this.value);document.querySelector('.adset:nth-of-type(${i+1}) h3')&&0"
+              onchange="render()"></div>
+          <div class="picker">
+            <label>Countries</label>
+            <input id="qC${s.id}" placeholder="Type a country…" autocomplete="off"
+              oninput="pick(${s.id},'C')" onfocus="pick(${s.id},'C')">
+            <div class="menu" id="mC${s.id}" style="display:none"></div>
+            <div class="chips">${s.countries.map(c=>
+              `<span class="chip" onclick="unpick(${s.id},'C','${c}')">${esc(cName[c]||c)} · ${c} ✕</span>`).join("")}</div>
+          </div>
+        </div>
+        <div class="grid g2" style="margin-top:12px">
+          <div class="picker">
+            <label>Languages <span style="color:var(--faint)">— blank means all</span></label>
+            <input id="qL${s.id}" placeholder="Type a language…" autocomplete="off"
+              oninput="pick(${s.id},'L')" onfocus="pick(${s.id},'L')">
+            <div class="menu" id="mL${s.id}" style="display:none"></div>
+            <div class="chips">${s.langs.map(l=>
+              `<span class="chip" onclick="unpick(${s.id},'L',${JSON.stringify(l).replace(/"/g,'&quot;')})">${esc(l)} ✕</span>`).join("")}</div>
+          </div>
+          <div class="grid g3">
+            <div><label>Ages</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input value="${s.ageMin}" inputmode="numeric" onchange="field(${s.id},'ageMin',+this.value||18)">
+                <span style="color:var(--faint)">to</span>
+                <input value="${s.ageMax}" inputmode="numeric" onchange="field(${s.id},'ageMax',+this.value||65)">
+              </div></div>
+            <div><label>Who</label><select onchange="field(${s.id},'gender',this.value)">
+              ${["All","Men","Women"].map(g=>`<option ${s.gender===g?"selected":""}>${g}</option>`).join("")}
+            </select></div>
+            <div class="${$("cMode").value==="ABO"?"":"hide"}" style="${$("cMode").value==="ABO"?"":"display:none"}">
+              <label>Daily budget</label>
+              <input value="${esc(s.budget)}" placeholder="10" inputmode="decimal"
+                onchange="field(${s.id},'budget',this.value)"></div>
+          </div>
+        </div>
+
+        ${s.ads.map((a,j)=>`
+          <div class="ad">
+            <div class="top">
+              <div><label>Ad name</label>
+                <input value="${esc(a.name)}" placeholder="SPR-LT-0${j+1}-price"
+                  onchange="adField(${s.id},${a.id},'name',this.value)"></div>
+              <div><label>Image file</label>
+                <input value="${esc(a.file)}" placeholder="lt-price.png" class="mono"
+                  onchange="adField(${s.id},${a.id},'file',this.value)"></div>
+              ${s.ads.length>1?`<button class="ghost mini danger" onclick="delAd(${s.id},${a.id})">✕</button>`:""}
+            </div>
+            <label>Primary text</label>
+            <div class="stack">${a.bodies.map((b,k)=>`
+              <div class="row">
+                <input value="${esc(b)}" placeholder="What the ad says"
+                  onchange="listSet(${s.id},${a.id},'bodies',${k},this.value)">
+                ${a.bodies.length>1?`<button class="ghost mini" onclick="listDel(${s.id},${a.id},'bodies',${k})">✕</button>`:""}
+              </div>`).join("")}</div>
+            ${a.bodies.length<5?`<button class="ghost mini" style="margin-top:6px"
+              onclick="listAdd(${s.id},${a.id},'bodies')">+ another primary text</button>`:""}
+            <label style="margin-top:12px">Headline</label>
+            <div class="stack">${a.heads.map((h,k)=>`
+              <div class="row">
+                <input value="${esc(h)}" placeholder="Short line under the image"
+                  onchange="listSet(${s.id},${a.id},'heads',${k},this.value)">
+                ${a.heads.length>1?`<button class="ghost mini" onclick="listDel(${s.id},${a.id},'heads',${k})">✕</button>`:""}
+              </div>`).join("")}</div>
+            ${a.heads.length<5?`<button class="ghost mini" style="margin-top:6px"
+              onclick="listAdd(${s.id},${a.id},'heads')">+ another headline</button>`:""}
+            ${(a.bodies.filter(Boolean).length>1||a.heads.filter(Boolean).length>1)
+              ? `<div class="hint">Meta rotates these inside this one ad and favours whichever wins.</div>`:""}
+          </div>`).join("")}
+        <button class="ghost mini" style="margin-top:12px" onclick="addAd(${s.id})">+ Add an ad</button>
+      </div></section>`;
+  }).join("");
+  tally();
+}
+
+/* ---------- live counts + problems ---------- */
+function tally(){
+  const nS=sets.length, nA=sets.reduce((t,s)=>t+s.ads.length,0);
+  const files=new Set(); sets.forEach(s=>s.ads.forEach(a=>{if(a.file)files.add(a.file.trim())}));
+  $("nSets").textContent=nS; $("nAds").textContent=nA; $("nCre").textContent=files.size;
+  const cur=$("cBudget").value.trim();
+  $("budgetHint").textContent = cur ? `${cur} per day, in your ad account's currency.`
+                                    : "Normal amount, e.g. 50 for fifty.";
+  const p=[];
+  if(!$("cName").value.trim()) p.push("The campaign needs a name.");
+  if(!$("cLink").value.trim()) p.push("No destination link yet — where should clicks go?");
+  const mode=$("cMode").value;
+  if(mode==="CBO"&&!$("cBudget").value.trim()) p.push("The campaign budget is empty.");
+  if(mode==="ABO"){
+    const missing=sets.filter(s=>!String(s.budget).trim()).map(s=>s.name||"an unnamed ad set");
+    if(missing.length) p.push("Budget sits on each ad set, but these have none: "+missing.join(", ")+".");
+  }
+  if(!sets.length) p.push("Add at least one ad set.");
+  sets.forEach(s=>{
+    const n=s.name||"an unnamed ad set";
+    if(!s.name.trim()) p.push("An ad set still needs a name.");
+    if(!s.countries.length) p.push(`“${n}” has no countries.`);
+    if(s.countries.some(c=>EU.has(c)) && !$("cDsa").value.trim())
+      p.push(`“${n}” targets the EU, so Meta needs the advertiser's legal name.`);
+    s.ads.forEach(a=>{
+      const an=a.name||"an unnamed ad";
+      if(!a.name.trim()) p.push(`An ad in “${n}” needs a name.`);
+      if(!a.file.trim()) p.push(`“${an}” has no image file.`);
+      if(!a.bodies.filter(Boolean).length) p.push(`“${an}” has no primary text.`);
+    });
+  });
+  const names=sets.flatMap(s=>s.ads.map(a=>a.name.trim())).filter(Boolean);
+  const dupes=[...new Set(names.filter((x,i)=>names.indexOf(x)!==i))];
+  if(dupes.length) p.push("Two ads share a name: "+dupes.join(", ")+". Every ad name must be different.");
+
+  $("issues").innerHTML = p.length
+    ? `<div class="issues"><b>${p.length} thing${p.length>1?"s":""} to finish</b>
+        <ul>${p.slice(0,9).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
+}
+["cName","cAcct","cLink","cBudget","cDsa"].forEach(id=>$(id).addEventListener("input",tally));
+["cObj","cCta","cDsa"].forEach(id=>$(id).addEventListener("change",tally));
+$("cMode").addEventListener("change",render);
+
+/* ---------- the brief ---------- */
+function brief(){
+  const L=[];
+  L.push(`Build this campaign. Everything paused.`,``);
+  L.push(`Campaign: ${$("cName").value.trim()||"(needs a name)"}`);
+  if($("cAcct").value.trim()) L.push(`Ad account: ${$("cAcct").value.trim()}`);
+  L.push(`Goal: ${$("cObj").value}`);
+  const mode=$("cMode").value;
+  L.push(mode==="CBO"
+    ? `Budget: ${$("cBudget").value.trim()||"(missing)"} a day on the campaign, Meta splits it`
+    : `Budget: set separately on each ad set`);
+  L.push(`Link: ${$("cLink").value.trim()||"(missing)"}`);
+  L.push(`Button: ${$("cCta").value}`);
+  if($("cPage").value.trim()) L.push(`Page: ${$("cPage").value.trim()}`);
+  if($("cDsa").value.trim()) L.push(`Advertiser name (EU): ${$("cDsa").value.trim()}`);
+  const cName=Object.fromEntries(COUNTRIES.map(c=>[c.c,c.n]));
+  sets.forEach(s=>{
+    L.push(``,`AD SET: ${s.name||"(needs a name)"}`);
+    L.push(`  Countries: ${s.countries.join(",")||"(missing)"}`
+      + (s.countries.length?`   (${s.countries.map(c=>cName[c]||c).join(", ")})`:""));
+    if(s.langs.length) L.push(`  Languages: ${s.langs.join(", ")}`);
+    L.push(`  Ages ${s.ageMin}-${s.ageMax}, ${s.gender}`);
+    if(mode==="ABO") L.push(`  Budget: ${String(s.budget).trim()||"(missing)"} a day`);
+    s.ads.forEach(a=>{
+      L.push(`  AD: ${a.name||"(needs a name)"}   image: ${a.file||"(missing)"}`);
+      a.bodies.filter(Boolean).forEach((b,i)=>L.push(`    text ${i+1}: ${b}`));
+      a.heads.filter(Boolean).forEach((h,i)=>L.push(`    headline ${i+1}: ${h}`));
+    });
+  });
+  const files=[...new Set(sets.flatMap(s=>s.ads.map(a=>a.file.trim())).filter(Boolean))];
+  if(files.length) L.push(``,`Images I'm attaching: ${files.join(", ")}`);
+  L.push(``,`Show me a preview before creating anything.`);
+  return L.join("\n");
+}
+function showOut(){ $("outText").textContent=brief(); $("outDlg").showModal(); }
+async function copyOut(btn){
+  try{ await navigator.clipboard.writeText(brief()); btn.textContent="Copied"; }
+  catch(e){
+    const r=document.createRange(); r.selectNodeContents($("outText"));
+    const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    btn.textContent="Selected — press Cmd+C";
+  }
+  setTimeout(()=>btn.textContent="Copy it",2200);
+}
+
+/* ---------- example ---------- */
+function loadExample(){
+  $("cName").value="Spring 2026 | EU | Traffic"; $("cObj").value="OUTCOME_TRAFFIC";
+  $("cMode").value="CBO"; $("cBudget").value="50";
+  $("cLink").value="https://example.com/spring"; $("cCta").value="SHOP_NOW";
+  $("cDsa").value="Example Ltd";
+  sets=[]; uid=0;
+  [["Spring | LT | 18-65","LT","Lithuanian"],["Spring | PL | 18-65","PL","Polish"]]
+   .forEach(([n,c,l])=>{
+    sets.push({id:++uid,name:n,countries:[c],langs:[l],ageMin:18,ageMax:65,gender:"All",
+      budget:"",ads:[
+      {id:++uid,name:n.split("|")[1].trim()+"-01-price",file:c.toLowerCase()+"-price.png",
+       bodies:["The spring sale is on.","Everything 30% off this week."],
+       heads:["Shop the sale","30% off"]},
+      {id:++uid,name:n.split("|")[1].trim()+"-02-proof",file:c.toLowerCase()+"-proof.png",
+       bodies:["Over 12,000 five-star reviews."],heads:["Trusted by customers"]}]});
+  });
+  render();
+}
+
+addSet(); render();
+</script>
