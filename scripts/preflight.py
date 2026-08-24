@@ -60,21 +60,16 @@ TOKEN_TUTORIAL = """
     A long string starting with "EAA..." appears. Copy it.
 
   STEP 6 — Hand it over
-    Just tell Claude:  save my token
-    A box appears on your screen. Paste the token into it and press Save.
-    That is the whole step - you never touch a terminal.
-
-    (If you prefer the terminal:  bash scripts/setup.sh  does the same thing.
-     Nothing appears on screen while you paste there; that is deliberate.)
+    A box will open on your screen. Paste the token into it and press Save.
+    That is the whole step.
 
     >>> Do NOT paste the token into the Claude chat window. <<<
     Chat is saved in the transcript. The box keeps it in a local .env only
     you can read. Pasted one by accident? Revoke it here:
       https://www.facebook.com/settings?tab=business_tools
 
-  STEP 7 — Confirm
-    Run:   python3 scripts/preflight.py
-    Expect READY, plus a list of every ad account you can reach.
+  STEP 7 — Done
+    Your ad accounts appear and you can start working.
 
   TROUBLESHOOTING
     "0 ad accounts found"

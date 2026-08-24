@@ -28,11 +28,21 @@ walkthrough. Relay it in your own words, in their language, calling out the two
 steps people miss: the **Privacy Policy URL** in App settings → Basic, and
 ticking **all five** permissions.
 
-**Then run this for them — do not send them to a terminal:**
+**These people do not use a terminal and will not learn to for this.** Never
+show them a shell command, never say "run this", never mention scripts, paths
+or `bash`. You run everything.
+
+Walk them through steps 1-5 on Meta's site, then say something like *"when you
+have the token, tell me and a box will open for you to paste it into"* — and
+**run this yourself the moment they say they have it**:
 
 ```bash
 python3 scripts/save_token.py
 ```
+
+A password box opens on their screen. They paste, press Save, done. It is
+validated against Meta and its five scopes checked before anything is written.
+Then rerun preflight yourself and show them their ad accounts.
 
 A native password box opens on their screen; they paste the token in and press
 Save. It is checked against Meta and its five scopes verified before anything
