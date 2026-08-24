@@ -388,16 +388,6 @@ class handler(BaseHTTPRequestHandler):
                                         "has_stats": bool(stats),
                                         "stats_error": stats_error})
 
-            if p.path == "/api/media-upload":
-                if not self._need_auth():
-                    return
-                return self._media_upload()
-
-            if p.path == "/api/ads-create":
-                if not self._need_auth():
-                    return
-                return self._ads_create()
-
             return self._send(404, {"error": "no such endpoint"})
         except meta.MetaError as e:
             return self._send(400, {"error": str(e)})
@@ -1240,6 +1230,16 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, {"total": len(rows),
                                         "flagged": sum(1 for r in rows if r["on"]),
                                         "ads": rows})
+            if p.path == "/api/media-upload":
+                if not self._need_auth():
+                    return
+                return self._media_upload()
+
+            if p.path == "/api/ads-create":
+                if not self._need_auth():
+                    return
+                return self._ads_create()
+
             return self._send(404, {"error": "no such endpoint"})
         except meta.MetaError as e:
             return self._send(400, {"error": str(e)})
