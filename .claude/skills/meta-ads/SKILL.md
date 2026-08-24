@@ -40,6 +40,9 @@ have the token, tell me and a box will open for you to paste it into"* — and
 python3 scripts/save_token.py
 ```
 
+If `scripts/save_token.py` is missing, their clone is out of date — pull first
+(see "Keeping the tool up to date"), then run it.
+
 A password box opens on their screen. They paste, press Save, done. It is
 validated against Meta and its five scopes checked before anything is written.
 Then rerun preflight yourself and show them their ad accounts.
