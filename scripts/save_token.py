@@ -16,6 +16,11 @@ ROOT = Path(__file__).resolve().parent.parent
 ENV = ROOT / ".env"
 
 
+class Cancelled(Exception):
+    """The user dismissed the box. Distinct from 'no window system here' —
+    conflating the two sent people to a terminal prompt that then crashed."""
+
+
 def ask_macos(prompt, hidden=True):
     script = (f'display dialog "{prompt}" default answer "" '
               f'{"with hidden answer " if hidden else ""}'
@@ -23,28 +28,35 @@ def ask_macos(prompt, hidden=True):
               f'with title "Meta Ads Agent"')
     try:
         r = subprocess.run(["osascript", "-e", script],
-                           capture_output=True, text=True, timeout=600)
+                           capture_output=True, text=True, timeout=900)
+    except FileNotFoundError:
+        return None                       # no osascript at all
     except Exception:
         return None
     if r.returncode != 0:
-        return None                      # cancelled
+        # osascript ran, so the box was shown. Non-zero means Cancel or the
+        # window was dismissed — NOT a reason to fall back to the terminal.
+        raise Cancelled()
     out = r.stdout.strip()
     if "text returned:" in out:
         return out.split("text returned:", 1)[1].strip()
-    return None
+    raise Cancelled()
 
 
 def ask_linux(prompt, hidden=True):
+    saw_tool = False
     for tool in (["zenity", "--entry", f"--text={prompt}", "--title=Meta Ads Agent"]
                  + (["--hide-text"] if hidden else []),
                  ["kdialog", "--password" if hidden else "--inputbox", prompt]):
         try:
-            r = subprocess.run(tool, capture_output=True, text=True, timeout=600)
+            r = subprocess.run(tool, capture_output=True, text=True, timeout=900)
+            saw_tool = True
             if r.returncode == 0:
                 return r.stdout.strip()
+            raise Cancelled()
         except FileNotFoundError:
             continue
-    return None
+    return None if not saw_tool else None
 
 
 def ask(prompt, hidden=True):
@@ -56,9 +68,17 @@ def ask(prompt, hidden=True):
         v = None
     if v is not None:
         return v
-    # No window system — fall back to a hidden terminal prompt.
+    # Genuinely no window system. Try a terminal prompt, but this often has no
+    # usable stdin (Claude Code runs commands without a TTY), so fail with
+    # something actionable rather than a traceback.
     import getpass
-    return (getpass.getpass(prompt + " ") if hidden else input(prompt + " ")).strip()
+    try:
+        return (getpass.getpass(prompt + " ") if hidden
+                else input(prompt + " ")).strip()
+    except (EOFError, OSError):
+        sys.exit("Could not open a dialog box and there is no keyboard input "
+                 "here.\nOpen a Terminal window yourself and run:\n"
+                 "  cd " + str(ROOT) + "\n  bash scripts/setup.sh")
 
 
 def check(token):
@@ -87,9 +107,12 @@ def check(token):
 def main():
     print("A box will appear on screen. Paste your Meta token into it.")
     print("(Nothing is typed here, and the token never goes through the chat.)\n")
-    token = ask("Paste your Meta access token:")
+    try:
+        token = ask("Paste your Meta access token:")
+    except Cancelled:
+        sys.exit("Cancelled — nothing was saved. Say 'save my token' to try again.")
     if not token:
-        sys.exit("Cancelled — nothing was saved.")
+        sys.exit("Nothing was entered — nothing was saved.")
     token = token.strip()
     if not token.startswith("EAA"):
         sys.exit("That does not look like a Meta token — they start with EAA. "

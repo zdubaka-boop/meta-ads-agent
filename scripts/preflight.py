@@ -180,6 +180,24 @@ for key, label in [("META_AD_ACCOUNT_ID", "Default ad account"),
     val = os.getenv(key)
     row(OK if val else SKIP, label, val or "not set (optional — a spec can supply it)")
 
+# 4b. is the tool itself out of date? ----------------------------------------
+try:
+    import subprocess as _sp
+    _g = lambda *a: _sp.run(["git", "-C", str(ROOT), *a], capture_output=True,
+                            text=True, timeout=20).stdout.strip()
+    if (ROOT / ".git").exists():
+        _sp.run(["git", "-C", str(ROOT), "fetch", "-q", "origin", "main"],
+                capture_output=True, timeout=25)
+        _behind = _g("rev-list", "--count", "HEAD..origin/main") or "0"
+        if _behind != "0":
+            row(WARN, "Tool version", f"{_behind} update(s) available — "
+                                      f"say: update the tool")
+            notes.append(f"There are {_behind} update(s). Say 'update the tool' to get them.")
+        else:
+            row(OK, "Tool version", "up to date")
+except Exception:
+    pass
+
 # 5. workspace ---------------------------------------------------------------
 tpl = ROOT / "spec" / "CAMPAIGN-TEMPLATE.xlsx"
 row(OK if tpl.exists() else BAD, "Excel template", "spec/CAMPAIGN-TEMPLATE.xlsx" if tpl.exists() else "MISSING")
