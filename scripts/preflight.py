@@ -59,14 +59,16 @@ TOKEN_TUTORIAL = """
     error. Click "Get token" and approve the Facebook login prompt.
     A long string starting with "EAA..." appears. Copy it.
 
-  STEP 6 — Hand it to this repo
-    Run:   bash scripts/setup.sh
-    Paste the token when asked. NOTHING APPEARS ON SCREEN as you paste -
-    that is deliberate, not a freeze. Press Enter. The next four questions
-    are optional; press Enter to skip them.
+  STEP 6 — Hand it over
+    Just tell Claude:  save my token
+    A box appears on your screen. Paste the token into it and press Save.
+    That is the whole step - you never touch a terminal.
+
+    (If you prefer the terminal:  bash scripts/setup.sh  does the same thing.
+     Nothing appears on screen while you paste there; that is deliberate.)
 
     >>> Do NOT paste the token into the Claude chat window. <<<
-    Chat is saved in the transcript. setup.sh keeps it in a local .env only
+    Chat is saved in the transcript. The box keeps it in a local .env only
     you can read. Pasted one by accident? Revoke it here:
       https://www.facebook.com/settings?tab=business_tools
 
@@ -109,10 +111,10 @@ env_file = ROOT / ".env"
 tok = os.getenv("META_ACCESS_TOKEN")
 if not env_file.exists():
     row(BAD, ".env file", "missing")
-    blockers.append("No .env — run: bash scripts/setup.sh")
+    blockers.append("No Meta token yet — tell Claude: save my token")
 elif not tok:
     row(BAD, ".env file", "present, but META_ACCESS_TOKEN is empty")
-    blockers.append("META_ACCESS_TOKEN is empty — run: bash scripts/setup.sh")
+    blockers.append("No Meta token yet — tell Claude: save my token")
 else:
     row(OK, ".env file", f"present ({oct(env_file.stat().st_mode)[-3:]} perms)")
 
@@ -124,7 +126,7 @@ if tok:
         row(OK, "Token authenticates", f"{me.get('name')} ({me.get('id')})")
     except Exception as e:
         row(BAD, "Token authenticates", str(e)[:44])
-        blockers.append("Token rejected by Meta — re-issue it, then rerun setup.sh")
+        blockers.append("Meta rejected this token — issue a new one, then tell Claude: save my token")
         tok = None
 
 if tok:

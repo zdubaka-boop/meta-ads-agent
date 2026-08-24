@@ -26,9 +26,23 @@ python3 scripts/preflight.py
 **No token → walk them through it.** preflight prints a complete 7-step
 walkthrough. Relay it in your own words, in their language, calling out the two
 steps people miss: the **Privacy Policy URL** in App settings → Basic, and
-ticking **all five** permissions. Then stop. `setup.sh` prompts silently in
-their terminal, so you cannot run it for them — tell them to run it and say
-"done", then rerun preflight yourself.
+ticking **all five** permissions.
+
+**Then run this for them — do not send them to a terminal:**
+
+```bash
+python3 scripts/save_token.py
+```
+
+A native password box opens on their screen; they paste the token in and press
+Save. It is checked against Meta and its five scopes verified before anything
+is written, then stored in `.env` at 0600. **The token never passes through the
+chat**, so it never lands in a saved transcript.
+
+If someone pastes a token into the chat anyway: tell them to revoke it at
+facebook.com/settings?tab=business_tools, issue a new one, and use
+`save_token.py`. Do not write a chat-pasted token to disk and carry on as if
+nothing happened — it is in the transcript from that moment.
 
 **Token present → list their ad accounts and ask which one.** Never make them
 type an ID; show the list and let them point at a row.
