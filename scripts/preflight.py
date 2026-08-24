@@ -227,8 +227,10 @@ if blockers:
         print(f"    * {b}")
     # A missing/invalid token is the only blocker a new user will normally hit,
     # so print the whole walkthrough here rather than pointing at a doc.
-    if any(k in " ".join(blockers) for k in ("No .env", "META_ACCESS_TOKEN", "Token rejected",
-                                             "expired", "missing ads", "is missing")):
+    # Any token-shaped blocker prints the whole walkthrough. Matching on
+    # wording is fragile - reword a blocker and the tutorial silently stops
+    # appearing - so match on the word "token" itself.
+    if any("token" in b.lower() or "permission" in b.lower() for b in blockers):
         print(TOKEN_TUTORIAL)
 else:
     print("  READY — everything needed to start is in place.")
