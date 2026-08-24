@@ -513,13 +513,15 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
 
     <!-- XLSX -->
     <div id="paneXlsx" style="margin-top:16px">
-      <div class="row">
-        <button class="btn" id="btnXlsx">Choose File</button>
+      <div class="row" style="flex-wrap:wrap">
+        <a class="btn ghost" href="/api/template" download="CAMPAIGN-TEMPLATE.xlsx">
+          <svg style="width:15px;height:15px"><use href="#i-up"/></svg> Download blank template</a>
+        <button class="btn" id="btnXlsx">Choose file</button>
         <span class="muted" id="xlsxName">No file chosen</span>
         <input type="file" id="xlsxInput" accept=".xlsx" hidden>
       </div>
-      <p class="hint">Upload an XLSX file with Campaign ID/Name, Ad Set ID/Name, and Ad Name columns.
-        <a href="/api/template">Download the template</a>.</p>
+      <p class="hint">Don't have one? Download the blank template above &mdash; it has the columns already
+        set up and an instructions tab. Fill it in, save it, then choose it here.</p>
     </div>
 
     <!-- API picker -->
@@ -528,8 +530,9 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
         <div class="row" style="align-items:flex-start">
           <div style="max-width:760px">
             <h3 style="font-size:19px;margin-bottom:5px">Select Ad from Facebook</h3>
-            <p class="muted small" style="margin:0;line-height:1.55">Select an existing ad from your account to use as a template.
-              Save it as a preset for quick reuse in future campaigns, then customize the setup for your new ads.</p>
+            <p class="muted small" style="margin:0;line-height:1.55">Pick the ad set(s) your new ads go into &mdash;
+              <b>tick as many as you like</b> and every one gets the full batch. Then pick the ad to copy settings from;
+              selecting more than one pools their headlines and primary texts into rotating variants.</p>
           </div>
           <div class="spacer"></div>
           <div class="seg a" id="fontSeg"><button data-fs="13">A</button><button data-fs="14.5" class="on">A</button><button data-fs="16.5">A</button></div>
@@ -546,7 +549,7 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
             <div class="list" id="listCampaigns"><div class="empty">No campaigns found</div></div>
           </div>
           <div class="col">
-            <h4>Ad Sets</h4>
+            <h4>Ad Sets <span class="tiny muted" id="selAdsets"></span></h4>
             <div class="tools">
               <input class="inp" id="qAdset" placeholder="Search ad sets..." disabled>
               <label class="check dis" style="padding:0;font-size:13.5px"><input type="checkbox" id="onlyActiveA" checked disabled> Only active</label>
@@ -554,7 +557,7 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
             <div class="list" id="listAdsets"><div class="empty">Select a campaign first</div></div>
           </div>
           <div class="col">
-            <h4>Ads</h4>
+            <h4>Ads <span class="tiny muted" id="selAds"></span></h4>
             <div class="tools">
               <input class="inp" id="qAd" placeholder="Search ads..." disabled>
               <label class="check dis" style="padding:0;font-size:13.5px"><input type="checkbox" id="onlyActiveD" checked disabled> Only active</label>
@@ -574,47 +577,75 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
     </div>
   </div>
 
-  <!-- --------------------- campaign / ad set options ------------------- -->
+  <!-- --------------------- where do these ads go ---------------------- -->
   <div class="card card-p" id="structCard">
-    <h2 style="font-size:20px">Campaign &amp; Ad Set Options</h2>
-    <label class="check"><input type="checkbox" id="optNewCampaign"> Create new campaign</label>
-    <div id="newCampaignPane" hidden style="padding:4px 0 8px 30px">
-      <div style="display:grid;grid-template-columns:1fr 210px 190px;gap:14px">
+    <h2 style="font-size:20px">Where should these ads go?</h2>
+    <p class="muted small" style="margin:5px 0 14px">Pick one option in each block. The rest disappear so you can't pick two that fight each other.</p>
+
+    <h3 style="font-size:16px;margin-bottom:4px">1. The campaign</h3>
+    <label class="radio"><input type="radio" name="camp" value="existing" checked> Use the campaign I picked above</label>
+    <label class="radio"><input type="radio" name="camp" value="new"> Make a new campaign</label>
+    <div id="newCampaignPane" hidden style="padding:6px 0 8px 30px">
+      <div style="display:grid;grid-template-columns:1fr 220px;gap:14px">
         <div><label class="f">Campaign name</label><input class="inp" id="ncName" placeholder="Spring 2026 | EU | Traffic"></div>
-        <div><label class="f">Objective</label><select class="inp" id="ncObjective">
-          <option value="OUTCOME_TRAFFIC">Traffic</option><option value="OUTCOME_SALES">Sales</option>
-          <option value="OUTCOME_LEADS">Leads</option><option value="OUTCOME_ENGAGEMENT">Engagement</option>
-          <option value="OUTCOME_AWARENESS">Awareness</option><option value="OUTCOME_APP_PROMOTION">App promotion</option>
+        <div><label class="f">What is it for?</label><select class="inp" id="ncObjective">
+          <option value="OUTCOME_TRAFFIC">Sending people to the website</option>
+          <option value="OUTCOME_SALES">Getting sales</option>
+          <option value="OUTCOME_LEADS">Getting leads</option>
+          <option value="OUTCOME_ENGAGEMENT">Getting engagement</option>
+          <option value="OUTCOME_AWARENESS">Reaching as many people as possible</option>
+          <option value="OUTCOME_APP_PROMOTION">App installs</option>
         </select></div>
-        <div><label class="f">Daily budget</label><input class="inp" id="ncBudget" placeholder="e.g. 50.00" inputmode="decimal"></div>
       </div>
-      <p class="hint">Leave the budget blank to use ad-set budgets instead. Nothing is ever assumed &mdash; a blank budget is asked for, not guessed.</p>
+
+      <h4 style="font-size:15px;margin:16px 0 2px">Who holds the budget?</h4>
+      <p class="hint" style="margin:0 0 4px">Meta lets you set this in one place only — never both.</p>
+      <label class="radio"><input type="radio" name="bmode" value="CBO" checked>
+        One budget for the whole campaign <span class="tiny muted">— Meta spreads it across the ad sets</span></label>
+      <div id="cboPane" style="padding:2px 0 6px 30px">
+        <div class="row"><span class="small">Spend per day</span>
+          <input class="inp" id="ncBudget" placeholder="50.00" inputmode="decimal" style="width:130px">
+          <span class="small muted" id="curLabel"></span></div>
+      </div>
+      <label class="radio"><input type="radio" name="bmode" value="ABO">
+        A separate budget for each ad set <span class="tiny muted">— you control each one</span></label>
     </div>
 
     <hr class="sep">
-    <h2 style="font-size:20px">Ad Set Options</h2>
-    <label class="check"><input type="checkbox" id="optNewAdset"> Create new ad set</label>
+    <h3 style="font-size:16px;margin-bottom:4px">2. The ad sets</h3>
+    <label class="radio" id="rExistingSet"><input type="radio" name="aset" value="existing" checked>
+      Use the ad set(s) I ticked above <span class="tiny muted" id="existingSetCount"></span></label>
+    <label class="radio"><input type="radio" name="aset" value="one"> Put everything in one new ad set</label>
     <div id="newAdsetPane" hidden style="padding:4px 0 8px 30px">
-      <div style="display:grid;grid-template-columns:1fr 210px;gap:14px">
-        <div><label class="f">Ad set name</label><input class="inp" id="naName" placeholder="Ad set name"></div>
-        <div><label class="f">Daily budget</label><input class="inp" id="naBudget" placeholder="e.g. 20.00" inputmode="decimal"></div>
-      </div>
+      <label class="f">Ad set name</label><input class="inp" id="naName" placeholder="Broad 18-65" style="max-width:420px">
     </div>
-    <label class="check"><input type="checkbox" id="optPerGroup"> Create new ad set per upload or group</label>
-    <label class="check"><input type="checkbox" id="optAutoDivide"> Auto-divide ads into ad sets</label>
+    <label class="radio"><input type="radio" name="aset" value="group">
+      One new ad set per group in my filenames <span class="tiny muted" id="groupHint"></span></label>
+    <label class="radio"><input type="radio" name="aset" value="split"> Split them evenly across new ad sets</label>
     <div id="autoDividePane" hidden style="padding:4px 0 8px 30px">
       <div class="row"><span class="small">Ads per ad set</span>
         <input class="inp" id="perSet" type="number" min="1" max="50" value="5" style="width:96px">
-        <span class="hint" style="margin:0">Meta allows 1&ndash;50 ads per ad set.</span></div>
+        <span class="hint" style="margin:0">Meta allows 1&ndash;50.</span></div>
     </div>
-    <label class="check"><input type="checkbox" id="optCustomSets"> Build custom ad set configuration</label>
+    <label class="radio"><input type="radio" name="aset" value="custom"> Let me sort them into ad sets by hand</label>
+    <div id="customPane" hidden style="padding:4px 0 8px 30px">
+      <button class="btn ghost" id="btnOpenBuilder">Open the ad set builder &rarr;</button>
+      <span class="small muted" id="customSummary" style="margin-left:10px"></span>
+    </div>
+    <div id="abBudgetPane" hidden style="padding:6px 0 8px 30px">
+      <div class="row"><span class="small">Spend per day, per ad set</span>
+        <input class="inp" id="naBudget" placeholder="20.00" inputmode="decimal" style="width:130px">
+        <span class="small muted" id="curLabel2"></span></div>
+    </div>
 
     <hr class="sep">
-    <h2 style="font-size:20px">Ad Name Options</h2>
-    <label class="check"><input type="checkbox" id="optNamePattern"> Use custom ad name pattern</label>
+    <h3 style="font-size:16px;margin-bottom:4px">3. What to call the ads</h3>
+    <label class="radio"><input type="radio" name="anam" value="file" checked> Name them after the image file</label>
+    <label class="radio"><input type="radio" name="anam" value="pattern"> Build the name myself</label>
     <div id="namePatternPane" hidden style="padding:4px 0 4px 30px">
+      <div class="row" style="flex-wrap:wrap;gap:7px;margin-bottom:9px" id="tokenBtns"></div>
       <input class="inp" id="namePattern" value="{filename}" style="max-width:520px">
-      <p class="hint">Tokens: <b>{filename}</b> <b>{index}</b> <b>{adset}</b> <b>{campaign}</b> <b>{date}</b> <b>{ratio}</b></p>
+      <p class="hint">Your first ad would be called: <b id="namePreview" style="color:var(--ink)">—</b></p>
     </div>
 
     <hr class="sep">
@@ -627,6 +658,7 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
       <thead><tr><th>Campaign ID</th><th>Campaign Name</th><th>Ad Set ID</th><th>Ad Set Name</th><th>Ad Name</th></tr></thead>
       <tbody id="previewBody"></tbody></table></div>
   </div>
+
   <!-- --------------------------- ad text ---------------------------- -->
   <div class="card card-p">
     <h2 style="font-size:20px">Ad Text Options</h2>
@@ -660,17 +692,32 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
         </select></div>
         <div><label class="f">Website URL</label><input class="inp" id="fLink" placeholder="https://example.com/"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
-        <div><label class="f">Display URL</label><input class="inp" id="fDisplay" placeholder="example.com"></div>
-        <div><label class="f">URL Parameters</label><input class="inp" id="fUtm"
-          value="utm_medium={{campaign.id}}&amp;utm_campaign={{campaign.name}}&amp;utm_term={{adset.id}}&amp;utm_content={{ad.id}}&amp;utm_source=facebook"></div>
+      <div style="margin-top:16px;max-width:50%">
+        <label class="f">Link shown on the ad</label>
+        <input class="inp" id="fDisplay" placeholder="example.com">
+        <p class="hint">Just the tidy version people see, e.g. <b>example.com</b>. Optional.</p>
+      </div>
+
+      <div style="margin-top:16px">
+        <label class="check"><input type="checkbox" id="utmOn" checked> Track where your traffic came from
+          <span class="sub">Adds hidden tags to the link so Google Analytics can tell you which
+            campaign, ad set and ad each visitor came from. It does not change what people see.</span></label>
+        <div style="padding-left:30px">
+          <button class="linkbtn" id="utmToggle">Show the exact tags</button>
+          <div id="utmAdv" hidden style="margin-top:8px">
+            <input class="inp" id="fUtm"
+              value="utm_medium={{campaign.id}}&amp;utm_campaign={{campaign.name}}&amp;utm_term={{adset.id}}&amp;utm_content={{ad.id}}&amp;utm_source=facebook">
+            <p class="hint">Meta fills in the <b>{{...}}</b> parts itself when the ad runs. Leave it alone
+              unless you know you need something different.</p>
+          </div>
+        </div>
       </div>
     </div>
 
     <div id="perAdsetText" hidden style="padding-left:30px"></div>
-    <div id="perAdBtnWrap" hidden style="padding-left:30px;margin-top:10px">
-      <button class="btn ghost" id="btnPerAd">Edit text for each ad &rarr;</button>
-      <p class="hint">Opens a table with one row per ad. Anything left blank falls back to the common text above.</p>
+    <div style="padding-left:30px;margin-top:14px">
+      <button class="btn ghost" id="btnPerAd">Edit the text on each ad one by one &rarr;</button>
+      <p class="hint">Opens a table with one row per ad. Anything you leave blank keeps the text above.</p>
     </div>
   </div>
 
@@ -726,12 +773,13 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
   </div>
 
   <div class="card card-p">
-    <h3 style="font-size:19px;margin-bottom:12px">Pick the ads to copy</h3>
+    <h3 style="font-size:19px;margin-bottom:4px">Pick the ads to copy</h3>
+    <p class="muted small" style="margin:0 0 12px">Tick as many ad sets as you like &mdash; their ads all appear in the third column.</p>
     <div class="cols">
       <div class="col"><h4>Campaigns</h4>
         <div class="tools"><input class="inp" id="dQCampaign" placeholder="Search campaigns..."></div>
         <div class="list" id="dListCampaigns"><div class="empty">No campaigns found</div></div></div>
-      <div class="col"><h4>Ad Sets</h4>
+      <div class="col"><h4>Ad Sets <span class="tiny muted">tick any number</span></h4>
         <div class="tools"><input class="inp" id="dQAdset" placeholder="Search ad sets..." disabled></div>
         <div class="list" id="dListAdsets"><div class="empty">Select a campaign first</div></div></div>
       <div class="col"><h4>Ads <span class="tiny muted" id="dPickCount"></span></h4>
@@ -751,9 +799,13 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
         <div class="list" id="dListDestA"><div class="empty">Select a campaign first</div></div></div>
       <div class="col"><h4>Summary</h4><div class="list" style="padding:15px"><div id="dupSummary" class="small muted">Nothing selected yet.</div></div></div>
     </div>
-    <label class="check" style="margin-top:14px"><input type="checkbox" id="dupRename"> Rename the copies
-      <span class="sub">Tokens: {name} {index} {date}</span></label>
-    <div id="dupRenamePane" hidden style="padding-left:30px"><input class="inp" id="dupPattern" value="{name} — copy {index}" style="max-width:420px"></div>
+    <label class="check" style="margin-top:14px"><input type="checkbox" id="dupRename"> Give the copies a new name
+      <span class="sub">Otherwise they keep the original name, which makes them hard to tell apart in Ads Manager.</span></label>
+    <div id="dupRenamePane" hidden style="padding-left:30px">
+      <label class="f">Add to the end of each name</label>
+      <input class="inp" id="dupSuffix" value="copy" style="max-width:300px" placeholder="copy">
+      <p class="hint">First copy would be called: <b id="dupPreview" style="color:var(--ink)">—</b></p>
+    </div>
     <button class="btn big" id="btnDuplicate" style="margin-top:18px" disabled>Duplicate 0 ads (paused)</button>
   </div>
  </div>
@@ -943,11 +995,14 @@ const S = {
   route:"dashboard", demo:false, me:null, accounts:[], acct:null,
   files:[], uploaded:[],            // uploaded = {id,name,type,url,hash|videoId}
   cfg:"xlsx", xlsxFile:null,
-  api:{campaigns:[],adsets:[],ads:[],c:null,a:null,d:null,loading:false},
-  dup:{campaigns:[],adsets:[],ads:[],c:null,a:null,picked:new Set(),destC:null,destA:null,destAdsets:[]},
+  /* a/d = which ad set's ads are listed and which ad drives the settings.
+     aSel/dSel = the multi-selections: destination ad sets, and the ads whose
+     copy gets pooled into rotating variants. */
+  api:{campaigns:[],adsets:[],ads:[],c:null,a:null,d:null,aSel:[],dSel:[],loading:false},
+  dup:{campaigns:[],adsets:[],ads:[],c:null,a:null,aSel:[],picked:new Set(),destC:null,destA:null,destAdsets:[]},
   media:{items:[],type:"all",q:""},
-  struct:{newCampaign:false,newAdset:false,perGroup:false,autoDivide:false,custom:false,perSet:5,
-          namePattern:false,pattern:"{filename}"},
+  struct:{camp:"existing", bmode:"CBO", aset:"existing", perSet:5,
+          anam:"file", pattern:"{filename}"},
   text:{mode:"common",headMode:"flexible",headlines:[""],bodies:[""],desc:"",cta:"SIGN_UP",link:"",display:"",
         utm:"utm_medium={{campaign.id}}&utm_campaign={{campaign.name}}&utm_term={{adset.id}}&utm_content={{ad.id}}&utm_source=facebook", page_id:"",
         perAd:{}, perAdset:{}},
@@ -1166,21 +1221,28 @@ function mountUploader(){
   ["qCampaign","qAdset","qAd"].forEach(id=>$("#"+id).oninput=drawApiLists);
   $("#onlyActiveC").onchange=drawApiLists; $("#onlyActiveA").onchange=drawApiLists; $("#onlyActiveD").onchange=drawApiLists;
 
-  /* ---------- structure options ---------- */
-  const bind=(id,key,pane)=>{ const c=$("#"+id); c.checked=S.struct[key];
-    c.onchange=()=>{ S.struct[key]=c.checked; if(pane) $("#"+pane).hidden=!c.checked;
-      if(key==="custom" && c.checked) openBuilder();
-      if(key==="custom" && !c.checked) S.customSets=[];
-      renderPreview(); }; };
-  bind("optNewCampaign","newCampaign","newCampaignPane");
-  bind("optNewAdset","newAdset","newAdsetPane");
-  bind("optPerGroup","perGroup");
-  bind("optAutoDivide","autoDivide","autoDividePane");
-  bind("optCustomSets","custom");
-  bind("optNamePattern","namePattern","namePatternPane");
+  /* ---------- structure: radios, so two options can never fight ---------- */
+  const group=(name,key,after)=>$$(`input[name="${name}"]`).forEach(r=>{
+    r.checked = r.value===S.struct[key];
+    r.onchange=()=>{ S.struct[key]=r.value; after&&after(r.value); syncStruct(); renderPreview(); };
+  });
+  group("camp","camp");
+  group("bmode","bmode");
+  group("aset","aset", v=>{ if(v==="custom") openBuilder(); else S.customSets=[]; });
+  group("anam","anam");
+  $("#btnOpenBuilder").onclick = openBuilder;
   $("#perSet").oninput = e=>{ S.struct.perSet=Math.max(1,Math.min(50,+e.target.value||1)); renderPreview(); };
   $("#namePattern").oninput = e=>{ S.struct.pattern=e.target.value; renderPreview(); };
-  ["ncName","ncObjective","ncBudget","naName","naBudget"].forEach(id=>$("#"+id).oninput=renderPreview);
+  ["ncName","ncObjective","ncBudget","naName"].forEach(id=>$("#"+id).oninput=renderPreview);
+  /* Name tokens as buttons — nobody should have to learn brace syntax. */
+  $("#tokenBtns").innerHTML = [["{filename}","image file name"],["{index}","1, 2, 3…"],
+      ["{adset}","ad set name"],["{campaign}","campaign name"],["{date}","today's date"],
+      ["{ratio}","which sizes"]]
+    .map(([t,l])=>`<button class="btn ghost sm" data-tok="${t}" title="Inserts the ${l}">${l}</button>`).join("");
+  $("#tokenBtns").onclick = e=>{ const b=e.target.closest("[data-tok]"); if(!b) return;
+    const f=$("#namePattern"); f.value += (f.value&&!f.value.endsWith(" ")?" ":"") + b.dataset.tok;
+    S.struct.pattern=f.value; renderPreview(); };
+  syncStruct();
 
   /* ---------- ad text ---------- */
   const modes = {txtCommon:"common", txtPerAdset:"perAdset", txtPerAd:"perAd"};
@@ -1189,8 +1251,8 @@ function mountUploader(){
     Object.keys(modes).forEach(o=>$("#"+o).checked = o===id);
     $("#commonText").hidden   = false;                       // common text is always the fallback
     $("#perAdsetText").hidden = S.text.mode!=="perAdset";
-    $("#perAdBtnWrap").hidden = S.text.mode!=="perAd";
     if(S.text.mode==="perAdset") renderPerAdsetText();
+    if(S.text.mode==="perAd") openPerAd();
   });
   $("#headMode").onclick = e=>{ const b=e.target.closest("button"); if(!b)return;
     S.text.headMode=b.dataset.m; $$("#headMode button").forEach(x=>x.classList.toggle("on",x===b)); renderPreview(); };
@@ -1203,6 +1265,9 @@ function mountUploader(){
     $("#"+id).value = S.text[k]; $("#"+id).oninput = e=>{ S.text[k]=e.target.value; };
   });
   $("#btnPerAd").onclick = openPerAd;
+  $("#utmToggle").onclick = ()=>{ const a=$("#utmAdv"); a.hidden=!a.hidden;
+    $("#utmToggle").textContent = a.hidden?"Show the exact tags":"Hide the exact tags"; };
+  $("#utmOn").onchange = e=>{ if(!e.target.checked) $("#utmAdv").hidden=true; };
 
   /* ---------- enhancements ---------- */
   $("#enhDefaults").onchange = e=>{
@@ -1229,6 +1294,43 @@ function mountUploader(){
     }
   };
   $("#btnCreate").onclick = confirmCreate;
+}
+
+/* Show only the fields the current choices actually use. This is the thing
+   that stops a campaign budget and an ad-set budget both being filled in. */
+function syncStruct(){
+  const st=S.struct;
+  $("#newCampaignPane").hidden = st.camp!=="new";
+  const abo = st.camp==="new" ? st.bmode==="ABO" : true;   // existing campaign: we don't touch its budget
+  $("#cboPane").hidden = st.bmode!=="CBO";
+  $("#abBudgetPane").hidden = !(st.camp==="new" && abo && st.aset!=="existing");
+  $("#newAdsetPane").hidden   = st.aset!=="one";
+  $("#autoDividePane").hidden = st.aset!=="split";
+  $("#customPane").hidden     = st.aset!=="custom";
+  $("#namePatternPane").hidden = st.anam!=="pattern";
+
+  /* A brand-new campaign has no existing ad sets to put anything into. */
+  const rex=$("#rExistingSet"), rexIn=rex.querySelector("input");
+  rexIn.disabled = st.camp==="new";
+  rex.classList.toggle("dis", st.camp==="new");
+  if(rexIn.disabled && st.aset==="existing"){
+    st.aset="one"; $$('input[name="aset"]').forEach(r=>r.checked = r.value==="one");
+    $("#newAdsetPane").hidden=false;
+  }
+  syncStructHints();
+}
+function syncStructHints(){
+  if(!$("#existingSetCount")) return;
+  $("#existingSetCount").textContent = S.api.aSel.length
+    ? `— ${S.api.aSel.length} ticked` : "— none ticked yet";
+  const groups = groupCreatives(S.uploaded.length?S.uploaded:S.files);
+  const prefixes = [...new Set(groups.map(g=>groupPrefix(g.base)))];
+  $("#groupHint").textContent = prefixes.length && prefixes.length<groups.length
+    ? `— ${prefixes.length} found: ${prefixes.slice(0,5).join(", ")}` : "";
+  $("#customSummary").textContent = S.customSets.length
+    ? `${S.customSets.length} ad set(s) set up` : "nothing sorted yet";
+  const cur = S.acct?.currency ? ` ${S.acct.currency}` : "";
+  $("#curLabel").textContent = cur; $("#curLabel2").textContent = cur;
 }
 
 function renderModeBanner(){
@@ -1434,7 +1536,7 @@ function showUploadErrors(failed, reasons){
 
 /* ============================= API picker ============================== */
 function resetApiPicker(){
-  S.api = {campaigns:S.api.campaigns,adsets:[],ads:[],c:null,a:null,d:null,loading:false};
+  S.api = {campaigns:S.api.campaigns,adsets:[],ads:[],c:null,a:null,d:null,aSel:[],dSel:[],loading:false};
   $("#qAdset").disabled=$("#qAd").disabled=true;
   $("#onlyActiveA").disabled=$("#onlyActiveD").disabled=true;
   $$("#apiCols .check").forEach((c,i)=>{ if(i) c.classList.add("dis"); });
@@ -1453,7 +1555,7 @@ async function loadCampaigns(force){
   S.api.loading=false; drawApiLists();
 }
 async function loadAdsets(cid){
-  S.api.adsets=[]; S.api.ads=[]; S.api.a=S.api.d=null; drawApiLists();
+  S.api.adsets=[]; S.api.ads=[]; S.api.a=S.api.d=null; S.api.aSel=[]; S.api.dSel=[]; drawApiLists();
   try{
     if(S.demo){ await sleep(220); S.api.adsets = DEMO.adsetsFor(cid); }
     else{ const r=await api(`/api/adsets?campaign=${encodeURIComponent(cid)}`); S.api.adsets=r.adsets||r.data||[]; }
@@ -1477,48 +1579,88 @@ function filt(list,q,onlyActive){
   return list.filter(x=>(!s||String(x.name||"").toLowerCase().includes(s)) &&
                         (!onlyActive || String(x.status||"").toUpperCase()==="ACTIVE"));
 }
+/* selIds may be a single id or a Set/array of them — the ad set and ad
+   columns are multi-select, campaigns stay single. */
 function drawList(el,items,selId,onPick,emptyMsg){
   if(S.api.loading && el.id==="listCampaigns"){ el.innerHTML=`<div class="empty">Loading…</div>`; return; }
   if(!items.length){ el.innerHTML=`<div class="empty">${esc(emptyMsg)}</div>`; return; }
   const fs = $("#fontSeg .on")?.dataset.fs || "14.5";
-  el.innerHTML = items.map(i=>`<div class="it${i.id===selId?" on":""}" data-id="${esc(i.id)}" style="font-size:${fs}px">
+  const on = id => Array.isArray(selId) ? selId.includes(id) : id===selId;
+  el.innerHTML = items.map(i=>`<div class="it${on(i.id)?" on":""}" data-id="${esc(i.id)}" style="font-size:${fs}px">
     <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.name)}</span>
-    ${i.id===selId?`<svg class="tick" style="width:16px;height:16px"><use href="#i-tick"/></svg>`:""}</div>`).join("");
+    ${on(i.id)?`<svg class="tick" style="width:16px;height:16px"><use href="#i-tick"/></svg>`:""}</div>`).join("");
   $$(".it",el).forEach(d=>d.onclick=()=>onPick(items.find(x=>x.id===d.dataset.id)));
+}
+function toggle(list,item){
+  const i=list.findIndex(x=>x.id===item.id);
+  if(i>=0) list.splice(i,1); else list.push(item);
+  return list;
 }
 function drawApiLists(){
   if(!$("#listCampaigns")) return;
   drawList($("#listCampaigns"), filt(S.api.campaigns,$("#qCampaign").value,$("#onlyActiveC").checked),
     S.api.c?.id, c=>{ S.api.c=c; loadAdsets(c.id); drawApiLists(); renderPreview(); }, "No campaigns found");
   drawList($("#listAdsets"), filt(S.api.adsets,$("#qAdset").value,$("#onlyActiveA").checked),
-    S.api.a?.id, a=>{ S.api.a=a; loadAds(a.id); drawApiLists(); renderPreview(); },
+    S.api.aSel.map(x=>x.id),
+    a=>{ toggle(S.api.aSel,a);
+         /* Always list the clicked set's ads, selected or not — you still need
+            to see inside a set you just unticked. */
+         S.api.a=a; loadAds(a.id); drawApiLists(); renderPreview(); },
     S.api.c?"No ad sets found":"Select a campaign first");
   drawList($("#listAds"), filt(S.api.ads,$("#qAd").value,$("#onlyActiveD").checked),
-    S.api.d?.id, d=>{ S.api.d=d; drawApiLists(); pickedTemplate(); renderPreview(); },
+    S.api.dSel.map(x=>x.id),
+    d=>{ toggle(S.api.dSel,d); S.api.d=S.api.dSel[0]||null;
+         drawApiLists(); pickedTemplate(); renderPreview(); },
     S.api.a?"No ads found":"Select an ad set first");
-  const on = S.api.c && S.api.a && S.api.d;
+  $("#selAdsets").textContent = S.api.aSel.length?`${S.api.aSel.length} selected`:"";
+  $("#selAds").textContent    = S.api.dSel.length?`${S.api.dSel.length} selected`:"";
+  const on = S.api.c && S.api.aSel.length && S.api.dSel.length;
   $("#cfgSource").hidden = !on;
-  if(on) $("#cfgCrumb").innerHTML =
-    `<div>${esc(S.api.c.name)}</div><div class="l2">&rsaquo; ${esc(S.api.a.name)}</div><div class="l3">&rsaquo; ${esc(S.api.d.name)}</div>`;
+  if(on){
+    const more = S.api.dSel.length>1 ? ` <span class="tiny muted">+ ${S.api.dSel.length-1} more, copy pooled</span>` : "";
+    $("#cfgCrumb").innerHTML =
+      `<div>${esc(S.api.c.name)}</div>
+       <div class="l2">&rsaquo; ${esc(S.api.aSel.map(a=>a.name).join(", "))}</div>
+       <div class="l3">&rsaquo; ${esc(S.api.d.name)}${more}</div>`;
+  }
 }
 async function pickedTemplate(){
-  /* Pull the chosen ad's copy so the text fields start from something real. */
-  let d = null;
-  if(S.demo){ d = demoDefaults; }
-  else{
-    try{ const r = await api(`/api/ad-defaults?ad=${encodeURIComponent(S.api.d.id)}`); d = r.defaults||r; }
-    catch(e){ toast("Loaded the ad, but could not read its copy: "+e.message); return; }
+  /* Pull the chosen ads' copy so the text fields start from something real.
+     The first selection decides identity (Page, link, CTA); every selection
+     contributes its headline and primary text to the rotating variants. */
+  const picks = S.api.dSel.slice(0,5);      // Meta rotates at most 5 of each
+  if(!picks.length){ return; }
+  let defs = [];
+  if(S.demo){
+    defs = picks.map((p,i)=>({...demoDefaults,
+      headline: i ? `${demoDefaults.headline} (${p.name})` : demoDefaults.headline,
+      body:     i ? `${demoDefaults.body}\n\n— ${p.name}` : demoDefaults.body}));
+  }else{
+    for(const p of picks){
+      try{ const r = await api(`/api/ad-defaults?ad=${encodeURIComponent(p.id)}`); defs.push(r.defaults||r); }
+      catch(e){ toast(`Could not read the copy on “${p.name}”: ${e.message}`); }
+    }
   }
-  if(!d) return;
-  if(d.page_id) S.text.page_id=d.page_id;
-  if(d.headline) S.text.headlines=[d.headline];
-  if(d.body)     S.text.bodies=[d.body];
-  S.text.desc = d.desc||d.description||S.text.desc;
-  S.text.cta  = d.cta||S.text.cta;
-  S.text.link = d.link||S.text.link;
-  S.text.display = d.display||d.display_link||S.text.display;
+  defs = defs.filter(Boolean);
+  if(!defs.length) return;
+
+  const first = defs[0];
+  if(first.page_id) S.text.page_id = first.page_id;
+  S.text.desc    = first.desc||first.description||S.text.desc;
+  S.text.cta     = first.cta||S.text.cta;
+  S.text.link    = first.link||S.text.link;
+  S.text.display = first.display||first.display_link||S.text.display;
+
+  const pool = key => [...new Set(defs.map(d=>d[key]).filter(Boolean))].slice(0,5);
+  const heads = pool("headline"), bodies = pool("body");
+  if(heads.length)  S.text.headlines = heads;
+  if(bodies.length) S.text.bodies    = bodies;
+
   renderTextFields();
-  toast("Copied settings and copy from “"+S.api.d.name+"”.");
+  toast(picks.length===1
+    ? `Copied settings and copy from “${picks[0].name}”.`
+    : `Settings from “${picks[0].name}”, copy pooled from ${picks.length} ads `+
+      `(${bodies.length} primary text${bodies.length===1?"":"s"}, ${heads.length} headline${heads.length===1?"":"s"}).`);
 }
 </script>
 <script>
@@ -1531,33 +1673,45 @@ function buildPlan(){
   const groups = groupCreatives(src);
   if(!groups.length) return {ads:[],sets:[],warnings:[]};
 
-  const warnings=[];
-  const camp = S.struct.newCampaign
+  const warnings=[], st=S.struct;
+  const camp = st.camp==="new"
     ? {id:"(new)", name:$("#ncName")?.value.trim()||"(unnamed campaign)"}
     : (S.api.c || {id:"—", name:"—"});
-  if(!S.struct.newCampaign && !S.api.c) warnings.push("No campaign chosen yet.");
+  if(st.camp==="new" && !$("#ncName")?.value.trim()) warnings.push("The new campaign has no name.");
+  if(st.camp==="new" && st.bmode==="CBO" && !$("#ncBudget")?.value.trim())
+    warnings.push("No daily budget for the campaign — a budget is never assumed.");
+  if(st.camp==="new" && st.bmode==="ABO" && st.aset!=="existing" && !$("#naBudget")?.value.trim())
+    warnings.push("No daily budget per ad set — a budget is never assumed.");
+  if(st.camp!=="new" && !S.api.c) warnings.push("No campaign chosen yet.");
 
   /* --- decide the ad sets --- */
   let sets=[];
-  if(S.struct.custom && S.customSets.length){
+  if(st.aset==="custom" && S.customSets.length){
     sets = S.customSets.map((s,i)=>({id:"(new)",name:s.name||`Ad Set ${i+1}`,
       items:groups.filter(g=>s.items.includes(g.main.id))}));
     const assigned=new Set(S.customSets.flatMap(s=>s.items));
     const left=groups.filter(g=>!assigned.has(g.main.id));
     if(left.length) warnings.push(`${left.length} ad(s) are not assigned to any ad set.`);
-  }else if(S.struct.autoDivide){
-    const n=Math.max(1,Math.min(50,S.struct.perSet));
+  }else if(st.aset==="custom"){
+    warnings.push("Nothing sorted into ad sets yet — open the ad set builder.");
+    sets=[{id:"(new)",name:"—",items:groups}];
+  }else if(st.aset==="split"){
+    const n=Math.max(1,Math.min(50,st.perSet));
     for(let i=0;i<groups.length;i+=n)
       sets.push({id:"(new)",name:`${camp.name} | Set ${Math.floor(i/n)+1}`,items:groups.slice(i,i+n)});
-  }else if(S.struct.perGroup){
+  }else if(st.aset==="group"){
     const by=new Map();
     for(const g of groups){ const k=groupPrefix(g.base); if(!by.has(k)) by.set(k,[]); by.get(k).push(g); }
     sets=[...by.entries()].map(([k,items])=>({id:"(new)",name:`${camp.name} | ${k.toUpperCase()}`,items}));
-  }else if(S.struct.newAdset){
+  }else if(st.aset==="one"){
+    if(!$("#naName")?.value.trim()) warnings.push("The new ad set has no name.");
     sets=[{id:"(new)",name:$("#naName")?.value.trim()||"(unnamed ad set)",items:groups}];
   }else{
-    if(!S.api.a) warnings.push("No ad set chosen yet — pick one, or tick an ad-set option.");
-    sets=[{id:S.api.a?.id||"—",name:S.api.a?.name||"—",items:groups}];
+    /* Every selected ad set receives the whole batch. */
+    const dest = S.api.aSel.length ? S.api.aSel : (S.api.a ? [S.api.a] : []);
+    if(!dest.length) warnings.push("No ad set chosen yet — tick one or more, or tick an ad-set option.");
+    sets = dest.length ? dest.map(a=>({id:a.id,name:a.name,items:groups}))
+                       : [{id:"—",name:"—",items:groups}];
   }
   sets.forEach(s=>{ if(s.items.length>50) warnings.push(`"${s.name}" has ${s.items.length} ads — Meta's limit is 50.`); });
   /* Identity and destination are never inferred — refuse rather than guess. */
@@ -1572,8 +1726,8 @@ function buildPlan(){
     /* The main file carries no role — only the suffixed extras do. */
     const ratio = g.extras.length
       ? [g.main,...g.extras].map(e=>e.role&&e.role!=="main"?e.role:"square").join("+") : "single";
-    const name = S.struct.namePattern
-      ? (S.struct.pattern||"{filename}")
+    const name = st.anam==="pattern"
+      ? (st.pattern||"{filename}")
           .replace(/\{filename\}/g,g.base).replace(/\{index\}/g,String(ads.length+1))
           .replace(/\{adset\}/g,set.name).replace(/\{campaign\}/g,camp.name)
           .replace(/\{date\}/g,today).replace(/\{ratio\}/g,ratio)
@@ -1600,6 +1754,8 @@ function renderPreview(){
     d.innerHTML=`<div><b>${warnings.length} thing(s) to sort out first</b>${warnings.map(x=>`<div>&bull; ${esc(x)}</div>`).join("")}</div>`;
     $("#previewCount").closest(".card").appendChild(d);
   }
+  if($("#namePreview")) $("#namePreview").textContent = ads[0]?.name || "—";
+  if($("#existingSetCount")) syncStructHints();
   const btn=$("#btnCreate");
   if(btn){ btn.disabled = !ads.length || !!warnings.length || S.busy;
     btn.textContent = ads.length ? `Create ${ads.length} Ad${ads.length===1?"":"s"}` : "Create Ads"; }
@@ -1688,7 +1844,9 @@ const B = {q:"",type:"all",usage:"unused",cols:4,sel:0};
 function openBuilder(){
   if(!S.files.length && !S.uploaded.length){
     toast("Add creatives first — there is nothing to group yet.");
-    $("#optCustomSets").checked=false; S.struct.custom=false; return;
+    S.struct.aset="one";
+    $$('input[name="aset"]').forEach(r=>r.checked = r.value==="one");
+    syncStruct(); return;
   }
   if(!S.customSets.length) S.customSets=[{name:"Ad Set 1",items:[]}];
   B.sel=0; $("#mBuilder").hidden=false; drawBuilder();
@@ -1825,7 +1983,11 @@ function openPerAd(){
   $("#mPerAd").hidden=false; drawPerAd();
 }
 function drawPerAd(){
-  const {ads}=buildPlan();
+  /* One row per creative, not per creative-x-ad-set: the same image keeps the
+     same copy wherever it lands, so N destinations must not mean N identical
+     rows to fill in. */
+  const seen=new Set();
+  const ads=buildPlan().ads.filter(a=>!seen.has(a.key)&&seen.add(a.key));
   const n=+$("#pCols").value, cols=PER_COLS.slice(0,n);
   const fs=$("#pFont .on")?.dataset.fs||"13.5";
   const fall = {headline:S.text.headlines[0]||"",body:S.text.bodies[0]||"",desc:S.text.desc,
@@ -1949,7 +2111,7 @@ async function runCreate(){
               body:JSON.stringify({account:S.acct.id,adset:setId,name:a.name,page_id:S.text.page_id,
                 creative:a.group.main.hash||a.group.main.videoId,
                 extras:a.group.extras.map(e=>({role:e.role,hash:e.hash,video_id:e.videoId})),
-                text:{...S.text, per:S.text.perAd[a.key]||{}},
+                text:{...S.text, utm:$("#utmOn")?.checked?S.text.utm:"", per:S.text.perAd[a.key]||{}},
                 enhancements:$("#enhDefaults").checked?null:S.enh,
                 status: paused?"PAUSED":"ACTIVE",
                 schedule: $("#pubSchedule").checked?{date:$("#schedDate").value,time:$("#schedTime").value}:null})});
@@ -1993,12 +2155,20 @@ function showResult(c,paused){
 </script>
 <script>
 /* ============================== duplicator ============================= */
+/* "campaign 1" -> "campaign 1 copy 2". No braces, no tokens to learn. */
+function dupName(original, n){
+  if(!$("#dupRename")?.checked) return original;
+  const suffix = ($("#dupSuffix")?.value || "copy").trim();
+  return `${original} ${suffix}${n>1?" "+n:""}`.slice(0,120);
+}
+
 function mountDuplicator(){
   const D=S.dup;
   fillAccounts($("#dupAcct"), ()=>{ D.campaigns=[]; loadDup(); });
   loadDup();
   ["dQCampaign","dQAdset","dQAd","dQDestC","dQDestA"].forEach(id=>$("#"+id).oninput=drawDup);
-  $("#dupRename").onchange=e=>{ $("#dupRenamePane").hidden=!e.target.checked; };
+  $("#dupRename").onchange=e=>{ $("#dupRenamePane").hidden=!e.target.checked; drawDup(); };
+  $("#dupSuffix").oninput=()=>drawDup();
   $("#btnDuplicate").onclick=runDuplicate;
 
   async function loadDup(){
@@ -2025,10 +2195,19 @@ function mountDuplicator(){
     if(!$("#dListCampaigns")) return;
     const f=(l,q)=>l.filter(x=>!q.trim()||String(x.name).toLowerCase().includes(q.trim().toLowerCase()));
     drawList($("#dListCampaigns"), f(D.campaigns,$("#dQCampaign").value), D.c?.id,
-      async c=>{ D.c=c; D.a=null; D.picked.clear(); D.adsets=await adsetsFor(c.id); D.ads=[];
+      async c=>{ D.c=c; D.a=null; D.aSel=[]; D.picked.clear(); D.adsets=await adsetsFor(c.id); D.ads=[];
         $("#dQAdset").disabled=false; drawDup(); }, "No campaigns found");
-    drawList($("#dListAdsets"), f(D.adsets,$("#dQAdset").value), D.a?.id,
-      async a=>{ D.a=a; D.picked.clear(); D.ads=await adsFor(a.id); $("#dQAd").disabled=false; drawDup(); },
+    drawList($("#dListAdsets"), f(D.adsets,$("#dQAdset").value), D.aSel.map(x=>x.id),
+      async a=>{ toggle(D.aSel,a); D.a=a;
+        /* Pool the ads from every ticked ad set, tagged so names stay clear. */
+        const pooled=[];
+        for(const set of D.aSel){
+          for(const ad of await adsFor(set.id))
+            pooled.push({...ad, _set:set.name});
+        }
+        D.ads=pooled;
+        D.picked=new Set([...D.picked].filter(id=>pooled.some(x=>x.id===id)));
+        $("#dQAd").disabled = !D.aSel.length; drawDup(); },
       D.c?"No ad sets found":"Select a campaign first");
 
     const ads=f(D.ads,$("#dQAd").value);
@@ -2036,8 +2215,9 @@ function mountDuplicator(){
     el.innerHTML = ads.length ? ads.map(a=>`<label class="it" style="cursor:pointer">
         <input type="checkbox" data-pick="${esc(a.id)}" ${D.picked.has(a.id)?"checked":""}
           style="width:17px;height:17px;accent-color:var(--brand)">
-        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</span></label>`).join("")
-      : `<div class="empty">${D.a?"No ads found":"Select an ad set first"}</div>`;
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}
+          ${D.aSel.length>1&&a._set?`<span class="tiny muted">· ${esc(a._set)}</span>`:""}</span></label>`).join("")
+      : `<div class="empty">${D.aSel.length?"No ads found":"Tick one or more ad sets first"}</div>`;
     $$("[data-pick]",el).forEach(c=>c.onchange=()=>{
       c.checked ? D.picked.add(c.dataset.pick) : D.picked.delete(c.dataset.pick); drawDup(); });
     $("#dPickCount").textContent = D.picked.size?`(${D.picked.size} selected)`:"";
@@ -2049,11 +2229,15 @@ function mountDuplicator(){
       a=>{ D.destA=a; drawDup(); }, D.destC?"No ad sets found":"Select a campaign first");
 
     const ready = D.picked.size && D.destA;
+    const firstPicked = D.ads.find(a=>D.picked.has(a.id));
+    if($("#dupPreview")) $("#dupPreview").textContent =
+      firstPicked ? dupName(firstPicked.name,1) : "—";
     $("#dupSummary").innerHTML = ready
-      ? `<b style="color:var(--ink)">${D.picked.size}</b> ad(s)<br>from <b>${esc(D.a.name)}</b>
+      ? `<b style="color:var(--ink)">${D.picked.size}</b> ad(s)<br>from
+         <b>${esc(D.aSel.map(a=>a.name).join(", "))}</b>
          <br>into <b>${esc(D.destA.name)}</b><br><span class="tiny">(${esc(D.destC.name)})</span>
          <br><br><span class="badge count">post ID preserved</span>`
-      : "Pick the ads on the left and a destination ad set above.";
+      : "Tick ad sets, tick the ads inside them, then pick where they go.";
     $("#btnDuplicate").disabled = !ready;
     $("#btnDuplicate").textContent = `Duplicate ${D.picked.size} ad${D.picked.size===1?"":"s"} (paused)`;
   }
@@ -2066,11 +2250,8 @@ function mountDuplicator(){
     let n=0, fails=0;
     for(const id of ids){
       const src=D.ads.find(a=>a.id===id)||{name:id};
-      const name = $("#dupRename").checked
-        ? ($("#dupPattern").value||"{name}").replace(/\{name\}/g,src.name)
-            .replace(/\{index\}/g,String(n+1)).replace(/\{date\}/g,new Date().toISOString().slice(0,10))
-        : src.name;
-      FL.log(`Copying ${src.name}...`);
+      const name = dupName(src.name, n+1);
+      FL.log(`Copying ${src.name} -> ${name}...`);
       try{
         if(S.demo) await sleep(420);
         else await api("/api/duplicate-adset",{method:"POST",headers:{"content-type":"application/json"},

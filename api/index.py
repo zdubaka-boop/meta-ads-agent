@@ -351,8 +351,12 @@ class handler(BaseHTTPRequestHandler):
                 if not self._need_auth():
                     return
                 out = {}
-                for ad in meta.get_all(f"{one('adset')}/ads",
-                        "name,creative{object_story_spec,asset_feed_spec,url_tags}", cap=1):
+                # ?ad= reads that exact ad; ?adset= falls back to its first ad.
+                FIELDS = "name,creative{object_story_spec,asset_feed_spec,url_tags}"
+                one_ad = (one("ad") or "").strip()
+                sources = ([meta.get(one_ad, FIELDS)] if one_ad
+                           else meta.get_all(f"{one('adset')}/ads", FIELDS, cap=1))
+                for ad in sources:
                     cr = ad.get("creative") or {}
                     oss = cr.get("object_story_spec") or {}
                     ld = oss.get("link_data") or oss.get("video_data") or {}
@@ -369,6 +373,10 @@ class handler(BaseHTTPRequestHandler):
                            "cta": cta.get("type") or "LEARN_MORE",
                            "link": ld.get("link") or (cta.get("value") or {}).get("link") or "",
                            "url_tags": cr.get("url_tags") or "",
+                           # The Page is the one thing an ad cannot be built
+                           # without, and it was never returned before.
+                           "page_id": oss.get("page_id") or "",
+                           "display": ld.get("caption") or "",
                            "from_ad": ad.get("name")}
                 return self._send(200, out)
 
