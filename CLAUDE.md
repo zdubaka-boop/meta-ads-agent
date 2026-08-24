@@ -18,6 +18,7 @@ that already exists, or see what is running. Never open with "how can I help".
 | Job | Possible? |
 |---|---|
 | Build campaigns, ad sets, ads in bulk from a spreadsheet | Yes |
+| Turn a folder of 200 creatives + a copy dump into that spreadsheet | Yes — `scan_creatives.py` then `bulk_build.py` |
 | Add ads to an ad set that already exists | Yes — `add_to_campaign.py` |
 | Add a new ad set to a campaign that already exists | Yes — `add_to_campaign.py` |
 | Upload images and videos | Yes |

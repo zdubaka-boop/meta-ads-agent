@@ -124,6 +124,70 @@ spec, log = parse(p)
 check("ABO with no ad-set budget is rejected",
       spec is None and "budget" in log.lower(), log.strip()[:70])
 
+# 7. An ad with no primary text must be rejected, not silently built.
+p = build_sheet(CAMPAIGN, ADSET, [{1: "Set A", 2: "ad-1", 3: "a.jpg", 5: "H"}])
+spec, log = parse(p)
+check("an ad with no body is rejected",
+      spec is None and "body" in log.lower(), log.strip()[:70])
+
+
+# --- bulk folder -> workbook -------------------------------------------------
+def bulk(folder, copy, extra=()):
+    """Run the real bulk builder over a throwaway folder of creatives."""
+    import os, subprocess
+    d = Path(tempfile.mkdtemp())
+    for n in folder:
+        (d / n).write_bytes(b"\x89PNG\r\n\x1a\n")
+    cj = d / "copy.json"
+    cj.write_text(json.dumps(copy))
+    out = tempfile.mktemp(suffix=".xlsx")
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "bulk_build.py"),
+                        "--creatives", str(d), "--copy", str(cj),
+                        "--name", "T", "--account", "act_1", "--page", "1",
+                        "--link", "https://example.org", "--budget", "10",
+                        "--out", out, *extra],
+                       capture_output=True, text=True)
+    if r.returncode:
+        return None, (r.stdout + r.stderr)
+    sp = tempfile.mktemp(suffix=".json")
+    r2 = subprocess.run([sys.executable, str(ROOT / "scripts" / "xlsx_to_spec.py"),
+                         out, "--out", sp], capture_output=True, text=True)
+    if r2.returncode:
+        return None, (r2.stdout + r2.stderr)
+    return json.loads(Path(sp).read_text()), r.stdout
+
+
+FILES = [f"{m}-{a}.png" for m in ("lt", "pl") for a in ("price", "ugc")]
+
+# 8. A folder of <market>-<angle> files becomes one ad set per market,
+#    each targeting that country — the grouping is read, not guessed.
+spec, log = bulk(FILES, {"lt": {"bodies": ["L"], "headlines": ["H"]},
+                         "pl": {"bodies": ["P"], "headlines": ["H"]}})
+got = sorted((spec or {}).get("adsets", []),
+             key=lambda x: x["name"])
+cc = [a["targeting"]["geo_locations"]["countries"] for a in got]
+check("a market-named folder becomes one ad set per country",
+      len(got) == 2 and cc == [["LT"], ["PL"]], f"{cc}")
+
+# 9. Angle-specific copy lands on the matching creative, and _default fills
+#    the rest. Pairing 200 files by hand is the thing this replaces.
+spec, log = bulk(FILES, {"lt": {"price": {"bodies": ["CHEAP"], "headlines": ["H"]},
+                                "_default": {"bodies": ["OTHER"], "headlines": ["H"]}},
+                         "pl": {"bodies": ["P"], "headlines": ["H"]}})
+body = {Path(ad["creative"]).name: ad.get("body")
+        for st in (spec or {}).get("adsets", []) for ad in st["ads"]}
+check("angle copy pairs with the matching creative",
+      body.get("lt-price.png") == "CHEAP" and body.get("lt-ugc.png") == "OTHER",
+      str(body))
+
+# 10. Creatives outside the repo must be referenced by full path, or the
+#     build looks for them in creatives/ and finds nothing.
+import os
+paths = [ad["creative"] for st in (spec or {}).get("adsets", []) for ad in st["ads"]]
+check("creatives outside the repo keep a resolvable path",
+      paths and all(os.path.exists(x) for x in paths),
+      f"{len(paths)} path(s), missing: {[x for x in paths if not os.path.exists(x)][:2]}")
+
 print("=" * 66)
 bad = results.count(False)
 print(f"  {len(results)-bad}/{len(results)} passed" + ("" if not bad else f"   {bad} FAILING"))

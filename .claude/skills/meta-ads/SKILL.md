@@ -79,7 +79,8 @@ unnecessary.**
 
   a  I already have the filled-in template   → drop it in
   b  Copy the settings from a campaign that already exists
-  c  From scratch — ask me the questions
+  c  I have a folder of creatives and the copy — you build it
+  d  From scratch — ask me the questions
 ```
 
 **(a) They have a template.** Skip to the build steps below.
@@ -103,10 +104,71 @@ and ask only what actually changes: the campaign name, and whatever else
 differs. Edit the workbook for them with `fill_template.py` or by editing the
 cells directly — **do not make them open Excel** unless they want to.
 
-**(c) From scratch.** Only now ask the full set: name, objective, budget and
+**(c) A folder of creatives plus a pile of copy.** See "The bulk drop" below.
+This is the normal shape of a real brief — 100+ files and a wall of text.
+
+**(d) From scratch.** Only now ask the full set: name, objective, budget and
 mode, targeting, destination URL, creatives and copy. Run `discover.py` first
 so you can offer the account's real Pages and pixels instead of asking them to
 find IDs.
+
+### The bulk drop — a folder of creatives and a wall of copy
+
+Someone points at a folder of 200 images and pastes their copy underneath.
+They are not going to fill in 200 rows, and neither are you by hand.
+
+**Step 1 — read the filenames. Never guess the grouping.**
+
+```bash
+python3 scripts/scan_creatives.py ~/path/to/folder
+```
+
+It reports what the filenames look like and proposes a grouping — sub-folders
+if there are any, otherwise the part of the name that varies like a market or
+an angle. **Show them what it found and ask if the grouping is right.** One
+group becomes one ad set. If it guessed wrong, they rename or re-nest and you
+scan again; do not override it silently.
+
+**Step 2 — turn their pasted copy into `copy.json` yourself.** They will paste
+something like "LT: <three lines> PL: <four lines>". Read it, key it by the
+group names the scan printed, and split their text into `bodies` and
+`headlines`. Ask about anything genuinely ambiguous — never invent a line.
+
+```json
+{
+  "lt": {"bodies": ["one", "two"], "headlines": ["A"]},
+  "pl": {"price":    {"bodies": ["..."], "headlines": ["..."]},
+         "_default": {"bodies": ["..."], "headlines": ["..."]}}
+}
+```
+
+Angle keys are optional and only worth it when their filenames carry an angle
+(`pl-price.png`, `pl-ugc.png`). `_default` covers every creative in that group
+with no angle-specific copy. Several `bodies` rotate inside one ad — they do
+not make extra ads.
+
+**Step 3 — build the workbook.**
+
+```bash
+python3 scripts/bulk_build.py --creatives ~/path/to/folder --copy copy.json \
+  --account act_<id> --name "<campaign name>" --budget 50 \
+  --page <page_id> --link "https://..." --out ~/Desktop/CAMPAIGN.xlsx
+
+# or, when they said "same settings as <campaign>":
+python3 scripts/bulk_build.py --creatives ~/path/to/folder --copy copy.json \
+  --like <campaign_id> --name "<campaign name>" --out ~/Desktop/CAMPAIGN.xlsx
+```
+
+`--like` reads objective, budget mode and amount, optimisation goal, billing
+event, age range, Page, link, CTA, URL tags and DSA beneficiary off a real
+campaign. It never copies its name or its ads.
+
+Add `--dry-run` to show the pairing without writing anything — do that first
+when the folder is large.
+
+**Step 4 — read what it printed.** It lists every field it could not fill and
+every creative it has no copy for. Those are blank on purpose. Take them back
+to the user; do not fill them in yourself. Then convert and build as normal.
 
 ### Do they need to send image files at all?
 

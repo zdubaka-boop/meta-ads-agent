@@ -55,14 +55,16 @@ def load_env(root=None):
 def token():
     t = os.getenv("META_ACCESS_TOKEN")
     if not t:
-        raise RuntimeError("META_ACCESS_TOKEN not set. Run: bash scripts/setup.sh")
+        raise RuntimeError("META_ACCESS_TOKEN not set. Run: python3 scripts/save_token.py "
+                           "(opens a box to paste the token into — no terminal needed).")
     return t
 
 
 def account(acct=None):
     a = acct or os.getenv("META_AD_ACCOUNT_ID")
     if not a:
-        raise RuntimeError("META_AD_ACCOUNT_ID not set. Run: bash scripts/setup.sh")
+        raise RuntimeError("META_AD_ACCOUNT_ID not set. Pass --account act_..., or run "
+                           "python3 scripts/save_token.py to set a default.")
     return a if str(a).startswith("act_") else f"act_{a}"
 
 

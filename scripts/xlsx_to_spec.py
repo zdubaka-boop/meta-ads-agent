@@ -322,6 +322,11 @@ def main():
                 if len(vs) > 1:
                     base[many] = vs
 
+        # Meta rejects an ad with no primary text. Catching it here costs
+        # nothing; catching it mid-build leaves half a campaign behind.
+        if not base.get("body"):
+            problems.append(f"Ads tab: ad '{adn}' has no body (primary text)")
+
         multi = len(creatives_cell) > 1
         for idx, cre in enumerate(creatives_cell, start=1):
             nm = adn if not multi else f"{adn} {idx:02d}"[:80]
