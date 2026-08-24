@@ -40,6 +40,16 @@ have the token, tell me and a box will open for you to paste it into"* — and
 python3 scripts/save_token.py
 ```
 
+If preflight reports updates available, or they say **"update the tool"**, run:
+
+```bash
+python3 scripts/update.py
+```
+
+It pulls, explains what changed in plain language, and re-runs the self test.
+Their token, creatives and spreadsheets are untouched. Do this before anything
+else — a stale clone is why a fixed bug appears to still be there.
+
 If `scripts/save_token.py` is missing, their clone is out of date — pull first
 (see "Keeping the tool up to date"), then run it.
 
