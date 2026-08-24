@@ -41,6 +41,22 @@ The three numbers Meta reports (`call_count`, `total_cputime`, `total_time`) are
 blocks everything on that ad account until the window rolls. It is a rolling
 window, not a quota you spend down for the day.
 
+**Which one is actually binding matters.** A real reading from this account:
+
+```
+call_count: 1    total_cputime: 8    total_time: 51
+```
+
+1% of the call budget, 51% of the processing-time budget. The limit here is not
+how many requests we send, it is how much work each one asks Meta to do. That
+rules out the obvious fix — batching many calls into one changes nothing,
+because the same work still happens server-side.
+
+What does help is asking for less: fewer nested fields, one request per ad set
+instead of one per ad, and never running insights during a build. Insights are
+the most CPU-expensive thing in the API and can throttle an account on their
+own while `call_count` sits in single digits.
+
 ## What the tool does about it now
 
 - **Reads the header on every response.** Past 70% used it pauses briefly

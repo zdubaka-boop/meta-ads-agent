@@ -65,12 +65,24 @@ def main():
         got_geo = (g.get("targeting") or {}).get("geo_locations", {}).get("countries")
         check("adset.geo_locations.countries", want_geo, got_geo)
 
+        # One call for the whole ad set, not one per ad. Each of these expands
+        # three nested creative objects server-side; asking 24 times is 24
+        # separate expansions, and Meta's binding limit is processing time,
+        # not call count. Same data, a fraction of the cost.
+        fetched = {x["id"]: x for x in meta.get_all(
+            f"{aid}/ads", "id,name,status,adset_id,creative{id,degrees_of_freedom_spec,"
+                          "object_story_spec,asset_feed_spec}", limit=50, cap=1000)}
+
         for ad in a["ads"]:
             adid = state["ads"].get(ad["name"])
             if not adid:
                 print(f"{FAIL}  ad '{ad['name']}' missing from state"); rows.append(False); continue
-            ga = meta.get(adid, "name,status,adset_id,creative{id,degrees_of_freedom_spec,"
-                                "object_story_spec,asset_feed_spec}")
+            ga = fetched.get(adid)
+            if ga is None:
+                # Created but not returned by the edge — read it directly rather
+                # than reporting a pass on data we never received.
+                ga = meta.get(adid, "name,status,adset_id,creative{id,degrees_of_freedom_spec,"
+                                    "object_story_spec,asset_feed_spec}")
             cr = ga.get("creative", {})
             oss = cr.get("object_story_spec", {})
             data = oss.get("link_data") or oss.get("video_data") or {}

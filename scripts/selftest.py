@@ -345,6 +345,14 @@ check("build and upload key creatives the same way",
       "meta.file_key(p)" in inspect.getsource(_bc), "build_campaign hashes differently")
 _m.upload_image, _m.account = _real_upload, _real_account
 
+# 24. Verification ran one call PER AD, each expanding three nested creative
+#     objects. Meta's binding limit is processing time, not call count, so
+#     that was the most expensive thing in a build — and it runs every time.
+_v = (ROOT / "scripts" / "verify.py").read_text()
+_per_adset = 'meta.get_all(\n            f"{aid}/ads"' in _v
+check("verification fetches ads per ad set, not per ad", _per_adset,
+      "verify.py is back to one call per ad")
+
 print("=" * 66)
 bad = results.count(False)
 print(f"  {len(results)-bad}/{len(results)} passed" + ("" if not bad else f"   {bad} FAILING"))
