@@ -623,9 +623,10 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
 
     <hr class="sep">
     <h2 style="font-size:20px;margin-bottom:9px">Preview</h2>
-    <div class="row" style="margin-bottom:11px">
+    <div class="row" style="margin-bottom:11px;flex-wrap:wrap">
       <span id="previewCount" class="small" style="color:var(--ink);font-weight:600">Nothing to preview yet</span>
-      <div class="spacer"></div><span class="tiny muted" style="font-style:italic">Scroll to see all ads</span>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" id="btnEditAdsets">Edit the campaign &amp; ad sets &rarr;</button>
     </div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th>Campaign ID</th><th>Campaign Name</th><th>Ad Set ID</th><th>Ad Set Name</th><th>Ad Name</th></tr></thead>
@@ -850,6 +851,30 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
  </div>
 </div>
 
+<!-- ======================= edit ad sets modal ============================ -->
+<div class="scrim" id="mAdsets" hidden>
+ <div class="modal" style="max-width:1100px">
+  <header>
+    <div><h3>Edit the Campaign and Ad Sets</h3><p>Everything that gets created, before it gets created</p></div>
+    <button class="x" data-close="mAdsets"><svg style="width:22px;height:22px"><use href="#i-x"/></svg></button>
+  </header>
+  <div class="body">
+    <h4 style="font-size:16px;margin-bottom:10px">Campaign</h4>
+    <div id="asCampaign" style="margin-bottom:24px"></div>
+
+    <div class="row" style="margin-bottom:10px">
+      <h4 style="font-size:16px">Ad sets</h4>
+      <div class="spacer"></div>
+      <span class="small muted" id="asNote"></span>
+    </div>
+    <div style="overflow:auto;max-height:52vh"><table class="pertbl" id="asTbl"></table></div>
+  </div>
+  <footer><div class="spacer"></div>
+    <button class="btn ghost" data-close="mAdsets">Cancel</button>
+    <button class="btn" id="asApply">Save</button></footer>
+ </div>
+</div>
+
 <!-- ========================= per-ad text modal ============================ -->
 <div class="scrim" id="mPerAd" hidden>
  <div class="modal">
@@ -976,6 +1001,7 @@ const S = {
   media:{items:[],type:"all",q:""},
   struct:{camp:"existing", bmode:"CBO", aset:"existing", perSet:5},
   adNames:{},                       // creative id -> the name the user typed
+  setOpts:{},                       // ad set name -> {name,budget,countries,age_min,age_max}
   text:{mode:"common",headMode:"flexible",headlines:[""],bodies:[""],desc:"",cta:"SIGN_UP",link:"",display:"",
         utm:"utm_medium={{campaign.id}}&utm_campaign={{campaign.name}}&utm_term={{adset.id}}&utm_content={{ad.id}}&utm_source=facebook", page_id:"",
         perAd:{}, perAdset:{}},
@@ -1234,6 +1260,7 @@ function mountUploader(){
     $("#"+id).value = S.text[k]; $("#"+id).oninput = e=>{ S.text[k]=e.target.value; };
   });
   $("#btnPerAd").onclick = openPerAd;
+  $("#btnEditAdsets").onclick = openAdsets;
   $("#utmToggle").onclick = ()=>{ const a=$("#utmAdv"); a.hidden=!a.hidden;
     $("#utmToggle").textContent = a.hidden?"Show the exact tags":"Hide the exact tags"; };
   $("#utmOn").onchange = e=>{ if(!e.target.checked) $("#utmAdv").hidden=true; };
@@ -1707,7 +1734,8 @@ function buildPlan(){
     sets = dest.length ? dest.map(a=>({id:a.id,name:a.name,items:groups}))
                        : [{id:"—",name:"—",items:groups}];
   }
-  sets.forEach(s=>{ if(s.items.length>50) warnings.push(`"${s.name}" has ${s.items.length} ads — Meta's limit is 50.`); });
+  sets.forEach(x=>{ x.label = S.setOpts[x.name]?.name || x.name; });
+  sets.forEach(s=>{ if(s.items.length>50) warnings.push(`"${s.label}" has ${s.items.length} ads — Meta's limit is 50.`); });
   /* Identity and destination are never inferred — refuse rather than guess. */
   if(!S.text.link.trim()) warnings.push("No destination URL — set Website URL under Ad Text Options.");
   if(!S.demo && !S.text.page_id) warnings.push("No Facebook Page — pick a template ad via the API, which is where the Page comes from.");
@@ -1730,7 +1758,7 @@ function renderPreview(){
     : "Nothing to preview yet — add creatives above.";
   body.innerHTML = ads.length ? ads.map(a=>`<tr>
       <td class="mono">${esc(a.campaign.id)}</td><td>${esc(a.campaign.name)}</td>
-      <td class="mono">${esc(a.set.id)}</td><td>${esc(a.set.name)}</td><td>${esc(a.name)}</td></tr>`).join("")
+      <td class="mono">${esc(a.set.id)}</td><td>${esc(a.set.label||a.set.name)}</td><td>${esc(a.name)}</td></tr>`).join("")
     : `<tr><td colspan="5" style="text-align:center;color:var(--faint);padding:34px">
          Drop creatives above and choose where they go.</td></tr>`;
   const w=$("#previewWarn"); if(w) w.remove();
@@ -2037,7 +2065,7 @@ function confirmCreate(){
       <tbody>
       <tr><td style="width:190px;font-weight:600;color:var(--ink)">Ad account</td><td>${esc(S.acct.name||"")} <span class="mono">${esc(S.acct.id)}</span></td></tr>
       <tr><td style="font-weight:600;color:var(--ink)">Campaign</td><td>${esc(camp.name)} <span class="mono">${esc(camp.id)}</span></td></tr>
-      <tr><td style="font-weight:600;color:var(--ink)">Ad sets</td><td>${sets.length} &mdash; ${esc(sets.map(s=>s.name).join(", ").slice(0,180))}</td></tr>
+      <tr><td style="font-weight:600;color:var(--ink)">Ad sets</td><td>${sets.length} &mdash; ${esc(sets.map(s=>s.label||s.name).join(", ").slice(0,180))}</td></tr>
       <tr><td style="font-weight:600;color:var(--ink)">Ads</td><td>${ads.length}</td></tr>
       <tr><td style="font-weight:600;color:var(--ink)">Status on creation</td>
           <td><b style="color:${paused?"var(--green)":"var(--red)"}">${paused?"PAUSED":"ACTIVE — will spend"}</b></td></tr>
@@ -2073,15 +2101,23 @@ async function runCreate(){
       if(FL.cancelled) break;
       let setId=set.id;
       if(setId==="(new)"){
-        FL.log(`Creating ad set: ${set.name}`);
+        const o = S.setOpts[set.name] || {};
+        const label = set.label || set.name;
+        FL.log(`Creating ad set: ${label}`);
         if(S.demo){ await sleep(700); setId="120227"+Math.floor(Math.random()*1e12); }
         else{
-          const r=await api("/api/adsets-create",{method:"POST",headers:{"content-type":"application/json"},
-            body:JSON.stringify({account:S.acct.id,campaign:S.api.c?.id,name:set.name})});
+          const money = v => v ? Math.round(parseFloat(String(v).replace(",", ".")) * 100) : null;
+          const r=await api("/api/adset-create",{method:"POST",headers:{"content-type":"application/json"},
+            body:JSON.stringify({account:S.acct.id, campaign:S.api.c?.id, name:label,
+              /* targeting is copied from the ad set they picked, never invented */
+              copy_targeting_from: S.api.aSel[0]?.id || S.api.a?.id || "",
+              daily_budget_minor: money(o.budget || $("#naBudget")?.value),
+              countries: o.countries || "",
+              age_min: o.age_min || "", age_max: o.age_max || ""})});
           setId=r.id;
         }
-        created.adsets.push({id:setId,name:set.name});
-        FL.log(`Ad set created: ${set.name}`,"ok");
+        created.adsets.push({id:setId,name:label});
+        FL.log(`Ad set created: ${label}`,"ok");
       }
       const mine=ads.filter(a=>a.set===set);
       for(const a of mine){
@@ -2295,6 +2331,88 @@ function drawMedia(){
 }
 
 boot();
+</script>
+<script>
+/* ===================== edit the campaign and ad sets ==================== */
+function openAdsets(){
+  const {sets}=buildPlan();
+  if(!sets.length) return toast("Add creatives first — there is nothing to set up yet.");
+  $("#mAdsets").hidden=false; drawAdsets();
+}
+function drawAdsets(){
+  const {sets,camp}=buildPlan(), st=S.struct;
+  const isNew = st.camp==="new";
+  const cur = S.acct?.currency ? " "+S.acct.currency : "";
+
+  /* --- campaign --- */
+  $("#asCampaign").innerHTML = isNew ? `
+    <div style="display:grid;grid-template-columns:1fr 240px 170px;gap:14px">
+      <div><label class="f">Name</label><input class="inp" id="asCName" value="${esc($("#ncName").value)}"></div>
+      <div><label class="f">What is it for?</label>
+        <select class="inp" id="asCObj">${[...$("#ncObjective").options]
+          .map(o=>`<option value="${o.value}"${o.selected?" selected":""}>${esc(o.text)}</option>`).join("")}</select></div>
+      <div><label class="f">${st.bmode==="CBO"?"Budget per day"+cur:"Budget"}</label>
+        ${st.bmode==="CBO"
+          ? `<input class="inp" id="asCBudget" value="${esc($("#ncBudget").value)}" inputmode="decimal">`
+          : `<input class="inp" value="set per ad set" disabled>`}</div>
+    </div>`
+    : `<div class="banner info"><div><b>${esc(camp.name)}</b> — an existing campaign.
+        Its name, objective and budget are not touched from here.</div></div>`;
+
+  /* --- ad sets --- */
+  const newSets = sets.filter(x=>x.id==="(new)");
+  const perSetBudget = isNew && st.bmode==="ABO";
+  $("#asNote").textContent = newSets.length
+    ? `${newSets.length} new, ${sets.length-newSets.length} existing`
+    : "all of these already exist — only the ads are new";
+
+  $("#asTbl").innerHTML = `
+    <thead><tr><th style="width:34px">#</th><th>Ad set name</th>
+      ${perSetBudget?`<th style="width:150px">Budget per day${esc(cur)}</th>`:""}
+      <th style="width:190px">Countries</th><th style="width:150px">Age</th>
+      <th style="width:90px">Ads</th></tr></thead>
+    <tbody>${sets.map((x,i)=>{
+      const o = S.setOpts[x.name] || {};
+      const existing = x.id!=="(new)";
+      return `<tr>
+        <td style="color:var(--faint)">${i+1}</td>
+        <td>${existing
+          ? `<b style="color:var(--ink)">${esc(x.name)}</b><div class="tiny muted mono">${esc(x.id)}</div>`
+          : `<input class="inp" data-so="${esc(x.name)}" data-k="name" value="${esc(o.name??x.name)}"
+                     placeholder="${esc(x.name)}">`}</td>
+        ${perSetBudget?`<td>${existing?`<span class="muted">—</span>`
+          :`<input class="inp" data-so="${esc(x.name)}" data-k="budget" inputmode="decimal"
+                   value="${esc(o.budget||"")}" placeholder="${esc($("#naBudget").value||"20.00")}">`}</td>`:""}
+        <td>${existing?`<span class="muted small">unchanged</span>`
+          :`<input class="inp" data-so="${esc(x.name)}" data-k="countries" value="${esc(o.countries||"")}"
+                   placeholder="${S.api.aSel.length?"copied from "+esc(S.api.aSel[0].name):"LT, LV, PL"}">`}</td>
+        <td>${existing?`<span class="muted small">unchanged</span>`
+          :`<div class="row" style="gap:6px">
+              <input class="inp" data-so="${esc(x.name)}" data-k="age_min" style="width:62px" inputmode="numeric"
+                     value="${esc(o.age_min||"")}" placeholder="18">
+              <span class="tiny muted">to</span>
+              <input class="inp" data-so="${esc(x.name)}" data-k="age_max" style="width:62px" inputmode="numeric"
+                     value="${esc(o.age_max||"")}" placeholder="65"></div>`}</td>
+        <td style="color:var(--ink);font-weight:600">${x.items.length}</td>
+      </tr>`;}).join("")}</tbody>`;
+
+  $$("[data-so]").forEach(el=>el.oninput=e=>{
+    /* keyed by the generated name, never the typed one — otherwise renaming
+       a row orphans the budget and targeting typed next to it */
+    const n=e.target.dataset.so, k=e.target.dataset.k, v=e.target.value;
+    const box = S.setOpts[n] = S.setOpts[n] || {};
+    if(v.trim()) box[k]=v.trim(); else delete box[k];
+  });
+}
+$("#asApply").onclick = ()=>{
+  if(S.struct.camp==="new"){
+    $("#ncName").value = $("#asCName").value;
+    $("#ncObjective").value = $("#asCObj").value;
+    if($("#asCBudget")) $("#ncBudget").value = $("#asCBudget").value;
+  }
+  $("#mAdsets").hidden=true; renderPreview();
+  toast("Saved. The preview below shows exactly what will be created.");
+};
 </script>
 <script>
 /* ============================== sign in ================================ */

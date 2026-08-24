@@ -1014,6 +1014,57 @@ class handler(BaseHTTPRequestHandler):
                                 "log": log_lines, "counts": counts})
 
     # ----------------------------------------------------------------- POST
+    # Targeting keys Meta accepts on create. Read-back returns extra
+    # bookkeeping fields that are rejected if posted straight back.
+    TARGETING_OK = {
+        "geo_locations", "excluded_geo_locations", "age_min", "age_max", "genders",
+        "locales", "interests", "flexible_spec", "exclusions", "custom_audiences",
+        "excluded_custom_audiences", "publisher_platforms", "device_platforms",
+        "facebook_positions", "instagram_positions", "audience_network_positions",
+        "messenger_positions", "targeting_automation",
+    }
+
+    def _adset_create(self):
+        """Create ONE ad set, PAUSED, copying targeting from an existing one.
+
+        The old /api/adsets-create takes a workbook. The browser has no
+        workbook — it has a template ad set the user picked and a name they
+        typed, so this is the shape it actually needs.
+        """
+        b = self._body()
+        acct = (b.get("account") or "").strip()
+        camp = (b.get("campaign") or "").strip()
+        name = (b.get("name") or "").strip()
+        if not (acct and camp and name):
+            return self._send(400, {"error": "account, campaign and name are all required"})
+
+        targeting, extra = {}, {}
+        src = (b.get("copy_targeting_from") or "").strip()
+        if src:
+            a = meta.get(src, "targeting,optimization_goal,billing_event,"
+                             "promoted_object,dsa_beneficiary")
+            targeting = {k: v for k, v in (a.get("targeting") or {}).items()
+                         if k in handler.TARGETING_OK}
+            for k in ("optimization_goal", "billing_event", "promoted_object",
+                      "dsa_beneficiary"):
+                if a.get(k):
+                    extra[k] = a[k]
+        # Explicit overrides win over whatever was copied.
+        cc = [c.strip().upper() for c in (b.get("countries") or "") .split(",") if c.strip()]
+        if cc:
+            targeting.setdefault("geo_locations", {})["countries"] = cc
+        for k in ("age_min", "age_max"):
+            if b.get(k):
+                targeting[k] = int(b[k])
+        if not targeting.get("geo_locations"):
+            return self._send(400, {"error": "No countries for this ad set, and none to "
+                                             "copy — targeting is never guessed."})
+        budget = b.get("daily_budget_minor")
+        res = meta.create_adset(acct, camp, name, targeting,
+                                budget_minor=int(budget) if budget else None, **extra)
+        return self._send(200, {"id": res.get("id") if isinstance(res, dict) else res,
+                                "name": name, "status": "PAUSED"})
+
     def _media_upload(self):
         """One creative in, one Meta reference out.
 
@@ -1238,6 +1289,11 @@ class handler(BaseHTTPRequestHandler):
                 return self._send(200, {"total": len(rows),
                                         "flagged": sum(1 for r in rows if r["on"]),
                                         "ads": rows})
+            if p.path == "/api/adset-create":
+                if not self._need_auth():
+                    return
+                return self._adset_create()
+
             if p.path == "/api/media-upload":
                 if not self._need_auth():
                     return
