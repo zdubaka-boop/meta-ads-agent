@@ -1,1174 +1,2047 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Meta Ads Agent</title>
+<title>Ads Uploader</title>
 <style>
+/* ============================ design tokens ============================ */
 :root{
-  --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2a323d;
-  --ink:#e6edf3; --dim:#8b98a5; --accent:#4a9eff; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+  --navy:#0b3c61; --navy-2:#0f4d7a;
+  --brand:#2563eb; --brand-h:#1d4ed8; --brand-soft:#eff4ff;
+  --purple:#7c3aed; --purple-soft:#f6f1fd;
+  --green:#16a34a; --green-soft:#eefaf1;
+  --amber:#b45309; --amber-soft:#fdf8e7;
+  --red:#dc2626; --red-soft:#fef2f2;
+
+  --page:#f3f7fc;
+  --card:#ffffff;
+  --line:#e4e9f0;
+  --line-2:#eef1f6;
+  --ink:#111827;
+  --body:#374151;
+  --dim:#6b7280;
+  --faint:#9ca3af;
+
+  --term:#0b1220; --term-ink:#dbe4f0; --term-ok:#4ade80; --term-dim:#7d8da4;
+
+  --r:10px; --r-sm:7px; --r-lg:14px;
+  --sh:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+  --sh-lg:0 10px 34px rgba(16,24,40,.14);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);
-  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-header{display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--line);
-  background:var(--panel);position:sticky;top:0;z-index:5}
-header h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.2px}
-header .sp{flex:1}
-.who{font-size:13px;color:var(--dim)}
-main{max-width:1040px;margin:0 auto;padding:26px 22px 80px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px}
-h2{font-size:17px;margin:0 0 4px}
-.sub{color:var(--dim);font-size:13.5px;margin:0 0 16px}
-label{display:block;font-size:13px;color:var(--dim);margin:0 0 6px}
-input,select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);
-  border-radius:7px;padding:10px 12px;font:inherit;font-size:14px}
-input:focus,select:focus{outline:none;border-color:var(--accent)}
-button{background:var(--accent);color:#08121f;border:0;border-radius:7px;padding:10px 16px;
-  font:inherit;font-weight:620;cursor:pointer}
-button:hover{filter:brightness(1.08)} button:disabled{opacity:.45;cursor:default}
-button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.choices{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
-.choice{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:16px;
-  cursor:pointer;transition:.12s}
-.choice:hover{border-color:var(--accent);transform:translateY(-1px)}
-.choice .n{color:var(--accent);font-weight:700;font-size:12px;letter-spacing:.6px}
-.choice h3{margin:6px 0 4px;font-size:15px}
-.choice p{margin:0;color:var(--dim);font-size:13px}
-table{width:100%;border-collapse:collapse;font-size:13.5px}
-th{text-align:left;color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;
-  letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:9px 10px;border-bottom:1px solid var(--line)}
-tr.pick{cursor:pointer} tr.pick:hover{background:var(--panel2)}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--dim)}
-.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;
-  border:1px solid var(--line);color:var(--dim)}
-.tag.ok{color:var(--ok);border-color:#1c3a24}
-.tag.warn{color:var(--warn);border-color:#3d3218}
-.tag.bad{color:var(--bad);border-color:#4a2222}
-.err{background:#2a1618;border:1px solid #4a2222;color:#ffb3ae;padding:11px 14px;border-radius:7px;
-  font-size:13.5px;margin-bottom:14px;white-space:pre-wrap}
-.note{background:#1a2230;border:1px solid #24374f;color:#a9c6e8;padding:11px 14px;border-radius:7px;
-  font-size:13px;margin-top:14px}
-pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:13px;overflow:auto;
-  font-size:12.5px;color:#c9d6e2;margin:10px 0 0}
-.crumb{color:var(--dim);font-size:13px;margin-bottom:14px}
-.crumb a{color:var(--accent);cursor:pointer;text-decoration:none}
-.hide{display:none}
-.picker{position:relative}
-.plist{position:absolute;z-index:20;left:0;right:0;top:100%;max-height:210px;overflow:auto;
-  background:var(--panel);border:1px solid var(--accent);border-radius:8px;margin-top:3px}
-.plist div{padding:7px 11px;cursor:pointer;font-size:13.5px}
-.plist div:hover,.plist div.on{background:var(--panel2)}
-.plist .code{color:var(--dim);font-family:ui-monospace,monospace;font-size:11.5px;float:right}
-.picked{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
-.picked .chip{cursor:pointer;border-color:var(--accent);color:var(--accent)}
-.picked .chip:hover{border-color:var(--bad);color:var(--bad)}
-.hint{color:var(--dim);font-size:12px;margin-top:4px}
-.done{background:#12241a;border:1px solid #1c5c33;border-radius:9px;padding:14px 16px;
-  margin-top:14px;font-size:14px}
-.done b{color:var(--ok)}
-.done ul{margin:8px 0 0;padding-left:18px;color:var(--dim);font-size:13px}
-.search{width:100%;max-width:340px;padding:8px 12px;font-size:14px;margin:0 0 12px}
-.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-.bar .sp{flex:1}
-.bulk{position:sticky;bottom:0;background:var(--panel2);border:1px solid var(--accent);
-  border-radius:9px;padding:11px 14px;margin-top:12px;display:flex;gap:10px;align-items:center;
-  flex-wrap:wrap}
-th.sortable{cursor:pointer;user-select:none} th.sortable:hover{color:var(--ink)}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
-.sw{position:relative;display:inline-block;width:38px;height:21px;cursor:pointer;vertical-align:middle}
-.sw input{display:none}
-.sl{position:absolute;inset:0;background:#39424e;border-radius:21px;transition:.15s}
-.sl:before{content:"";position:absolute;height:15px;width:15px;left:3px;top:3px;background:#c9d1d9;
-  border-radius:50%;transition:.15s}
-.sw input:checked + .sl{background:var(--ok)}
-.sw input:checked + .sl:before{transform:translateX(17px)}
-.cols{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--dim);margin-bottom:10px}
-.cols label{display:inline-flex;gap:5px;align-items:center;margin:0;cursor:pointer}
-.cols input{width:auto}
-select.mini{width:auto;padding:7px 10px;font-size:13px}
-.drop{border:2px dashed var(--line);border-radius:11px;padding:38px 22px;text-align:center;
-  background:var(--panel2);transition:.15s;cursor:pointer}
-.drop.over{border-color:var(--accent);background:#16243a}
-.drop h3{margin:0 0 6px;font-size:16px}
-.drop p{margin:0;color:var(--dim);font-size:13.5px}
-.files{margin-top:14px;display:flex;flex-wrap:wrap;gap:7px}
-.chip{background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:4px 11px;font-size:12px}
-.chip.book{border-color:var(--accent);color:var(--accent)}
-.ok{color:var(--ok)}
-.spin{color:var(--dim);font-size:13.5px}
-</style></head><body>
+body{
+  min-height:100vh;
+  margin:0;background:var(--page);color:var(--body);
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{color:var(--ink);margin:0;font-weight:700;letter-spacing:-.01em}
+a{color:var(--brand);text-decoration:none}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink)}
+[hidden]{display:none !important}
 
-<header>
-  <h1>Meta Ads Agent <span style="font-weight:400;color:var(--dim);font-size:11px">build 0822-1620</span></h1><span class="sp"></span>
-  <span class="who" id="who"></span>
-  <button class="ghost hide" id="out" onclick="logout()">Sign out</button>
-</header>
+/* ============================== top nav ================================ */
+.nav{
+  background:var(--navy);color:#fff;position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:26px;padding:0 26px;height:72px;
+}
+.brand{display:flex;align-items:center;gap:11px;font-size:19px;font-weight:700;color:#fff}
+.brand svg{width:26px;height:26px}
+.nav-links{display:flex;align-items:center;gap:4px;margin:0 auto}
+.nav-links a{
+  color:#dbe7f3;padding:9px 15px;border-radius:8px;font-size:14.5px;font-weight:600;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.nav-links a:hover{background:rgba(255,255,255,.09);color:#fff}
+.nav-links a.on{background:var(--brand);color:#fff}
+.nav-links a .ext{opacity:.75;width:11px;height:11px}
+.acct{position:relative}
+.acct>button{
+  background:none;border:0;color:#dbe7f3;font-size:14.5px;font-weight:600;
+  display:flex;align-items:center;gap:6px;padding:9px 12px;border-radius:8px;
+}
+.acct>button:hover{background:rgba(255,255,255,.09);color:#fff}
+.acct-menu{
+  position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--sh-lg);min-width:230px;padding:6px;
+}
+.acct-menu button, .acct-menu a{
+  display:block;width:100%;text-align:left;background:none;border:0;padding:9px 11px;
+  border-radius:var(--r-sm);font-size:14px;color:var(--body);font-weight:500;
+}
+.acct-menu button:hover, .acct-menu a:hover{background:var(--page);color:var(--ink)}
+.acct-menu .sep{height:1px;background:var(--line-2);margin:5px 0}
+.acct-menu .who{padding:9px 11px;font-size:12.5px;color:var(--dim);line-height:1.4}
 
-<main>
-  <div id="err" class="err hide"></div>
+/* =============================== layout ================================ */
+.wrap{max-width:1180px;margin:0 auto;padding:34px 26px 110px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh)}
+.card-p{padding:26px 30px}
+.stack{display:flex;flex-direction:column;gap:22px}
+.row{display:flex;align-items:center;gap:12px}
+.spacer{flex:1}
+.muted{color:var(--dim)}
+.small{font-size:13px}
+.tiny{font-size:12px}
 
-  <!-- LOGIN -->
-  <section id="login" class="card hide">
-    <h2>Sign in</h2>
-    <p class="sub">Enter your personal login code.</p>
-    <label for="code">Login code</label>
-    <input id="code" type="text" placeholder="abcd-efgh-ijkl" autocomplete="off" spellcheck="false">
-    <div class="row" style="margin-top:14px">
-      <button onclick="login()">Sign in</button>
-      <button class="ghost" onclick="showReg()">First time? Set up my code</button>
+/* =============================== banner ================================ */
+.banner{
+  display:flex;align-items:flex-start;gap:11px;padding:13px 17px;border-radius:var(--r);
+  font-size:13.5px;line-height:1.5;margin-bottom:20px;border:1px solid;
+}
+.banner b{display:block;color:var(--ink);margin-bottom:2px}
+.banner.warn{background:var(--amber-soft);border-color:#f0e2b6;color:#7c5310}
+.banner.warn b{color:#7c5310}
+.banner.info{background:var(--brand-soft);border-color:#d6e4ff;color:#1e40af}
+.banner.info b{color:#1e40af}
+.banner.bad{background:var(--red-soft);border-color:#fecaca;color:#991b1b}
+.banner.bad b{color:#991b1b}
+
+/* =============================== buttons =============================== */
+.btn{
+  border:1px solid transparent;border-radius:var(--r-sm);padding:10px 17px;font-size:14.5px;
+  font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  background:var(--brand);color:#fff;
+}
+.btn:hover{background:var(--brand-h)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:#fff;border-color:var(--line);color:var(--body)}
+.btn.ghost:hover{background:var(--page);border-color:#d3dae4}
+.btn.red{background:var(--red)}
+.btn.red:hover{background:#b91c1c}
+.btn.redline{background:#fff;border-color:#fca5a5;color:var(--red)}
+.btn.redline:hover{background:var(--red-soft)}
+.btn.sm{padding:7px 12px;font-size:13px}
+.btn.big{width:100%;padding:16px;font-size:16.5px;border-radius:var(--r)}
+.btn.yt{background:#e11d2e}
+.btn.yt:hover{background:#b91c1c}
+.linkbtn{background:none;border:0;color:var(--brand);font-size:13.5px;font-weight:600;padding:0;text-decoration:underline}
+
+/* =============================== forms ================================= */
+label.f{display:block;font-size:13.5px;font-weight:600;color:var(--body);margin-bottom:6px}
+.inp,select.inp,textarea.inp{
+  width:100%;background:#fff;border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:11px 13px;font-size:14.5px;outline:none;
+}
+.inp:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+textarea.inp{resize:vertical;min-height:84px;line-height:1.6}
+select.inp{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'><path d='M5.5 7.5 10 12l4.5-4.5'/></svg>");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:16px;padding-right:34px}
+.hint{font-size:12.5px;color:var(--dim);margin-top:6px;line-height:1.5}
+
+.check{display:flex;align-items:flex-start;gap:11px;padding:9px 0;cursor:pointer;font-size:14.5px;color:var(--ink)}
+.check input{width:19px;height:19px;margin:1px 0 0;accent-color:var(--brand);cursor:pointer;flex:none}
+.check .sub{display:block;font-size:12.5px;color:var(--dim);margin-top:3px;font-weight:400;line-height:1.5}
+.check.dis{opacity:.45;cursor:not-allowed}
+.check.dis input{cursor:not-allowed}
+
+.radio{display:flex;align-items:center;gap:11px;padding:9px 0;cursor:pointer;font-size:14.5px;color:var(--ink)}
+.radio input{width:19px;height:19px;margin:0;accent-color:var(--brand);cursor:pointer;flex:none}
+
+.switch{position:relative;display:inline-block;width:42px;height:23px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;background:#cbd5e1;border-radius:99px;transition:.16s}
+.switch span:before{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.16s}
+.switch input:checked+span{background:var(--brand)}
+.switch input:checked+span:before{transform:translateX(19px)}
+
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:99px;font-size:11.5px;font-weight:700;letter-spacing:.01em}
+.badge.pop{background:var(--purple);color:#fff}
+.badge.soon{background:#4b5563;color:#fff}
+.badge.count{background:var(--green-soft);color:var(--green)}
+.badge.tag{background:var(--green-soft);color:var(--green);font-weight:600}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;background:#fff}
+.seg button{background:#fff;border:0;padding:7px 13px;font-size:13.5px;font-weight:600;color:var(--dim);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:#1f2937;color:#fff}
+.seg.a button:nth-child(1){font-size:11.5px}
+.seg.a button:nth-child(2){font-size:14px}
+.seg.a button:nth-child(3){font-size:16.5px}
+.seg.pill button.on{background:#fff;color:var(--brand);border-color:var(--brand)}
+.seg.pill button{border:1px solid var(--line);border-radius:var(--r-sm);margin-right:-1px}
+
+.sect-t{font-size:19px;font-weight:700;color:var(--ink);margin:0 0 4px}
+.sect-h{padding:22px 30px 0}
+hr.sep{border:0;border-top:1px solid var(--line-2);margin:22px 0}
+</style>
+<style>
+/* ============================== dashboard ============================== */
+.hello{display:flex;align-items:center;gap:19px;padding:24px 30px}
+.hello img,.hello .ph{width:62px;height:62px;border-radius:50%;object-fit:cover;flex:none;background:#dbe4f0}
+.hello h2{font-size:26px}
+.hello p{margin:3px 0 0;font-size:14.5px;color:var(--dim)}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.tile{display:flex;gap:16px;padding:22px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh);text-align:left;width:100%}
+.tile:hover{border-color:#c9d6e6;box-shadow:0 4px 16px rgba(16,24,40,.08);transform:translateY(-1px)}
+.tile .ic{width:46px;height:46px;border-radius:10px;display:grid;place-items:center;flex:none}
+.tile h3{font-size:17px;margin-bottom:5px}
+.tile p{margin:0;font-size:13.5px;color:var(--dim);line-height:1.5}
+.ic.b{background:var(--brand-soft);color:var(--brand)} .ic.p{background:var(--purple-soft);color:var(--purple)}
+.ic.g{background:var(--green-soft);color:var(--green)} .ic.y{background:var(--amber-soft);color:var(--amber)}
+.feats{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
+.feat{padding:20px 22px;border-radius:var(--r)}
+.feat h4{font-size:16px;margin-bottom:8px}
+.feat p{margin:0 0 12px;font-size:13.5px;line-height:1.6;color:var(--body)}
+.feat a{font-size:13.5px;font-weight:600}
+.feat.b{background:var(--brand-soft)} .feat.b h4,.feat.b a{color:var(--brand)}
+.feat.y{background:var(--amber-soft)} .feat.y h4,.feat.y a{color:var(--amber)}
+.feat.g{background:var(--green-soft)} .feat.g h4,.feat.g a{color:var(--green)}
+.feat.p{background:var(--purple-soft)} .feat.p h4,.feat.p a{color:var(--purple)}
+
+/* =============================== dropzone ============================== */
+.dz{
+  border:2px dashed #cfd9e6;border-radius:var(--r-lg);background:#fff;padding:26px;
+  position:relative;text-align:center;transition:.14s;
+}
+.dz.over{border-color:var(--brand);background:var(--brand-soft)}
+.dz .srcbtns{position:absolute;left:22px;top:22px;display:flex;gap:9px}
+.dz .srcbtn{width:44px;height:36px;border:1px solid var(--line);background:#fff;border-radius:var(--r-sm);
+  display:grid;place-items:center;color:var(--dim)}
+.dz .srcbtn:hover{border-color:var(--brand);color:var(--brand)}
+.dz .up{width:34px;height:34px;color:var(--dim);margin:8px auto 12px;display:block}
+.dz .t{font-size:15px;color:var(--body)}
+.dz .f{font-size:12.5px;color:var(--faint);margin-top:6px}
+.turbo{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:13px;font-size:14.5px;color:var(--ink);font-weight:500}
+
+.files{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:#fff}
+.frow{display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--line-2)}
+.frow:last-child{border-bottom:0}
+.frow .fic{width:38px;height:38px;border-radius:8px;display:grid;place-items:center;flex:none}
+.frow .fic.img{background:var(--green-soft);color:var(--green)}
+.frow .fic.vid{background:var(--purple-soft);color:var(--purple)}
+.frow .fn{font-size:14.5px;color:var(--ink);font-weight:600}
+.frow .fm{font-size:12.5px;color:var(--dim);margin-top:2px}
+.frow .x{background:none;border:0;color:var(--faint);padding:6px;border-radius:6px;line-height:0}
+.frow .x:hover{background:var(--red-soft);color:var(--red)}
+.frow .pill{font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;background:var(--brand-soft);color:var(--brand)}
+
+/* ============================ three columns ============================ */
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.col{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;background:#fff}
+.col>h4{padding:13px 15px;font-size:15px;border-bottom:1px solid var(--line-2);background:#fff}
+.col .tools{padding:11px 13px;border-bottom:1px solid var(--line-2);display:flex;flex-direction:column;gap:9px}
+.col .tools .inp{padding:8px 11px 8px 32px;font-size:13.5px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m20 20-3.5-3.5'/></svg>");
+  background-repeat:no-repeat;background-position:10px center;background-size:14px}
+.col .list{overflow-y:auto;height:330px}
+.col .it{padding:10px 15px;font-size:14px;color:var(--body);cursor:pointer;display:flex;align-items:center;gap:8px}
+.col .it:hover{background:var(--page)}
+.col .it.on{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.col .it .tick{margin-left:auto;color:var(--brand);flex:none}
+.col .empty{display:grid;place-items:center;height:100%;color:var(--faint);font-size:14px;text-align:center;padding:16px}
+.src{background:var(--page);border:1px solid var(--line-2);border-radius:var(--r);padding:17px 20px;margin-top:18px}
+.src h4{font-size:15px;margin-bottom:9px}
+.src .crumb{font-size:14px;color:var(--body);line-height:1.9}
+.src .crumb .l2{padding-left:19px} .src .crumb .l3{padding-left:38px;font-weight:700;color:var(--ink)}
+
+/* =============================== tables ================================ */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);max-height:420px;overflow-y:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+table.tbl th{
+  text-align:left;padding:12px 15px;background:#fafbfd;border-bottom:1px solid var(--line);
+  font-size:11.5px;font-weight:700;color:var(--dim);letter-spacing:.055em;text-transform:uppercase;
+  position:sticky;top:0;white-space:nowrap;
+}
+table.tbl td{padding:12px 15px;border-bottom:1px solid var(--line-2);color:var(--body);vertical-align:top}
+table.tbl tr:last-child td{border-bottom:0}
+table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
+
+/* ============================= enhancements ============================ */
+.enh{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:18px}
+.enh h4{font-size:15.5px;margin-bottom:10px;display:flex;align-items:center;gap:9px}
+.enh .check{padding:6px 0;font-size:14px}
+.i{width:15px;height:15px;color:var(--faint);flex:none;cursor:help}
+
+/* =============================== modal ================================= */
+.scrim{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:60;display:grid;place-items:center;padding:26px;overflow:auto}
+.modal{background:#fff;border-radius:var(--r-lg);box-shadow:var(--sh-lg);width:100%;max-width:1180px;max-height:92vh;display:flex;flex-direction:column}
+.modal>header{display:flex;align-items:flex-start;gap:14px;padding:22px 26px;border-bottom:1px solid var(--line-2)}
+.modal>header h3{font-size:21px}
+.modal>header p{margin:3px 0 0;font-size:13.5px;color:var(--dim)}
+.modal>header .x{margin-left:auto;background:none;border:0;color:var(--faint);padding:5px;border-radius:6px;line-height:0}
+.modal>header .x:hover{background:var(--page);color:var(--ink)}
+.modal>.body{padding:22px 26px;overflow:auto;flex:1}
+.modal>footer{display:flex;align-items:center;gap:12px;padding:17px 26px;border-top:1px solid var(--line-2);background:#fcfdfe;border-radius:0 0 var(--r-lg) var(--r-lg)}
+
+/* ========================= ad set builder modal ======================== */
+.builder{display:grid;grid-template-columns:1fr 1fr;gap:22px;min-height:460px}
+.mfilters{display:flex;flex-wrap:wrap;align-items:center;gap:11px;padding:14px;border:1px solid var(--line);border-radius:var(--r);margin-bottom:16px}
+.mfilters .lbl{font-size:13px;color:var(--dim);font-weight:600}
+.mgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-height:440px;overflow-y:auto;padding-right:4px}
+.mcell{text-align:center}
+.mcell .thumb{position:relative;aspect-ratio:1;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--page);cursor:pointer;display:grid;place-items:center}
+.mcell .thumb img{width:100%;height:100%;object-fit:cover}
+.mcell .thumb:hover{border-color:var(--brand)}
+.mcell .thumb.used{opacity:.42}
+.mcell .zoom{position:absolute;left:7px;bottom:7px;width:26px;height:26px;border-radius:6px;background:rgba(17,24,39,.72);color:#fff;display:grid;place-items:center;border:0}
+.mcell .nm{font-size:12.5px;color:var(--body);margin-top:7px;word-break:break-all}
+.asets{border:1px solid var(--line);border-radius:var(--r);padding:14px;max-height:440px;overflow-y:auto;background:#fbfcfe}
+.aset{border:2px solid var(--line);border-radius:var(--r);padding:13px;background:#fff;margin-bottom:13px}
+.aset.on{border-color:var(--brand)}
+.aset .top{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.aset .top .inp{padding:8px 11px;font-size:14px;font-weight:600}
+.aset .strip{display:flex;flex-wrap:wrap;gap:8px}
+.aset .strip .t{width:62px;height:62px;border:1px solid var(--line);border-radius:6px;overflow:hidden;position:relative;background:var(--page)}
+.aset .strip .t img{width:100%;height:100%;object-fit:cover}
+.aset .strip .t button{position:absolute;top:1px;right:1px;width:17px;height:17px;border-radius:50%;background:rgba(17,24,39,.75);color:#fff;border:0;font-size:11px;line-height:1;display:grid;place-items:center;padding:0}
+.aset .none{font-size:12.5px;color:var(--faint);padding:9px 0}
+
+/* ========================== per-ad text modal =========================== */
+.pertbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.pertbl th{background:#fafbfd;border-bottom:1px solid var(--line);padding:12px;text-align:left;
+  font-size:11.5px;font-weight:700;color:var(--dim);letter-spacing:.055em;text-transform:uppercase;position:sticky;top:0;z-index:2}
+.pertbl th .cp{background:none;border:0;color:var(--faint);padding:2px;margin-left:5px;line-height:0;vertical-align:-2px}
+.pertbl th .cp:hover{color:var(--brand)}
+.pertbl td{border-bottom:1px solid var(--line-2);padding:12px;vertical-align:top}
+.pertbl .adcell{text-align:center;width:96px}
+.pertbl .adcell img{width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.pertbl .adcell .n{font-size:12.5px;color:var(--dim);margin-top:5px}
+.pertbl textarea{width:100%;min-width:170px;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13.5px;resize:vertical;line-height:1.5}
+.addbtn{width:30px;height:30px;border:1px solid var(--brand);color:var(--brand);background:#fff;border-radius:var(--r-sm);display:grid;place-items:center;margin:7px auto 0}
+.addbtn:hover{background:var(--brand-soft)}
+
+/* ============================ float progress =========================== */
+.float{
+  position:fixed;right:26px;bottom:26px;width:min(560px,calc(100vw - 52px));z-index:70;
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-lg);overflow:hidden;
+}
+.float>header{display:flex;align-items:center;gap:10px;padding:15px 19px;border-bottom:1px solid var(--line-2)}
+.float>header .dot{width:9px;height:9px;border-radius:50%;background:var(--brand);flex:none;animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.28}}
+.float>header h4{font-size:16.5px}
+.float>header .note{margin-left:auto;font-size:12.5px;color:var(--dim)}
+.float>header .min{background:none;border:0;color:var(--dim);padding:4px 7px;border-radius:6px;line-height:0}
+.float>header .min:hover{background:var(--page)}
+.float .pad{padding:17px 19px}
+.bar{height:7px;background:#e9eef5;border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:99px;transition:width .25s}
+.float .count{text-align:center;font-size:13.5px;color:var(--body);margin-top:9px;font-weight:600}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:17px;margin-top:15px}
+.stats .k{font-size:12.5px;color:var(--dim);font-weight:600}
+.stats .v{font-family:var(--mono);font-size:14.5px;color:var(--ink);margin-top:3px}
+.stats .s{font-size:12px;color:var(--faint);margin-top:2px}
+.term{background:var(--term);color:var(--term-ink);font-family:var(--mono);font-size:12.5px;line-height:1.75;
+  padding:13px 15px;height:150px;overflow-y:auto}
+.term .ln{white-space:pre-wrap;word-break:break-word}
+.term .ts{color:var(--term-dim)}
+.term .ok{color:var(--term-ok)}
+.term .er{color:#fca5a5}
+.term .cur{display:inline-block;width:8px;height:14px;background:#60a5fa;vertical-align:-2px;animation:blink 1.05s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.float footer{padding:14px 19px;border-top:1px solid var(--line-2);display:flex;gap:10px;justify-content:center}
+.float.mini .pad,.float.mini .term,.float.mini footer{display:none}
+
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:90;
+  background:#111827;color:#fff;padding:12px 20px;border-radius:var(--r);font-size:14px;box-shadow:var(--sh-lg)}
+
+.chatbtn{position:fixed;left:22px;bottom:22px;width:52px;height:52px;border-radius:50%;background:#fff;
+  border:1px solid var(--line);box-shadow:var(--sh-lg);display:grid;place-items:center;color:var(--brand);z-index:50}
+
+@media(max-width:1000px){
+  .tiles,.feats,.cols,.enh,.builder,.mgrid{grid-template-columns:1fr}
+  .nav{height:auto;flex-wrap:wrap;padding:12px 16px;gap:10px}
+  .nav-links{margin:0;flex-wrap:wrap}
+  .wrap{padding:22px 16px 90px}
+  .card-p{padding:20px}
+}
+</style>
+</head>
+<body>
+<svg style="display:none" aria-hidden="true">
+<symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 16V8m0 0-3 3m3-3 3 3"/></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-img" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 16-5-5L5 20"/></symbol>
+<symbol id="i-vid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="m22 8-6 4 6 4V8Z"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+<symbol id="i-lib" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V5m0 0-5 5m5-5 5 5M4 19h16"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5.2 5.2L20 7"/></symbol>
+<symbol id="i-ref" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></symbol>
+<symbol id="i-drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 8 0 5 9-4 0zM8 3 3 12l4 7 4-7zm-1 16h10l2.5-4H9.5z"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.2" stroke-linecap="round"/></symbol>
+<symbol id="i-zoom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2M11 8.6v4.8M8.6 11h4.8"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-min" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6L19 12z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4c-1.3 0-2.6-.3-3.7-.8L3 21l1.9-4.6A8.4 8.4 0 1 1 21 11.5Z"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+</svg>
+
+<nav class="nav">
+  <a class="brand" href="#/dashboard"><svg><use href="#i-logo"/></svg>Ads Uploader</a>
+  <div class="nav-links" id="navLinks">
+    <a href="#/dashboard" data-r="dashboard">Dashboard</a>
+    <a href="#/uploader"  data-r="uploader">Uploader</a>
+    <a href="#/duplicator" data-r="duplicator">Duplicator</a>
+    <a href="#/media"     data-r="media">Media Library</a>
+    <a href="https://adsuploader.com" target="_blank" rel="noopener">Docs <svg class="ext"><use href="#i-ext"/></svg></a>
+  </div>
+  <div class="acct">
+    <button id="acctBtn" aria-haspopup="true" aria-expanded="false">Account <svg style="width:14px;height:14px"><use href="#i-chev"/></svg></button>
+    <div class="acct-menu" id="acctMenu" hidden>
+      <div class="who" id="acctWho">Not connected</div>
+      <div class="sep"></div>
+      <button data-act="accounts">Switch ad account</button>
+      <button data-act="presets">Manage presets</button>
+      <a href="https://adsuploader.com" target="_blank" rel="noopener">Documentation</a>
+      <div class="sep"></div>
+      <button data-act="logout">Sign out</button>
     </div>
-  </section>
+  </div>
+</nav>
 
-  <!-- REGISTER -->
-  <section id="reg" class="card hide">
-    <h2>Set up your login code</h2>
-    <p class="sub">Paste your own Meta access token once. We check it works, store it
-      encrypted, and give you a short code to use from then on.</p>
-    <label for="tok">Your Meta access token</label>
-    <input id="tok" type="password" placeholder="EAA…" autocomplete="off" spellcheck="false">
-    <div class="note">Your token is encrypted with a key derived from your login code, so
-      nobody — including whoever runs this server — can read it without that code.
-      Because it is <b>your</b> token, Meta records every action against <b>you</b>, not a
-      shared account. Don't have one? See
-      <a href="https://github.com/zdubaka-boop/meta-ads-agent#2-get-your-meta-access-token"
-         style="color:var(--accent)">the 5-minute setup</a>.</div>
-    <div class="row" style="margin-top:14px">
-      <button onclick="register()">Create my code</button>
-      <button class="ghost" onclick="show('login')">Back</button>
+<main class="wrap" id="app"></main>
+
+<!-- =============================== templates =============================== -->
+<template id="tpl-dashboard">
+  <div class="stack">
+    <div class="card hello">
+      <div class="ph" id="dashAvatar"></div>
+      <div>
+        <h2 id="dashName">Welcome</h2>
+        <p id="dashSub">Logged in with Facebook</p>
+      </div>
     </div>
-    <div id="regOut"></div>
-  </section>
 
-  <!-- ACCOUNT -->
-  <section id="acct" class="card hide">
-    <h2>Choose an ad account</h2>
-    <p class="sub">Everything after this is scoped to the account you pick.</p>
-    <div id="acctList" class="spin">Loading…</div>
-  </section>
-
-  <!-- THREE QUESTIONS -->
-  <section id="menu" class="card hide">
-    <div class="crumb"><a onclick="toAccounts()">← accounts</a> · <b id="acctName"></b></div>
-    <h2>What do you want to do?</h2>
-    <p class="sub">Nothing is ever created live. Everything lands paused.</p>
-    <div class="choices">
-      <div class="choice" onclick="q1()">
-        <div class="n">1</div><h3>Create a NEW campaign</h3>
-        <p>Build a campaign, ad sets and ads from the Excel template.</p></div>
-      <div class="choice" onclick="q2()">
-        <div class="n">2</div><h3>Add to an EXISTING campaign</h3>
-        <p>New ads into an ad set, or a new ad set into a campaign.</p></div>
-      <div class="choice" onclick="q3()">
-        <div class="n">3</div><h3>Audit an account</h3>
-        <p>Which live ads still have creative enhancements switched on.</p></div>
+    <div class="tiles">
+      <button class="tile" data-go="uploader">
+        <span class="ic b"><svg style="width:23px;height:23px"><use href="#i-img"/></svg></span>
+        <span><h3>Upload Ads</h3><p>Upload images and videos and launch Meta Ads</p></span>
+      </button>
+      <button class="tile" data-go="duplicator">
+        <span class="ic p"><svg style="width:23px;height:23px"><use href="#i-copy"/></svg></span>
+        <span><h3>Duplicate Ads</h3><p>Copy winning ads while preserving social proof</p></span>
+      </button>
+      <button class="tile" data-go="media">
+        <span class="ic g"><svg style="width:23px;height:23px"><use href="#i-lib"/></svg></span>
+        <span><h3>Manage Media</h3><p>Browse and manage your uploaded media</p></span>
+      </button>
     </div>
-  </section>
 
-  <!-- PANE -->
-  <section id="pane" class="card hide"></section>
-</main>
+    <div class="card card-p">
+      <h2 style="font-size:23px">Power Features</h2>
+      <div class="feats">
+        <div class="feat b">
+          <h4>Automatic Thumbnail Attachment</h4>
+          <p>Simply add <b>_thumbnail</b> to your image filename and it automatically pairs with your video. No manual linking needed &mdash; the system handles everything.</p>
+          <a href="#/uploader">View docs &rarr;</a>
+        </div>
+        <div class="feat y">
+          <h4>Aspect Ratio Variations</h4>
+          <p>Upload additional 9:16 and 16:9 ads with <b>_vertical</b> and <b>_horizontal</b> suffixes, and let us take care of the rest. We'll build it all into one multi-placement ad.</p>
+          <a href="#/uploader">View docs &rarr;</a>
+        </div>
+        <div class="feat g">
+          <h4>Presets &mdash; Launch Campaigns in Seconds</h4>
+          <p>Save your go-to campaign structures as presets. Access your most-used configurations instantly and create new ads without the setup hassle.</p>
+          <a href="#/uploader">View docs &rarr;</a>
+        </div>
+        <div class="feat p">
+          <h4>Duplicator &mdash; Keep Your Social Proof</h4>
+          <p>Copy winning ads to new campaigns while preserving all engagement. Uses the existing post ID so your likes, comments, and shares carry over.</p>
+          <a href="#/duplicator">View docs &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<template id="tpl-uploader">
+ <div class="stack">
+  <div class="row" style="margin-bottom:2px">
+    <div>
+      <h1 style="font-size:31px">Meta Ads Uploader</h1>
+      <p class="muted" style="margin:5px 0 0;font-size:15px">Upload media files and configure campaigns for Meta Ads</p>
+    </div>
+    <div class="spacer"></div>
+    <a class="btn yt" href="https://www.youtube.com/watch?v=h-9l6HQJpdY" target="_blank" rel="noopener">
+      <svg style="width:16px;height:16px"><use href="#i-play"/></svg> Watch Tutorial</a>
+  </div>
 
+  <div id="modeBanner"></div>
+
+  <!-- ---------------------------- account ---------------------------- -->
+  <div class="card card-p row">
+    <h2 style="font-size:20px">Account Selection</h2>
+    <div class="spacer"></div>
+    <select class="inp" id="acctSelect" style="max-width:290px"></select>
+  </div>
+
+  <!-- ---------------------------- dropzone --------------------------- -->
+  <div>
+    <div class="dz" id="dz">
+      <div class="srcbtns">
+        <button class="srcbtn" id="btnDrive" title="Import from Google Drive"><svg style="width:19px;height:19px"><use href="#i-drive"/></svg></button>
+        <button class="srcbtn" id="btnFolder" title="Choose a folder"><svg style="width:19px;height:19px"><use href="#i-folder"/></svg></button>
+      </div>
+      <svg class="up"><use href="#i-up"/></svg>
+      <div class="t">Drag and drop files here, or <button class="linkbtn" id="btnBrowse">browse for files</button></div>
+      <div class="f">Supported formats: JPG, PNG, WEBP, GIF, MP4, MOV (videos up to 4GB, images up to 30MB)</div>
+      <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,.mov" hidden>
+      <input type="file" id="dirInput" multiple webkitdirectory hidden>
+    </div>
+    <label class="turbo">
+      <span class="switch"><input type="checkbox" id="turbo" checked><span></span></span>
+      Turbo Mode
+      <svg class="i" title="Uploads and creates ads in parallel. Faster, but Meta rate-limits harder — turn it off for very large batches."><use href="#i-info"/></svg>
+    </label>
+  </div>
+
+  <div id="fileBox" hidden>
+    <div class="files" id="fileList"></div>
+    <button class="btn big" id="btnUpload" style="margin-top:16px">Upload 0 files</button>
+  </div>
+
+  <!-- ------------------------ configuration -------------------------- -->
+  <div class="card card-p">
+    <h2 style="font-size:20px;margin-bottom:9px">Configuration Method</h2>
+
+    <label class="radio"><input type="radio" name="cfg" value="xlsx" checked> Upload Ad Configuration XLSX</label>
+    <label class="radio"><input type="radio" name="cfg" value="xlsxPreset">
+      <select class="inp" id="xlsxPreset" style="max-width:275px"><option>Select a saved XLSX preset</option></select></label>
+    <label class="radio"><input type="radio" name="cfg" value="api"> Select a Meta Ad to Copy Settings From via API
+      <span class="badge pop">Most Popular</span></label>
+    <label class="radio"><input type="radio" name="cfg" value="apiPreset">
+      <select class="inp" id="apiPreset" style="max-width:275px"><option>Select a saved API preset</option></select></label>
+
+    <!-- XLSX -->
+    <div id="paneXlsx" style="margin-top:16px">
+      <div class="row">
+        <button class="btn" id="btnXlsx">Choose File</button>
+        <span class="muted" id="xlsxName">No file chosen</span>
+        <input type="file" id="xlsxInput" accept=".xlsx" hidden>
+      </div>
+      <p class="hint">Upload an XLSX file with Campaign ID/Name, Ad Set ID/Name, and Ad Name columns.
+        <a href="/api/template">Download the template</a>.</p>
+    </div>
+
+    <!-- API picker -->
+    <div id="paneApi" hidden style="margin-top:18px">
+      <div class="card card-p" style="box-shadow:none">
+        <div class="row" style="align-items:flex-start">
+          <div style="max-width:760px">
+            <h3 style="font-size:19px;margin-bottom:5px">Select Ad from Facebook</h3>
+            <p class="muted small" style="margin:0;line-height:1.55">Select an existing ad from your account to use as a template.
+              Save it as a preset for quick reuse in future campaigns, then customize the setup for your new ads.</p>
+          </div>
+          <div class="spacer"></div>
+          <div class="seg a" id="fontSeg"><button data-fs="13">A</button><button data-fs="14.5" class="on">A</button><button data-fs="16.5">A</button></div>
+          <button class="btn" id="btnRefresh" style="margin-left:11px"><svg style="width:16px;height:16px"><use href="#i-ref"/></svg> Refresh</button>
+        </div>
+
+        <div class="cols" id="apiCols" style="margin-top:18px">
+          <div class="col">
+            <h4>Campaigns</h4>
+            <div class="tools">
+              <input class="inp" id="qCampaign" placeholder="Search campaigns...">
+              <label class="check" style="padding:0;font-size:13.5px"><input type="checkbox" id="onlyActiveC" checked> Only active</label>
+            </div>
+            <div class="list" id="listCampaigns"><div class="empty">No campaigns found</div></div>
+          </div>
+          <div class="col">
+            <h4>Ad Sets</h4>
+            <div class="tools">
+              <input class="inp" id="qAdset" placeholder="Search ad sets..." disabled>
+              <label class="check dis" style="padding:0;font-size:13.5px"><input type="checkbox" id="onlyActiveA" checked disabled> Only active</label>
+            </div>
+            <div class="list" id="listAdsets"><div class="empty">Select a campaign first</div></div>
+          </div>
+          <div class="col">
+            <h4>Ads</h4>
+            <div class="tools">
+              <input class="inp" id="qAd" placeholder="Search ads..." disabled>
+              <label class="check dis" style="padding:0;font-size:13.5px"><input type="checkbox" id="onlyActiveD" checked disabled> Only active</label>
+            </div>
+            <div class="list" id="listAds"><div class="empty">Select an ad set first</div></div>
+          </div>
+        </div>
+
+        <div class="src" id="cfgSource" hidden>
+          <h4>Configuration Source</h4>
+          <p class="small muted" style="margin:0 0 7px">We'll copy the configuration from this ad for your new ads:</p>
+          <div class="crumb" id="cfgCrumb"></div>
+        </div>
+        <div class="row" style="margin-top:14px"><div class="spacer"></div>
+          <button class="btn ghost" id="btnResetSel">Reset Selection</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- --------------------- campaign / ad set options ------------------- -->
+  <div class="card card-p" id="structCard">
+    <h2 style="font-size:20px">Campaign &amp; Ad Set Options</h2>
+    <label class="check"><input type="checkbox" id="optNewCampaign"> Create new campaign</label>
+    <div id="newCampaignPane" hidden style="padding:4px 0 8px 30px">
+      <div style="display:grid;grid-template-columns:1fr 210px 190px;gap:14px">
+        <div><label class="f">Campaign name</label><input class="inp" id="ncName" placeholder="Spring 2026 | EU | Traffic"></div>
+        <div><label class="f">Objective</label><select class="inp" id="ncObjective">
+          <option value="OUTCOME_TRAFFIC">Traffic</option><option value="OUTCOME_SALES">Sales</option>
+          <option value="OUTCOME_LEADS">Leads</option><option value="OUTCOME_ENGAGEMENT">Engagement</option>
+          <option value="OUTCOME_AWARENESS">Awareness</option><option value="OUTCOME_APP_PROMOTION">App promotion</option>
+        </select></div>
+        <div><label class="f">Daily budget</label><input class="inp" id="ncBudget" placeholder="e.g. 50.00" inputmode="decimal"></div>
+      </div>
+      <p class="hint">Leave the budget blank to use ad-set budgets instead. Nothing is ever assumed &mdash; a blank budget is asked for, not guessed.</p>
+    </div>
+
+    <hr class="sep">
+    <h2 style="font-size:20px">Ad Set Options</h2>
+    <label class="check"><input type="checkbox" id="optNewAdset"> Create new ad set</label>
+    <div id="newAdsetPane" hidden style="padding:4px 0 8px 30px">
+      <div style="display:grid;grid-template-columns:1fr 210px;gap:14px">
+        <div><label class="f">Ad set name</label><input class="inp" id="naName" placeholder="Ad set name"></div>
+        <div><label class="f">Daily budget</label><input class="inp" id="naBudget" placeholder="e.g. 20.00" inputmode="decimal"></div>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="optPerGroup"> Create new ad set per upload or group</label>
+    <label class="check"><input type="checkbox" id="optAutoDivide"> Auto-divide ads into ad sets</label>
+    <div id="autoDividePane" hidden style="padding:4px 0 8px 30px">
+      <div class="row"><span class="small">Ads per ad set</span>
+        <input class="inp" id="perSet" type="number" min="1" max="50" value="5" style="width:96px">
+        <span class="hint" style="margin:0">Meta allows 1&ndash;50 ads per ad set.</span></div>
+    </div>
+    <label class="check"><input type="checkbox" id="optCustomSets"> Build custom ad set configuration</label>
+
+    <hr class="sep">
+    <h2 style="font-size:20px">Ad Name Options</h2>
+    <label class="check"><input type="checkbox" id="optNamePattern"> Use custom ad name pattern</label>
+    <div id="namePatternPane" hidden style="padding:4px 0 4px 30px">
+      <input class="inp" id="namePattern" value="{filename}" style="max-width:520px">
+      <p class="hint">Tokens: <b>{filename}</b> <b>{index}</b> <b>{adset}</b> <b>{campaign}</b> <b>{date}</b> <b>{ratio}</b></p>
+    </div>
+
+    <hr class="sep">
+    <h2 style="font-size:20px;margin-bottom:9px">Preview</h2>
+    <div class="row" style="margin-bottom:11px">
+      <span id="previewCount" class="small" style="color:var(--ink);font-weight:600">Nothing to preview yet</span>
+      <div class="spacer"></div><span class="tiny muted" style="font-style:italic">Scroll to see all ads</span>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Campaign ID</th><th>Campaign Name</th><th>Ad Set ID</th><th>Ad Set Name</th><th>Ad Name</th></tr></thead>
+      <tbody id="previewBody"></tbody></table></div>
+  </div>
+  <!-- --------------------------- ad text ---------------------------- -->
+  <div class="card card-p">
+    <h2 style="font-size:20px">Ad Text Options</h2>
+    <label class="check"><input type="checkbox" id="txtCommon" checked> Apply common text to all ads</label>
+    <label class="check"><input type="checkbox" id="txtPerAdset"> Write unique ad text per ad set</label>
+    <label class="check"><input type="checkbox" id="txtPerAd"> Write unique ad text for each ad</label>
+
+    <div id="commonText" style="padding-left:30px">
+      <div class="row" style="margin:6px 0 6px">
+        <label class="f" style="margin:0">Headlines</label>
+        <div class="spacer"></div>
+        <div class="seg" id="headMode"><button data-m="separate">Separate Ads</button><button data-m="flexible" class="on">Flexible Texts</button></div>
+        <button class="addbtn" id="addHeadline" style="margin:0" title="Add another headline"><svg style="width:15px;height:15px"><use href="#i-plus"/></svg></button>
+      </div>
+      <div id="headlines"></div>
+
+      <div style="margin-top:16px">
+        <div class="row" style="margin-bottom:6px"><label class="f" style="margin:0">Primary Texts</label><div class="spacer"></div>
+          <button class="addbtn" id="addBody" style="margin:0" title="Add another primary text"><svg style="width:15px;height:15px"><use href="#i-plus"/></svg></button></div>
+        <div id="bodies"></div>
+      </div>
+
+      <div style="margin-top:16px"><label class="f">Link Description</label>
+        <textarea class="inp" id="fDesc" rows="2" placeholder="Used by agencies, entrepreneurs, and media buyers…"></textarea></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+        <div><label class="f">Call to Action</label><select class="inp" id="fCta">
+          <option>SIGN_UP</option><option>LEARN_MORE</option><option>SHOP_NOW</option><option>BOOK_TRAVEL</option>
+          <option>DOWNLOAD</option><option>GET_OFFER</option><option>GET_QUOTE</option><option>SUBSCRIBE</option>
+          <option>CONTACT_US</option><option>APPLY_NOW</option><option>SEE_MENU</option><option>ORDER_NOW</option>
+        </select></div>
+        <div><label class="f">Website URL</label><input class="inp" id="fLink" placeholder="https://example.com/"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+        <div><label class="f">Display URL</label><input class="inp" id="fDisplay" placeholder="example.com"></div>
+        <div><label class="f">URL Parameters</label><input class="inp" id="fUtm"
+          value="utm_medium={{campaign.id}}&amp;utm_campaign={{campaign.name}}&amp;utm_term={{adset.id}}&amp;utm_content={{ad.id}}&amp;utm_source=facebook"></div>
+      </div>
+    </div>
+
+    <div id="perAdsetText" hidden style="padding-left:30px"></div>
+    <div id="perAdBtnWrap" hidden style="padding-left:30px;margin-top:10px">
+      <button class="btn ghost" id="btnPerAd">Edit text for each ad &rarr;</button>
+      <p class="hint">Opens a table with one row per ad. Anything left blank falls back to the common text above.</p>
+    </div>
+  </div>
+
+  <!-- ---------------------- creative enhancements -------------------- -->
+  <div class="card card-p">
+    <h2 style="font-size:20px">Creative Enhancements</h2>
+    <p class="muted small" style="margin:5px 0 12px">Select Advantage+ enhancements to enable. Available options vary by media type.</p>
+    <div class="row" style="gap:34px">
+      <label class="check" style="padding:0"><input type="checkbox" id="enhDefaults"> Use Meta Defaults
+        <svg class="i" title="Leaves every enhancement at whatever Meta decides. Meta turns most of them ON by default."><use href="#i-info"/></svg></label>
+      <label class="check" style="padding:0"><input type="checkbox" id="enhAll"> Select All</label>
+    </div>
+    <div class="enh" id="enhGrid"></div>
+    <div id="enhNote" class="banner info" style="margin:18px 0 0" hidden></div>
+  </div>
+
+  <!-- ------------------------ publication ---------------------------- -->
+  <div class="card card-p">
+    <h2 style="font-size:20px">Publication Options</h2>
+    <label class="check"><input type="checkbox" id="pubPaused" checked> Create ads in paused status
+      <span class="sub">Ads will be created but won't run until you manually activate them in Meta Ads Manager.</span></label>
+    <label class="check"><input type="checkbox" id="pubSchedule"> Schedule these ads to start at a specific time
+      <span class="sub" id="tzLine">Choose when your ads should start running. Ads will remain paused until the scheduled time.</span></label>
+    <div id="schedPane" hidden style="padding:2px 0 6px 30px">
+      <div class="row">
+        <input class="inp" type="date" id="schedDate" style="width:200px">
+        <span class="muted">on</span>
+        <input class="inp" type="time" id="schedTime" value="00:00" style="width:150px">
+      </div>
+    </div>
+    <div id="pausedWarn" class="banner bad" style="margin:14px 0 0" hidden>
+      <div><b>These ads will go live and start spending immediately.</b>
+      Nothing here re-checks your budget. Turn "Create ads in paused status" back on unless you meant this.</div>
+    </div>
+    <button class="btn big" id="btnCreate" style="margin-top:20px">Create Ads</button>
+  </div>
+ </div>
+</template>
+
+<template id="tpl-duplicator">
+ <div class="stack">
+  <div>
+    <h1 style="font-size:31px">Duplicator</h1>
+    <p class="muted" style="margin:5px 0 0;font-size:15px">Copy winning ads to new ad sets while keeping their likes, comments and shares</p>
+  </div>
+  <div class="banner info"><div><b>How the social proof survives.</b>
+    The copy re-uses the original ad's post ID instead of creating a new post, so all existing engagement carries over.
+    Every copy is created <b>paused</b>.</div></div>
+
+  <div class="card card-p row">
+    <h2 style="font-size:20px">Account Selection</h2><div class="spacer"></div>
+    <select class="inp" id="dupAcct" style="max-width:290px"></select>
+  </div>
+
+  <div class="card card-p">
+    <h3 style="font-size:19px;margin-bottom:12px">Pick the ads to copy</h3>
+    <div class="cols">
+      <div class="col"><h4>Campaigns</h4>
+        <div class="tools"><input class="inp" id="dQCampaign" placeholder="Search campaigns..."></div>
+        <div class="list" id="dListCampaigns"><div class="empty">No campaigns found</div></div></div>
+      <div class="col"><h4>Ad Sets</h4>
+        <div class="tools"><input class="inp" id="dQAdset" placeholder="Search ad sets..." disabled></div>
+        <div class="list" id="dListAdsets"><div class="empty">Select a campaign first</div></div></div>
+      <div class="col"><h4>Ads <span class="tiny muted" id="dPickCount"></span></h4>
+        <div class="tools"><input class="inp" id="dQAd" placeholder="Search ads..." disabled></div>
+        <div class="list" id="dListAds"><div class="empty">Select an ad set first</div></div></div>
+    </div>
+  </div>
+
+  <div class="card card-p">
+    <h3 style="font-size:19px;margin-bottom:12px">Copy them into</h3>
+    <div class="cols">
+      <div class="col"><h4>Destination campaign</h4>
+        <div class="tools"><input class="inp" id="dQDestC" placeholder="Search campaigns..."></div>
+        <div class="list" id="dListDestC"><div class="empty">No campaigns found</div></div></div>
+      <div class="col"><h4>Destination ad set</h4>
+        <div class="tools"><input class="inp" id="dQDestA" placeholder="Search ad sets..." disabled></div>
+        <div class="list" id="dListDestA"><div class="empty">Select a campaign first</div></div></div>
+      <div class="col"><h4>Summary</h4><div class="list" style="padding:15px"><div id="dupSummary" class="small muted">Nothing selected yet.</div></div></div>
+    </div>
+    <label class="check" style="margin-top:14px"><input type="checkbox" id="dupRename"> Rename the copies
+      <span class="sub">Tokens: {name} {index} {date}</span></label>
+    <div id="dupRenamePane" hidden style="padding-left:30px"><input class="inp" id="dupPattern" value="{name} — copy {index}" style="max-width:420px"></div>
+    <button class="btn big" id="btnDuplicate" style="margin-top:18px" disabled>Duplicate 0 ads (paused)</button>
+  </div>
+ </div>
+</template>
+
+<template id="tpl-media">
+ <div class="stack">
+  <div class="row">
+    <div><h1 style="font-size:31px">Media Library</h1>
+      <p class="muted" style="margin:5px 0 0;font-size:15px">Everything already uploaded to this ad account. Re-use any of it without uploading again.</p></div>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="btnMediaRefresh"><svg style="width:16px;height:16px"><use href="#i-ref"/></svg> Refresh</button>
+  </div>
+  <div class="card card-p row">
+    <h2 style="font-size:20px">Account Selection</h2><div class="spacer"></div>
+    <select class="inp" id="mediaAcct" style="max-width:290px"></select>
+  </div>
+  <div class="card card-p">
+    <div class="mfilters" style="margin-bottom:18px">
+      <input class="inp" id="mQ" placeholder="Search by name..." style="max-width:280px">
+      <span class="lbl">Type:</span>
+      <div class="seg pill" id="mType"><button data-t="all" class="on">All</button><button data-t="image">Images</button><button data-t="video">Videos</button></div>
+      <div class="spacer"></div><span class="small muted" id="mCount"></span>
+    </div>
+    <div class="mgrid" id="mediaGrid" style="max-height:none"></div>
+  </div>
+ </div>
+</template>
+
+<!-- ====================== build custom ad sets modal ====================== -->
+<div class="scrim" id="mBuilder" hidden>
+ <div class="modal">
+  <header>
+    <div><h3>Build Custom Ad Set Configuration</h3><p>Organize your media into custom ad sets (1&ndash;50 ads per ad set)</p></div>
+    <button class="x" data-close="mBuilder"><svg style="width:22px;height:22px"><use href="#i-x"/></svg></button>
+  </header>
+  <div class="body">
+   <div class="builder">
+    <div>
+      <div class="mfilters">
+        <input class="inp" id="bQ" placeholder="Search by name..." style="max-width:190px">
+        <span class="lbl">Type:</span>
+        <div class="seg pill" id="bType"><button data-t="all" class="on">All</button><button data-t="image">Images</button><button data-t="video">Videos</button></div>
+        <span class="lbl">Usage:</span>
+        <div class="seg pill" id="bUsage"><button data-u="all">All</button><button data-u="used">Used</button><button data-u="unused" class="on">Unused</button></div>
+        <span class="lbl">Grid:</span>
+        <div class="seg pill" id="bGrid"><button data-g="4" class="on"><svg style="width:15px;height:15px"><use href="#i-lib"/></svg></button><button data-g="6"><svg style="width:15px;height:15px"><use href="#i-img"/></svg></button></div>
+      </div>
+      <div class="mgrid" id="bGridWrap"></div>
+    </div>
+    <div>
+      <div class="row" style="margin-bottom:12px">
+        <div><h4 style="font-size:17px">Ad Sets</h4><p class="tiny muted" style="margin:3px 0 0">Click media to add 1&ndash;50 ads per ad set</p></div>
+        <div class="spacer"></div>
+        <button class="btn ghost sm" id="bAuto"><svg style="width:14px;height:14px"><use href="#i-bolt"/></svg> Auto Group</button>
+        <button class="btn ghost sm" id="bNew"><svg style="width:14px;height:14px"><use href="#i-plus"/></svg> New Ad Set</button>
+      </div>
+      <div class="asets" id="bSets"></div>
+    </div>
+   </div>
+  </div>
+  <footer>
+    <button class="btn ghost" id="bAddAll">Add All to Selected Ad Set (0) <span class="tiny muted" style="margin-left:5px">&#8984;E</span></button>
+    <div class="spacer"></div>
+    <span class="small" id="bUnassigned" style="color:var(--amber);font-weight:600"></span>
+    <button class="btn ghost" data-close="mBuilder">Cancel</button>
+    <button class="btn" id="bApply" disabled>Apply Configuration</button>
+  </footer>
+ </div>
+</div>
+
+<!-- ========================= per-ad text modal ============================ -->
+<div class="scrim" id="mPerAd" hidden>
+ <div class="modal">
+  <header>
+    <div><h3>Edit Text for Each Ad</h3><p>Configure unique text for individual ads</p></div>
+    <button class="x" data-close="mPerAd"><svg style="width:22px;height:22px"><use href="#i-x"/></svg></button>
+  </header>
+  <div class="body">
+    <div class="row" style="margin-bottom:14px">
+      <button class="linkbtn" id="pReset">Reset All</button>
+      <div class="spacer"></div>
+      <div class="seg a" id="pFont"><button data-fs="12.5">A</button><button data-fs="13.5" class="on">A</button><button data-fs="15">A</button></div>
+      <div class="row" style="gap:7px;margin-left:11px">
+        <svg style="width:16px;height:16px;color:var(--dim)"><use href="#i-eye"/></svg>
+        <span class="small muted">Columns</span>
+        <select class="inp" id="pCols" style="width:74px;padding:6px 8px;font-size:13px">
+          <option>3</option><option>4</option><option>5</option><option selected>6</option></select>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:62vh"><table class="pertbl" id="perTbl"></table></div>
+  </div>
+  <footer><div class="spacer"></div>
+    <button class="btn ghost" data-close="mPerAd">Cancel</button>
+    <button class="btn" id="pApply">Save text</button></footer>
+ </div>
+</div>
+
+<!-- ============================ zoom modal =============================== -->
+<div class="scrim" id="mZoom" hidden>
+ <div class="modal" style="max-width:760px">
+  <header><div><h3 id="zoomName">Preview</h3></div>
+    <button class="x" data-close="mZoom"><svg style="width:22px;height:22px"><use href="#i-x"/></svg></button></header>
+  <div class="body" style="display:grid;place-items:center;background:var(--page)"><div id="zoomBody"></div></div>
+ </div>
+</div>
+
+<!-- ========================== confirm modal ============================== -->
+<div class="scrim" id="mConfirm" hidden>
+ <div class="modal" style="max-width:620px">
+  <header><div><h3 id="cfTitle">Confirm</h3><p id="cfSub"></p></div>
+    <button class="x" data-close="mConfirm"><svg style="width:22px;height:22px"><use href="#i-x"/></svg></button></header>
+  <div class="body"><div id="cfBody"></div></div>
+  <footer><div class="spacer"></div>
+    <button class="btn ghost" data-close="mConfirm">Cancel</button>
+    <button class="btn" id="cfGo">Confirm</button></footer>
+ </div>
+</div>
+
+<!-- ========================== float progress ============================= -->
+<div class="float" id="float" hidden>
+  <header>
+    <span class="dot"></span><h4 id="flTitle">Working</h4>
+    <span class="note" id="flNote">You can minimize this and continue working</span>
+    <button class="min" id="flMin"><svg style="width:17px;height:17px"><use href="#i-min"/></svg></button>
+  </header>
+  <div class="pad">
+    <div class="bar"><i id="flBar" style="width:0%"></i></div>
+    <div class="count" id="flCount">0 of 0 completed</div>
+    <div class="stats" id="flStats"></div>
+  </div>
+  <div class="term" id="flTerm"></div>
+  <footer id="flFoot"><button class="btn red" id="flCancel">Cancel Upload</button></footer>
+</div>
+
+<button class="chatbtn" id="chatBtn" title="Ask for help"><svg style="width:23px;height:23px"><use href="#i-chat"/></svg></button>
 <script>
-let MODE="own_token", ACCT=null, ACCT_NAME="", CAMP=null, CAMP_NAME="";
-const $=id=>document.getElementById(id);
-const show=(...ids)=>["login","reg","acct","menu","pane"].forEach(i=>$(i).classList.toggle("hide",!ids.includes(i)));
-const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function err(m){ $("err").textContent=m; $("err").classList.remove("hide"); }
-function clearErr(){ $("err").classList.add("hide"); }
+/* =========================== tiny helpers ============================== */
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const mb  = b => b>=1073741824 ? (b/1073741824).toFixed(2)+" GB" : b>=1048576 ? (b/1048576).toFixed(2)+" MB" : (b/1024).toFixed(1)+" KB";
+const uid = (()=>{let n=0;return()=>"u"+(++n)})();
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function toast(msg,ms=2600){const t=document.createElement("div");t.className="toast";t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),ms);}
 
-async function api(path,opts){
-  const r=await fetch(path,Object.assign({headers:{"Content-Type":"application/json"}},opts||{}));
-  const d=await r.json().catch(()=>({error:"bad response from server"}));
-  if(!r.ok){
-    // 503 means storage hiccuped, not that the session died. Retry once
-    // rather than bouncing someone to the login screen.
-    if(r.status===503 && d.transient && !(opts||{}).retried){
-      await new Promise(x=>setTimeout(x,900));
-      return api(path,Object.assign({},opts,{retried:true}));
-    }
-    const e=new Error(d.error||("HTTP "+r.status)); e.status=r.status; throw e;
-  }
-  return d;
+async function api(path,opts={}){
+  const r = await fetch(path,{credentials:"same-origin",...opts});
+  const txt = await r.text();
+  let j=null; try{ j = txt?JSON.parse(txt):null }catch{}
+  if(!r.ok) throw Object.assign(new Error((j&&(j.error||j.message))||`${r.status} ${path}`),{status:r.status,body:j});
+  return j;
 }
 
+/* =============================== state ================================= */
+const S = {
+  route:"dashboard", demo:false, me:null, accounts:[], acct:null,
+  files:[], uploaded:[],            // uploaded = {id,name,type,url,hash|videoId}
+  cfg:"xlsx", xlsxFile:null,
+  api:{campaigns:[],adsets:[],ads:[],c:null,a:null,d:null,loading:false},
+  dup:{campaigns:[],adsets:[],ads:[],c:null,a:null,picked:new Set(),destC:null,destA:null,destAdsets:[]},
+  media:{items:[],type:"all",q:""},
+  struct:{newCampaign:false,newAdset:false,perGroup:false,autoDivide:false,custom:false,perSet:5,
+          namePattern:false,pattern:"{filename}"},
+  text:{mode:"common",headMode:"flexible",headlines:[""],bodies:[""],desc:"",cta:"SIGN_UP",link:"",display:"",
+        utm:"utm_medium={{campaign.id}}&utm_campaign={{campaign.name}}&utm_term={{adset.id}}&utm_content={{ad.id}}&utm_source=facebook", page_id:"",
+        perAd:{}, perAdset:{}},
+  enh:{}, customSets:[], busy:false,
+};
+
+/* ============================ enhancements ============================= */
+const ENH = {
+  Images:[
+    ["image_templates","Add overlays","Meta lays text or graphic overlays on top of your image."],
+    ["image_brightness_and_contrast","Adjust brightness and contrast","Meta re-grades the image automatically."],
+    ["enhance_cta","Enhance CTA","Meta rewrites or restyles the call-to-action."],
+    ["image_animation","Image animation","Meta turns a still image into a short animation."],
+    ["inline_comment","Relevant comments","Meta surfaces comments from other ads under this one."],
+    ["reveal_details_over_time","Reveal details over time","Meta drip-feeds parts of the creative."],
+    ["text_optimizations","Text improvements","Meta rewrites your headline or primary text."],
+    ["text_translation","Translate text","Meta machine-translates your copy per viewer."],
+    ["image_touchups","Visual touch-ups","Meta crops, straightens and retouches the image."],
+  ],
+  Videos:[
+    ["video_filtering","Add video effects","Meta applies filters and effects to the video."],
+    ["enhance_cta","Enhance CTA","Meta rewrites or restyles the call-to-action."],
+    ["inline_comment","Relevant comments","Meta surfaces comments from other ads under this one."],
+    ["reveal_details_over_time","Reveal details over time","Meta drip-feeds parts of the creative."],
+    ["text_optimizations","Text improvements","Meta rewrites your headline or primary text."],
+    ["text_translation","Translate text","Meta machine-translates your copy per viewer."],
+    ["cv_transformation","Visual touch-ups","Meta re-crops and adjusts the video automatically."],
+  ],
+  Carousel:[
+    ["enhance_cta","Enhance CTA",""],["inline_comment","Relevant comments",""],
+    ["reveal_details_over_time","Reveal details over time",""],
+    ["text_optimizations","Text improvements",""],["text_translation","Translate text",""],
+  ],
+};
+const ENH_DEFAULT = {
+  Images:{image_templates:1,image_brightness_and_contrast:1,enhance_cta:1,image_animation:1,
+          inline_comment:1,reveal_details_over_time:0,text_optimizations:1,text_translation:0,image_touchups:1},
+  Videos:{video_filtering:0,enhance_cta:1,inline_comment:1,reveal_details_over_time:0,
+          text_optimizations:1,text_translation:0,cv_transformation:0},
+  Carousel:{enhance_cta:1,inline_comment:1,reveal_details_over_time:0,text_optimizations:1,text_translation:0},
+};
+S.enh = JSON.parse(JSON.stringify(ENH_DEFAULT));
+
+/* ============================= demo data =============================== */
+const DEMO_ACCOUNTS = [{id:"act_000000000000000",name:"Ads Uploader",currency:"USD",timezone:"America/Los_Angeles"}];
+const DEMO = {
+  campaigns:[
+    {id:"120227021670410001",name:"WW - Start Trial",status:"ACTIVE"},
+    {id:"120227021670410002",name:"Leads - Event campaign",status:"PAUSED"},
+    {id:"120227021670410003",name:"Reach - Event campaign",status:"PAUSED"},
+    {id:"120227021670410004",name:"Leads - WhatsApp campaign",status:"PAUSED"},
+    {id:"120227021670410005",name:"Leads - Instagram campaign",status:"ACTIVE"},
+    {id:"120227021670410006",name:"Leads - Messenger campaign",status:"PAUSED"},
+    {id:"120227021670410007",name:"Leads - Calls campaign",status:"PAUSED"},
+    {id:"120227021670410008",name:"Leads - Instant Form campaign",status:"PAUSED"},
+    {id:"120227021670410472",name:"Sales - Purchase campaign",status:"ACTIVE"},
+    {id:"120227021670410009",name:"Page Likes campaign",status:"PAUSED"},
+  ],
+  adsets:{"120227021670410472":[
+    {id:"120227042567750470",name:"angle2",status:"PAUSED"},
+    {id:"120227042567750471",name:"angle1",status:"PAUSED"},
+    {id:"120227042567750472",name:"general",status:"ACTIVE"},
+  ]},
+  ads:{"120227042567750472":[4,19,10,18,13,20,17,14,6,2].map(n=>(
+    {id:"12022705"+String(1000+n),name:"angle-gen-"+n,status:n%3?"ACTIVE":"PAUSED"}))},
+};
+/* Every demo campaign needs somewhere to go, or poking around hits dead ends. */
+DEMO.adsetsFor = cid => DEMO.adsets[cid] || [
+  {id:cid+"-as1",name:"Broad",status:"ACTIVE"},
+  {id:cid+"-as2",name:"Retargeting",status:"PAUSED"}];
+DEMO.adsFor = aid => DEMO.ads[aid] || Array.from({length:4},(_,i)=>(
+  {id:aid+"-ad"+i,name:`ad-${i+1}`,status:i%2?"ACTIVE":"PAUSED"}));
+const demoDefaults = {
+  page_id:"1042049511453137", link:"https://adsuploader.com/", cta:"SIGN_UP",
+  display:"adsuploader.com",
+  headline:"Ads Uploader: Bulk Upload 100+ Ads in Minutes",
+  body:"Stop spending hours manually uploading ads. Ads Uploader automates the entire process - bulk upload videos and images, auto-match aspect ratios, thumbnails, and launch ads in minutes instead of hours.\n\nUsed by agencies, entrepreneurs, and media buyers who need to scale creative testing without the operational nightmare.",
+  desc:"Used by agencies, entrepreneurs, and media buyers to scale creative testing without the operational nightmare.",
+};
+
+/* =============================== router ================================ */
+const ROUTES = ["dashboard","uploader","duplicator","media"];
+function go(r){ location.hash = "#/"+r; }
+function currentRoute(){ const r=(location.hash||"").replace(/^#\/?/,"").split("?")[0]; return ROUTES.includes(r)?r:"dashboard"; }
+function render(){
+  const r = S.route = currentRoute();
+  $$("#navLinks a").forEach(a=>a.classList.toggle("on", a.dataset.r===r));
+  const app = $("#app"); app.innerHTML="";
+  app.appendChild($("#tpl-"+r).content.cloneNode(true));
+  ({dashboard:mountDashboard,uploader:mountUploader,duplicator:mountDuplicator,media:mountMedia}[r])();
+  window.scrollTo(0,0);
+}
+addEventListener("hashchange",render);
+
+/* ============================ session boot ============================= */
 async function boot(){
-  const s=await api("/api/session"); MODE=s.mode;
-  if(s.build && window.BUILD && s.build!==window.BUILD && !sessionStorage.getItem("reloaded")){
-    // This tab is running an older build than the server. Reload once.
-    sessionStorage.setItem("reloaded", s.build);
-    location.reload(true);
-    return;
+  try{
+    const s = await api("/api/session");
+    S.me = s && (s.user||s.me||s.name) ? s : null;
+    const a = await api("/api/accounts");
+    S.accounts = (a && (a.accounts||a.data)) || [];
+    if(!S.accounts.length) throw new Error("no accounts");
+    S.demo = false;
+  }catch(e){
+    S.demo = true;
+    S.accounts = DEMO_ACCOUNTS;
+    S.me = {name:"Chris Pollard", source:"Facebook"};
   }
-  if(s.build===window.BUILD) sessionStorage.removeItem("reloaded");
-  if(s.signed_in){
-    $("who").textContent = s.degraded ? "signed in" : (s.who||"");
-    $("out").classList.remove("hide");
-    toAccounts();
-  } else show("login");
+  S.acct = S.accounts[0];
+  $("#acctWho").innerHTML = S.demo
+    ? "<b>Demo data</b><br>No Meta token connected"
+    : esc((S.me&&(S.me.name||S.me.user))||"Connected")+"<br>"+esc(S.acct.id);
+  render();
 }
 
-function showReg(){ clearErr(); show("reg"); }
-
-async function register(){
-  clearErr(); $("regOut").innerHTML='<p class="spin">Checking the token with Meta…</p>';
-  try{
-    const d=await api("/api/register",{method:"POST",body:JSON.stringify({token:$("tok").value})});
-    $("tok").value="";
-    $("regOut").innerHTML=`<div class="note" style="border-color:#1c3a24;background:#12241a">
-      <b>Your login code is</b>
-      <div style="font-size:26px;letter-spacing:2px;margin:10px 0;font-family:ui-monospace,monospace">${esc(d.code)}</div>
-      Write it down now — it is the only key to your token and cannot be recovered.
-      From now on just sign in with this code.</div>`;
-    $("who").textContent=d.who||""; $("out").classList.remove("hide");
-  }catch(e){ $("regOut").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
+/* ============================== dashboard ============================== */
+function mountDashboard(){
+  $("#dashName").textContent = "Welcome, " + ((S.me&&(S.me.name||S.me.user))||"there");
+  $("#dashSub").textContent  = S.demo ? "Demo mode — no Meta token connected" : "Logged in with Facebook";
+  $$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
 }
 
-async function login(){
-  clearErr();
-  try{
-    const d=await api("/api/login",{method:"POST",body:JSON.stringify({code:$("code").value})});
-    $("code").value="";
-    $("who").textContent=d.who||""; $("out").classList.remove("hide");
-    toAccounts();
-  }catch(e){ err(e.message); }
+/* ======================== shared: account select ======================= */
+function fillAccounts(sel,onChange){
+  if(!sel) return;
+  sel.innerHTML = S.accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name||a.id)}</option>`).join("");
+  sel.value = S.acct.id;
+  sel.onchange = ()=>{ S.acct = S.accounts.find(a=>a.id===sel.value)||S.acct; onChange&&onChange(); };
 }
-async function logout(){ await api("/api/logout",{method:"POST"});
-  $("who").textContent=""; $("out").classList.add("hide"); ACCT=null; show("login"); }
 
-async function toAccounts(replay){
-  clearErr(); show("acct");
-  if(!replay) history.replaceState({view:"accounts"},"",location.pathname); $("acctList").textContent="Loading…";
-  try{
-    const d=await api("/api/accounts");
-    $("acctList").innerHTML =
-      searchBox("qAcct","tAcct","Search by name, ID or business…","account(s)")+
-      `<table id="tAcct"><thead><tr>
-        <th class="sortable" onclick="sortBy('tAcct',0)">Account</th><th>ID</th>
-        <th class="sortable" onclick="sortBy('tAcct',2)">Business</th>
-        <th>Currency</th><th>Status</th></tr></thead><tbody>`+
-      d.accounts.map(a=>
-      `<tr class="pick" onclick="pickAcct('${a.id}','${esc(a.name).replace(/'/g,"")}')">
-        <td>${esc(a.name)}</td><td class="mono">${a.id}</td><td>${esc(a.business)}</td>
-        <td>${esc(a.currency)}</td>
-        <td><span class="tag ${a.status==="ACTIVE"?"ok":"warn"}">${a.status}</span></td></tr>`).join("")
-      +"</tbody></table>";
-    filterRows("qAcct","tAcct");
-  }catch(e){ err(e.message); $("acctList").textContent=""; }
+/* ============================ account menu ============================= */
+$("#acctBtn").onclick = e=>{ e.stopPropagation();
+  const m=$("#acctMenu"); m.hidden=!m.hidden; $("#acctBtn").setAttribute("aria-expanded",String(!m.hidden)); };
+document.addEventListener("click",()=>{ $("#acctMenu").hidden=true; });
+$("#acctMenu").onclick = e=>{
+  e.stopPropagation();
+  const act = e.target.closest("[data-act]")?.dataset.act; if(!act) return;
+  $("#acctMenu").hidden=true;
+  if(act==="accounts"){ go("uploader"); setTimeout(()=>$("#acctSelect")?.focus(),120); }
+  if(act==="presets")  toast("Presets are saved per ad account from the Uploader page.");
+  if(act==="logout"){ if(S.demo) return toast("Demo mode — nothing to sign out of.");
+    api("/api/logout",{method:"POST"}).finally(()=>location.reload()); }
+};
+$("#chatBtn").onclick = ()=>toast("Ask your question in the Claude chat — that's the support channel.");
+$$("[data-close]").forEach(b=>b.onclick=()=>{ $("#"+b.dataset.close).hidden=true; });
+$$(".scrim").forEach(s=>s.addEventListener("click",e=>{ if(e.target===s) s.hidden=true; }));
+addEventListener("keydown",e=>{ if(e.key==="Escape") $$(".scrim").forEach(s=>s.hidden=true); });
+</script>
+<script>
+/* ====================== creative naming conventions ==================== */
+/* name_thumbnail.jpg  pairs onto name.mp4
+   name_vertical.jpg / name_horizontal.jpg  become extra placements of name.jpg */
+const SUFFIX = /_(thumbnail|vertical|horizontal)$/i;
+const isVideo = n => /\.(mp4|mov|m4v|webm)$/i.test(n);
+function stem(n){ return n.replace(/\.[^.]+$/,""); }
+function partsOf(name){
+  const s = stem(name), m = s.match(SUFFIX);
+  return { base: m ? s.replace(SUFFIX,"") : s, role: m ? m[1].toLowerCase() : "main" };
 }
-function pickAcct(id,name){ ACCT=id; ACCT_NAME=name;
-  $("acctName").textContent=name+" ("+id+")"; nav("menu"); }
-
-/* ---------- history: Back steps back one screen, not to the start ----------
-   Each screen pushes a state carrying everything needed to rebuild 0822-1620, so
-   the browser Back button lands on the previous screen with the same
-   account/campaign/ad set already selected. */
-function nav(view, extra){
-  const st = Object.assign({view, acct:ACCT, acctName:ACCT_NAME,
-                            camp:CAMP, campName:CAMP_NAME}, extra||{});
-  history.pushState(st, "", location.pathname);
-  render(st);
-}
-function render(st){
-  ACCT=st.acct||ACCT; ACCT_NAME=st.acctName||ACCT_NAME;
-  CAMP=st.camp||CAMP; CAMP_NAME=st.campName||CAMP_NAME;
-  if(ACCT_NAME) $("acctName").textContent=ACCT_NAME+(ACCT?" ("+ACCT+")":"");
-  clearErr();
-  switch(st.view){
-    case "accounts": return toAccounts(true);
-    case "menu":     return show("menu");
-    case "q1":       return q1(true);
-    case "campaigns":return q2(true);
-    case "adsets":   return pickCamp(st.camp, st.campName, true);
-    case "ads":      return pickAdset(st.adset, st.adsetName, true);
-    case "audit":    return q3(true);
-    default:         return show("acct");
+/* One ad per base name; suffixed files ride along as extra assets. */
+function groupCreatives(list){
+  const by = new Map();
+  for(const f of list){
+    const {base,role} = partsOf(f.name);
+    if(!by.has(base)) by.set(base,{base,main:null,extras:[]});
+    const g = by.get(base);
+    if(role==="main"){ g.main = g.main || f; if(g.main!==f) g.extras.push({...f,role}); }
+    else g.extras.push({...f,role});
   }
+  /* A group of only suffixed files still deserves an ad — promote the first. */
+  for(const g of by.values()) if(!g.main && g.extras.length){ g.main = g.extras.shift(); }
+  return [...by.values()].filter(g=>g.main);
 }
-window.addEventListener("popstate", e=>{
-  if(e.state && e.state.view) render(e.state);
-  else show(ACCT?"menu":"acct");
-});
+function groupPrefix(base){ const m = base.match(/^([A-Za-z0-9]+)[-_]/); return m ? m[1] : base; }
 
-/* ---------- 1: create new ---------- */
-let FILES=[];
-function q1(replay){
-  FILES=[];
-  if(!replay) return nav("q1");
-  show("pane");
-  $("pane").innerHTML = crumb()+`
-   <h2>Create a new campaign</h2>
-   <p class="sub">Three steps. Nothing is created until you have read the preview
-     and pressed the button.</p>
+/* ============================== uploader =============================== */
+function mountUploader(){
+  fillAccounts($("#acctSelect"), ()=>{ resetApiPicker(); renderPreview(); });
+  renderModeBanner(); renderFiles(); renderEnh(); renderTextFields(); renderPreview();
 
-   <div class="card" style="background:var(--panel2);margin:0 0 16px">
-     <div class="row" style="justify-content:space-between">
-       <div>
-         <h3 style="margin:0 0 4px;font-size:15px">1 · Get the template</h3>
-         <p class="sub" style="margin:0">Pre-filled for <b>${esc(ACCT_NAME)}</b> — the account,
-           Page and pixel IDs are already in it, and a <b>Your account</b> tab lists every
-           ID you might need. You fill in the copy.</p>
-       </div>
-       <a href="/api/template?account=${encodeURIComponent(ACCT)}" download>
-         <button>Download template for this account</button></a>
-     </div>
-   </div>
+  /* ---------- dropzone ---------- */
+  const dz=$("#dz"), fi=$("#fileInput"), di=$("#dirInput");
+  $("#btnBrowse").onclick = e=>{ e.preventDefault(); fi.click(); };
+  $("#btnFolder").onclick = e=>{ e.preventDefault(); di.click(); };
+  $("#btnDrive").onclick  = e=>{ e.preventDefault();
+    toast("Google Drive import needs a Drive OAuth client — not connected on this deployment."); };
+  fi.onchange = ()=>{ addFiles([...fi.files]); fi.value=""; };
+  di.onchange = ()=>{ addFiles([...di.files]); di.value=""; };
+  ["dragenter","dragover"].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.add("over")}));
+  ["dragleave","drop"].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.remove("over")}));
+  dz.addEventListener("drop",e=>addFiles([...(e.dataTransfer?.files||[])]));
 
-   <h3 style="margin:0 0 4px;font-size:15px">2 · Fill it in</h3>
-   <p class="sub"><b>creative_file</b> accepts any of these:<br>
-     • a filename of an image you drop in below<br>
-     • the <b>name of an image or video already in this ad account</b> — nothing to attach,
-       no size limit, and videos work<br>
-     • several names separated by <b>|</b> — you get one ad per creative, sharing the copy</p>
+  $("#turbo").onchange = e => { if(!e.target.checked) toast("Turbo off — uploads run one at a time."); };
+  $("#btnUpload").onclick = doUpload;
 
-   <h3 style="margin:18px 0 8px;font-size:15px">3 · Drop it all here</h3>
-   <div class="drop" id="dz">
-     <h3>Drop your files here</h3>
-     <p><b>Easiest:</b> right-click your campaign folder → Compress → drop the <b>.zip</b>.<br>
-        Or drag the whole folder. Or the .xlsx and every image together.</p>
-   </div>
-   <input type="file" id="fi" multiple class="hide"
-          accept=".zip,.xlsx,.xlsm,image/png,image/jpeg,image/gif,image/webp">
-   <div class="files" id="chips"></div>
-   <div class="row" style="margin-top:16px">
-     <button id="go" disabled onclick="preview()">Check the workbook</button>
-   </div>
-   <div id="out"></div>`;
-  const dz=$("dz"), fi=$("fi");
-  dz.onclick=()=>fi.click();
-  fi.onchange=e=>addFiles(e.target.files);
-  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{
-    e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
-  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
-    e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
-  dz.addEventListener("drop",e=>takeDrop(e,addFiles));
-  fi.setAttribute("webkitdirectory-hint","");
-}
-
-/* Dragging a FOLDER gives directory entries, not files. Walk them so people
-   can drop the whole campaign folder instead of hand-picking every image. */
-async function takeDrop(e, sink){
-  const items=[...(e.dataTransfer.items||[])];
-  const entries=items.map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);
-  if(!entries.length) return sink(e.dataTransfer.files);
-  const out=[];
-  const walk = entry => new Promise(res=>{
-    if(entry.isFile) return entry.file(f=>{out.push(f);res();});
-    if(entry.isDirectory){
-      const rd=entry.createReader();
-      rd.readEntries(async es=>{ for(const c of es) await walk(c); res(); });
-    } else res();
+  /* ---------- configuration method ---------- */
+  $$('input[name="cfg"]').forEach(r=>r.onchange=()=>{
+    S.cfg = r.value;
+    $("#paneXlsx").hidden = r.value!=="xlsx";
+    $("#paneApi").hidden  = r.value!=="api";
+    if(r.value==="api" && !S.api.campaigns.length) loadCampaigns();
+    renderPreview();
   });
-  for(const en of entries) await walk(en);
-  sink(out);
-}
-function addFiles(list){
-  for(const f of list){ if(!FILES.some(x=>x.name===f.name)) FILES.push(f); }
-  const zips=FILES.filter(f=>/\.zip$/i.test(f.name));
-  const book=FILES.filter(f=>/\.xlsx?$|\.xlsm$/i.test(f.name));
-  $("chips").innerHTML=FILES.map(f=>{
-    const isBook=/\.xlsx?$|\.xlsm$/i.test(f.name);
-    return `<span class="chip ${isBook?"book":""}">${esc(f.name)} · ${(f.size/1024).toFixed(0)}kB</span>`;
-  }).join("");
-  const total=FILES.reduce((a,f)=>a+f.size,0);
-  const imgs=FILES.filter(f=>!/\.(xlsx|xlsm|csv)$/i.test(f.name)).length;
-  $("go").disabled = !(book.length===1 || zips.length===1);
-  let msg="";
-  if(zips.length===1 && !book.length) msg=`Ready: ${FILES[0].name} — the workbook and images `+
-    `will be read from inside it.`;
-  else if(book.length===0) msg="Add the .xlsx workbook, or a .zip of the whole folder.";
-  else if(book.length>1) msg="Only one workbook at a time.";
-  else if(!imgs) msg="Workbook loaded, but no images yet. Drag the images in too — "+
-                     "or drop the whole folder.";
-  else if(total>4.2e6) msg="Total is over ~4.2MB — Vercel will reject it. Use fewer/smaller images.";
-  else msg = `Ready: 1 workbook + ${imgs} image(s).`;
-  $("out").innerHTML = msg?`<div class="note">${esc(msg)}</div>`:"";
-}
-function formData(){ const fd=new FormData(); FILES.forEach(f=>fd.append("f",f,f.name)); return fd; }
+  $$("#paneXlsx .radio, .radio select").forEach(s=>s.addEventListener("click",e=>e.stopPropagation()));
+  $("#btnXlsx").onclick = e=>{ e.preventDefault(); $("#xlsxInput").click(); };
+  $("#xlsxInput").onchange = e=>{
+    S.xlsxFile = e.target.files[0]||null;
+    $("#xlsxName").textContent = S.xlsxFile ? S.xlsxFile.name : "No file chosen";
+    renderPreview();
+  };
+  $("#btnRefresh").onclick = ()=>{ S.api.campaigns=[]; loadCampaigns(true); };
+  $("#btnResetSel").onclick = ()=>{ resetApiPicker(); renderPreview(); };
+  $("#fontSeg").onclick = e=>{ const b=e.target.closest("button"); if(!b)return;
+    $$("#fontSeg button").forEach(x=>x.classList.toggle("on",x===b));
+    $$("#apiCols .it").forEach(i=>i.style.fontSize=b.dataset.fs+"px"); };
+  ["qCampaign","qAdset","qAd"].forEach(id=>$("#"+id).oninput=drawApiLists);
+  $("#onlyActiveC").onchange=drawApiLists; $("#onlyActiveA").onchange=drawApiLists; $("#onlyActiveD").onchange=drawApiLists;
 
-async function preview(){
-  $("go").disabled=true;
-  $("out").innerHTML='<p class="spin">Reading the workbook and checking it against Meta…</p>';
-  try{
-    const r=await fetch("/api/preview",{method:"POST",body:formData()});
-    const d=await r.json();
-    if(!r.ok){ $("out").innerHTML=`<div class="err">${esc(d.error||"upload failed")}</div>`;
-               $("go").disabled=false; return; }
-    if(!d.ok){
-      const miss=[...new Set(d.problems.map(x=>{
-        const m=x.match(/'([^']+)' was not among the files/); return m?m[1]:null;}).filter(Boolean))];
-      const other=d.problems.filter(x=>!/was not among the files/.test(x));
-      let h="";
-      if(miss.length){
-        h+=`<div class="note" style="border-color:#5a4a12;background:#241f10">
-          <b>${miss.length} image(s) still missing.</b> Your workbook is still loaded —
-          just drop these in and press the button again, no need to start over:
-          <div class="files" style="margin-top:8px">
-            ${miss.map(m=>`<span class="chip">${esc(m)}</span>`).join("")}
-          </div>
-          <div class="sub" style="margin-top:8px">Tip: drag the whole folder onto the
-            box above and everything goes in at once.</div></div>`;
-      }
-      if(other.length){
-        h+=`<div class="err">${other.length} problem(s):\n\n`+
-           other.map(x=>"• "+esc(x)).join("\n")+`</div>`;
-      }
-      $("out").innerHTML=h;
-      $("go").disabled=false; return;
+  /* ---------- structure options ---------- */
+  const bind=(id,key,pane)=>{ const c=$("#"+id); c.checked=S.struct[key];
+    c.onchange=()=>{ S.struct[key]=c.checked; if(pane) $("#"+pane).hidden=!c.checked;
+      if(key==="custom" && c.checked) openBuilder();
+      if(key==="custom" && !c.checked) S.customSets=[];
+      renderPreview(); }; };
+  bind("optNewCampaign","newCampaign","newCampaignPane");
+  bind("optNewAdset","newAdset","newAdsetPane");
+  bind("optPerGroup","perGroup");
+  bind("optAutoDivide","autoDivide","autoDividePane");
+  bind("optCustomSets","custom");
+  bind("optNamePattern","namePattern","namePatternPane");
+  $("#perSet").oninput = e=>{ S.struct.perSet=Math.max(1,Math.min(50,+e.target.value||1)); renderPreview(); };
+  $("#namePattern").oninput = e=>{ S.struct.pattern=e.target.value; renderPreview(); };
+  ["ncName","ncObjective","ncBudget","naName","naBudget"].forEach(id=>$("#"+id).oninput=renderPreview);
+
+  /* ---------- ad text ---------- */
+  const modes = {txtCommon:"common", txtPerAdset:"perAdset", txtPerAd:"perAd"};
+  Object.keys(modes).forEach(id=>$("#"+id).onchange=()=>{
+    S.text.mode = modes[id];
+    Object.keys(modes).forEach(o=>$("#"+o).checked = o===id);
+    $("#commonText").hidden   = false;                       // common text is always the fallback
+    $("#perAdsetText").hidden = S.text.mode!=="perAdset";
+    $("#perAdBtnWrap").hidden = S.text.mode!=="perAd";
+    if(S.text.mode==="perAdset") renderPerAdsetText();
+  });
+  $("#headMode").onclick = e=>{ const b=e.target.closest("button"); if(!b)return;
+    S.text.headMode=b.dataset.m; $$("#headMode button").forEach(x=>x.classList.toggle("on",x===b)); renderPreview(); };
+  $("#addHeadline").onclick=()=>{ if(S.text.headlines.length>=5) return toast("Meta allows at most 5 headlines.");
+    S.text.headlines.push(""); renderTextFields(); };
+  $("#addBody").onclick=()=>{ if(S.text.bodies.length>=5) return toast("Meta allows at most 5 primary texts.");
+    S.text.bodies.push(""); renderTextFields(); };
+  ["fDesc","fCta","fLink","fDisplay","fUtm"].forEach(id=>{
+    const k={fDesc:"desc",fCta:"cta",fLink:"link",fDisplay:"display",fUtm:"utm"}[id];
+    $("#"+id).value = S.text[k]; $("#"+id).oninput = e=>{ S.text[k]=e.target.value; };
+  });
+  $("#btnPerAd").onclick = openPerAd;
+
+  /* ---------- enhancements ---------- */
+  $("#enhDefaults").onchange = e=>{
+    if(e.target.checked){ $("#enhAll").checked=false; }
+    renderEnh(); updateEnhNote();
+  };
+  $("#enhAll").onchange = e=>{
+    if(e.target.checked) $("#enhDefaults").checked=false;
+    for(const g of Object.keys(ENH)) for(const [k] of ENH[g]) S.enh[g][k] = e.target.checked?1:0;
+    renderEnh(); updateEnhNote();
+  };
+
+  /* ---------- publication ---------- */
+  $("#pubPaused").onchange = e=>{ $("#pausedWarn").hidden = e.target.checked; };
+  $("#pubSchedule").onchange = e=>{
+    $("#schedPane").hidden=!e.target.checked;
+    if(e.target.checked){
+      const tz = S.acct.timezone||"your account timezone";
+      const now = new Date();
+      $("#tzLine").textContent = `Your account timezone is: ${tz}. Current time: `+
+        now.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+      const t=new Date(Date.now()+864e5);
+      $("#schedDate").value = t.toISOString().slice(0,10);
     }
-    $("out").innerHTML=`
-      <div class="card" style="margin-top:18px;background:var(--panel2)">
-        <h2>${esc(d.campaign.name)}</h2>
-        <p class="sub">${esc(d.campaign.objective)} · ${esc(d.campaign.budget_mode)}
-          ${d.campaign.daily_budget_minor?" · budget "+d.campaign.daily_budget_minor+" (minor units)":""}
-          — <b>${d.counts.adsets} ad set(s), ${d.counts.ads} ad(s)</b></p>
-        ${d.adsets.map(a=>`<div style="margin:12px 0">
-           <b>${esc(a.name)}</b> <span class="mono">${(a.countries||[]).join(", ")}</span>
-           <div class="mono" style="margin-top:4px">${a.ads.map(esc).join(" · ")}</div></div>`).join("")}
-        ${d.resolved.length?`<div class="note"><b>Resolved to Meta IDs — check these:</b><br>`+
-           d.resolved.map(esc).join("<br>")+`</div>`:""}
-        <div class="note">Everything will be created <b>PAUSED</b>. Nothing can spend
-          until you launch it yourself in Ads Manager.</div>
-        <div class="row" style="margin-top:14px">
-          <button onclick="createNow()">Create these ${d.counts.ads} ad(s), paused</button>
-          <button class="ghost" onclick="q1()">Start over</button>
-        </div>
-      </div>`;
-  }catch(e){ $("out").innerHTML=`<div class="err">${esc(e.message)}</div>`; $("go").disabled=false; }
+  };
+  $("#btnCreate").onclick = confirmCreate;
 }
 
-async function createNow(){
-  $("out").innerHTML='<p class="spin">Creating… uploading images and building each object. '+
-    'This can take a minute. Do not close the tab.</p>';
-  try{
-    const r=await fetch("/api/create",{method:"POST",body:formData()});
-    const d=await r.json();
-    if(!d.ok){
-      let h=`<div class="err">`+(d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`;
-      if(d.partial && (d.partial.campaign||d.partial.adsets.length)){
-        h+=`<div class="note"><b>Some objects were created before it failed.</b> They are
-          PAUSED and cannot spend, but they DO exist — delete them in Ads Manager, or rename
-          the campaign in your workbook before retrying, or the duplicate guard will block you.
-          <table style="margin-top:8px">
-          ${d.partial.campaign?`<tr><td>Campaign</td><td>${esc(d.partial.campaign.name)}</td>
-            <td class="mono">${d.partial.campaign.id}</td></tr>`:""}
-          ${d.partial.adsets.map(a=>`<tr><td>Ad set</td><td>${esc(a.name)}</td>
-            <td class="mono">${a.id}</td></tr>`).join("")}
-          ${d.partial.ads.map(a=>`<tr><td>Ad</td><td>${esc(a.name)}</td>
-            <td class="mono">${a.id}</td></tr>`).join("")}
-          </table></div>`;
-      }
-      $("out").innerHTML=h; return; }
-    const res=d.result;
-    $("out").innerHTML=`
-      <div class="card" style="margin-top:18px;background:var(--panel2)">
-        <h2 class="ok">Created — all paused</h2>
-        <p class="sub">${res.ads.length} ad(s) across ${res.adsets.length} ad set(s).</p>
-        <table><tr><th>Object</th><th>Name</th><th>ID</th></tr>
-          <tr><td>Campaign</td><td>${esc(res.campaign.name)}</td><td class="mono">${res.campaign.id}</td></tr>
-          ${res.adsets.map(a=>`<tr><td>Ad set</td><td>${esc(a.name)}</td><td class="mono">${a.id}</td></tr>`).join("")}
-          ${res.ads.map(a=>`<tr><td>Ad</td><td>${esc(a.name)}</td><td class="mono">${a.id}</td></tr>`).join("")}
-        </table>
-        ${res.skipped.length?`<div class="note">Skipped: ${res.skipped.map(esc).join(", ")}</div>`:""}
-        <div class="note">Review them in Ads Manager, then un-pause when you are ready.
-          Nothing is spending right now.</div>
-      </div>`;
-  }catch(e){ $("out").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
+function renderModeBanner(){
+  const b=$("#modeBanner"); if(!b) return;
+  b.innerHTML = S.demo
+    ? `<div class="banner warn"><div><b>Demo data — nothing here touches Meta.</b>
+        No access token is configured, so campaigns, ad sets and ads below are samples.
+        Every button works; nothing is sent. Set a token to go live.</div></div>`
+    : `<div class="banner info"><div><b>Connected to ${esc(S.acct.name||S.acct.id)}.</b>
+        Ads are created paused by default — activation is a separate, explicit step.</div></div>`;
 }
 
-/* ---------- 2: add to existing ---------- */
-async function q2(replay){
-  if(!replay) return nav("campaigns");
-  show("pane"); $("pane").innerHTML=crumb()+"<h2>Add to an existing campaign</h2><p class='spin'>Loading campaigns…</p>";
-  try{
-    const d=await api("/api/campaigns?account="+encodeURIComponent(ACCT)+"&preset="+myPreset());
-    const C=COLS.filter(c=>myCols().includes(c[0]));
-    $("pane").innerHTML = crumb()+`<h2>Which campaign?</h2>`+
-      presetBar()+colsBar()+
-      (d.campaigns.length
-        ? searchBox("qCamp","tCamp","Search campaigns by name or ID…","campaign(s)")+
-          `<table id="tCamp"><thead><tr>
-            <th class="sortable" onclick="sortBy('tCamp',0)">Name</th>
-            <th>Budget</th>
-            ${C.map((c,n)=>`<th class="num sortable" onclick="sortBy('tCamp',${2+n},true)">${c[1]}</th>`).join("")}
-            <th>Status</th><th></th></tr></thead><tbody>`+
-          d.campaigns.map(c=>{const st=c.stats||{};return `
-            <tr class="pick" onclick="pickCamp('${c.id}','${esc(c.name).replace(/'/g,"")}')">
-            <td>${esc(c.name)}<div class="mono">${c.id}</div></td>
-            <td>${c.budget_mode}</td>
-            ${C.map(x=>`<td class="num" data-v="${st[x[0]]??-1}">${fmtStat(st[x[0]],x[0])}</td>`).join("")}
-            <td><span class="tag ${/ACTIVE/.test(c.effective_status)?"ok":"warn"}">${esc(c.effective_status||c.status)}</span></td>
-            <td><a href="/api/export?campaign=${c.id}" download onclick="event.stopPropagation()">
-              <button class="ghost" style="padding:4px 9px;font-size:12px">Copy to sheet</button></a></td>
-          </tr>`;}).join("")+`</tbody></table>
-          <div class="note"><b>Copy to sheet</b> downloads a campaign as a workbook —
-            targeting, copy and creatives already filled in, creatives as Meta image IDs so
-            there are <b>no image files to attach</b>.<br><br>
-            <b>Uploading that file back through "Create a NEW campaign" builds a brand new
-            campaign</b>, which starts its own learning from zero. That is right when you want
-            a fresh clone of a winner.<br>
-            <b>To add to a campaign that is already running, open it instead</b> — you can
-            append new ad sets there, or open an ad set and append ads. Those only create what
-            is new and never rebuild 0822-1620 is delivering.</div>`
-        : "<p class='sub'>No campaigns in this account yet.</p>");
-    if(d.campaigns.length) filterRows("qCamp","tCamp");
-  }catch(e){ err(e.message); }
-}
-async function pickCamp(id,name,replay){
-  CAMP=id; CAMP_NAME=name;
-  if(!replay) return nav("adsets",{camp:id,campName:name});
-  show("pane");   // history restore lands here with another section visible
-  $("pane").innerHTML=crumb()+"<p class='spin'>Loading ad sets…</p>";
-  try{
-    const d=await api("/api/adsets?campaign="+encodeURIComponent(id)+"&preset="+myPreset());
-    const C=COLS.filter(c=>myCols().includes(c[0]));
-    $("pane").innerHTML = crumb(true)+`<h2>${esc(name)}</h2>`+
-      presetBar()+colsBar()+
-      searchBox("qSet","tSet","Search ad sets by name, ID or country…","ad set(s)")+
-      `<table id="tSet"><thead><tr>
-        <th class="sortable" onclick="sortBy('tSet',0)">Ad set</th>
-        <th class="num sortable" onclick="sortBy('tSet',1,true)">Ads</th>
-        <th>Countries</th><th>Budget</th>
-        ${C.map((c,n)=>`<th class="num sortable" onclick="sortBy('tSet',${4+n},true)">${c[1]}</th>`).join("")}
-        <th>Status</th><th></th></tr></thead><tbody>`+
-      d.adsets.map(a=>{const st=a.stats||{};return `
-        <tr class="pick" onclick="pickAdset('${a.id}','${esc(a.name).replace(/'/g,"")}')">
-        <td>${esc(a.name)}<div class="mono">${a.id}</div></td>
-        <td class="num" data-v="${a.ad_count||0}">${a.ad_count??"?"}</td>
-        <td style="max-width:260px;font-size:12px">${(a.countries||[]).join(", ")}</td>
-        <td>${a.daily_budget||a.lifetime_budget||"campaign-level"}</td>
-        ${C.map(x=>`<td class="num" data-v="${st[x[0]]??-1}">${fmtStat(st[x[0]],x[0])}</td>`).join("")}
-        <td><span class="tag ${/ACTIVE/.test(a.effective_status)?"ok":"warn"}">${esc(a.effective_status||a.status)}</span></td>
-        <td><button class="ghost" style="padding:4px 9px;font-size:12px"
-             onclick="event.stopPropagation();dupAdset('${a.id}','${esc(a.name).replace(/'/g,"")}')">Duplicate</button></td>
-      </tr>`;}).join("")+`</tbody></table>
-      <div class="note"><b>To add ADS:</b> click an ad set above, then drop images in.
-        No spreadsheet. <b>To add an AD SET:</b> hit <b>Duplicate</b> on the one closest to
-        what you want and change the couple of things that differ.</div>
-
-      <div id="dupbox"></div>
-
-      <details style="margin-top:22px"><summary class="sub" style="cursor:pointer">
-        Adding many ad sets at once? Use a spreadsheet instead</summary>
-        <div class="card" style="background:var(--panel2);margin:12px 0">
-          <div class="row" style="justify-content:space-between">
-            <div><h3 style="margin:0 0 4px;font-size:15px">Sheet for this campaign</h3>
-              <p class="sub" style="margin:0">Comes with this campaign's ad sets listed as
-                examples. Add yours underneath.</p></div>
-            <a href="/api/sheet?scope=adsets&id=${CAMP}" download>
-              <button class="ghost">Download sheet</button></a>
-          </div>
-        </div>
-        <div class="drop" id="dz3" style="padding:20px">
-          <h3 style="font-size:15px">Drop the filled-in sheet here</h3>
-          <p>Plus any images it names. Existing ad sets in it are skipped.</p>
-        </div>
-        <input type="file" id="fi3" multiple class="hide">
-        <div class="files" id="chips3"></div>
-        <div class="row" style="margin-top:12px">
-          <button id="go3" disabled onclick="setsPreview()">Check the ad sets</button>
-        </div>
-        <div id="out3"></div>
-      </details>`;
-    filterRows("qSet","tSet"); wireDrop3();
-  }catch(e){ err(e.message); }
-}
-function fmtStat(v,k){
-  if(v==null||v<0) return "—";
-  return (k==="spend"||k==="cpa"||k==="cpc"||k==="ctr") ? Number(v).toFixed(2)
-       : Number(v).toLocaleString();
-}
-function presetBar(){
-  return `<div class="bar"><select class="mini" onchange="setPreset(this.value)">
-    ${[["today","Today"],["yesterday","Yesterday"],["last_7d","Last 7 days"],
-       ["last_14d","Last 14 days"],["last_30d","Last 30 days"],["maximum","All time"]]
-      .map(([v,l])=>`<option value="${v}" ${myPreset()===v?"selected":""}>${l}</option>`).join("")}
-  </select><span class="sub" style="margin:0">performance window</span></div>`;
-}
-function colsBar(){
-  return `<div class="cols">Columns:
-    ${COLS.map(([k,l])=>`<label><input type="checkbox" value="${k}"
-      ${myCols().includes(k)?"checked":""} onchange="saveCols()">${l}</label>`).join("")}
-    <span>(saved on this browser)</span></div>`;
-}
-const COLS=[["spend","Spend"],["results","Results"],["cpa","CPA"],["ctr","CTR %"],
-            ["cpc","CPC"],["clicks","Clicks"],["impressions","Impr."]];
-function myCols(){ try{ return JSON.parse(localStorage.getItem("cols")) ||
-  ["spend","results","cpa","ctr"]; }catch(e){ return ["spend","results","cpa","ctr"]; } }
-function saveCols(){
-  const on=[...document.querySelectorAll(".cols input:checked")].map(x=>x.value);
-  localStorage.setItem("cols",JSON.stringify(on));
-  redraw();
-}
-function redraw(){
-  const st=history.state||{};
-  if(st.view==="ads")       return pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
-  if(st.view==="adsets")    return pickCamp(CAMP,CAMP_NAME,true);
-  if(st.view==="campaigns") return q2(true);
-}
-function myPreset(){ return localStorage.getItem("preset")||"last_7d"; }
-function setPreset(v){ localStorage.setItem("preset",v); redraw(); }
-let CUR_ADSET=null, CUR_ADSET_NAME="";
-
-async function pickAdset(id,name,replay){
-  if(!replay) return nav("ads",{adset:id,adsetName:name});
-  CUR_ADSET=id; CUR_ADSET_NAME=name;
-  show("pane");   // history restore lands here with another section visible
-  $("pane").innerHTML=crumb({camp:1})+"<p class='spin'>Loading ads and performance…</p>";
-  try{
-    const d=await api(`/api/ads?adset=${encodeURIComponent(id)}&preset=${myPreset()}`);
-    const cols=myCols(), C=COLS.filter(c=>cols.includes(c[0]));
-    const fmt=fmtStat;
-    $("pane").innerHTML = crumb({camp:1})+`
-      <h2>${esc(name)}</h2>
-      <p class="sub">${d.ads.length} ad(s). Tick rows to change several at once.</p>
-
-      ${presetBar()}${colsBar()}
-
-      ${searchBox("qAd","tAd","Search ads by name or ID…","ad(s)")}
-      <table id="tAd"><thead><tr>
-        <th style="width:28px"><input type="checkbox" onchange="tickAll(this)"></th>
-        <th class="sortable" onclick="sortBy('tAd',1)">Ad</th>
-        <th>On / off</th>
-        ${C.map((c,n)=>`<th class="num sortable" onclick="sortBy('tAd',${3+n},true)">${c[1]}</th>`).join("")}
-        <th>Status</th><th></th></tr></thead><tbody>`+
-      d.ads.map(a=>{
-        const st=a.stats||{}, live=/ACTIVE/.test(a.effective_status);
-        return `<tr>
-          <td><input type="checkbox" class="pk" value="${a.id}" onchange="refreshBulk()"></td>
-          <td>${esc(a.name)}<div class="mono">${a.id}</div></td>
-          <td><label class="sw"><input type="checkbox" ${a.status==="ACTIVE"?"checked":""}
-                onchange="toggleOne('${a.id}',this)"><span class="sl"></span></label></td>
-          ${C.map(c=>`<td class="num" data-v="${st[c[0]]??-1}">${fmt(st[c[0]],c[0])}</td>`).join("")}
-          <td><span class="tag ${live?"ok":"warn"}">${esc(a.effective_status||a.status)}</span></td>
-          <td><button class="ghost" style="padding:4px 9px;font-size:12px"
-               onclick="renameAd('${a.id}','${esc(a.name).replace(/'/g,"")}')">Rename</button></td>
-        </tr>`;}).join("")+
-      `</tbody></table>
-      <div id="bulk"></div>
-
-      <h3 style="margin:26px 0 6px;font-size:15px">Add more ads to this ad set</h3>
-      <p class="sub">No spreadsheet needed. Drop images, check the copy, done —
-        one ad per image.</p>
-
-      <div class="card" style="background:var(--panel2);margin:0 0 14px">
-        <div class="drop" id="dzq" style="padding:20px">
-          <h3 style="font-size:15px">Drop the new images here</h3>
-          <p>One ad is created per image. Or click to choose them.</p>
-        </div>
-        <input type="file" id="fiq" multiple class="hide" accept="image/*">
-        <div class="files" id="chipsq"></div>
-
-        <div style="margin-top:14px">
-          <label>Primary text</label>
-          <div id="qBodies"></div>
-          <button class="ghost" style="margin-top:6px;padding:5px 11px;font-size:12.5px"
-                  onclick="addField('qBodies','Primary text')">+ Add another primary text</button>
-
-          <div style="height:14px"></div>
-          <label>Headline</label>
-          <div id="qHeads"></div>
-          <button class="ghost" style="margin-top:6px;padding:5px 11px;font-size:12.5px"
-                  onclick="addField('qHeads','Headline')">+ Add another headline</button>
-
-          <div class="hint" style="margin-top:8px">Add more than one and Meta rotates them
-            inside each ad, showing whichever performs best. Up to 5 of each.</div>
-
-          <div style="height:16px"></div>
-          <div class="row">
-            <div style="flex:2;min-width:230px"><label>Destination link</label>
-              <input id="qLink"></div>
-            <div style="flex:1;min-width:160px"><label>Button</label>
-              <select id="qCta"></select></div>
-          </div>
-          <div style="height:12px"></div>
-          <label>Name these ads <span class="sub">— a number and the image name are added</span></label>
-          <input id="qPrefix" value="new" oninput="nameHint()">
-          <div class="hint" id="qNameHint"></div>
-          <div class="sub" id="qFrom" style="margin-top:8px"></div>
-          <div class="row" style="margin-top:12px">
-            <button id="goq" disabled onclick="quickPreview()">Check these ads</button>
-          </div>
-          <div id="outq"></div>
-        </div>
-      </div>
-
-      <details><summary class="sub" style="cursor:pointer">Or upload a spreadsheet instead
-        (for bigger batches with different copy per ad)</summary>
-      <div class="card" style="background:var(--panel2);margin:10px 0">
-        <div class="row" style="justify-content:space-between">
-          <div>
-            <h3 style="margin:0 0 4px;font-size:15px">Get the sheet for THIS ad set</h3>
-            <p class="sub" style="margin:0">The ad set name is already filled in on every row.
-              Just add ad_name, creative_file and the copy.</p>
-          </div>
-          <a href="/api/sheet?scope=ads&id=${CUR_ADSET}" download>
-            <button class="ghost">Download sheet</button></a>
-        </div>
-      </div>
-      <p class="sub">Then drop it back below, with the images it names. Ads already here
-        are skipped.</p>
-      <div class="drop" id="dz2" style="padding:24px">
-        <h3 style="font-size:15px">Drop the ad list and images here</h3>
-        <p>Columns: ad_name, creative_file, body, headline, description, cta, link</p>
-      </div>
-      <input type="file" id="fi2" multiple class="hide">
-      <div class="files" id="chips2"></div>
-      <div class="row" style="margin-top:12px">
-        <button id="go2" disabled onclick="addPreview()">Check these ads</button>
-      </div>
-      <div id="out2"></div></details>
-      <div class="note">Switching an ad <b>off</b> takes effect immediately and never costs
-        anything. Switching one <b>on</b> starts spending, so it asks first.
-        <br>CPA and Results use whichever conversion the ad set optimises for
-        (purchase, lead, or link click).</div>`;
-    filterRows("qAd","tAd"); refreshBulk(); wireDrop2(); wireQuick();
-  }catch(e){ err(e.message); }
-}
-
-let COUNTRIES=[], PICKED=[], ACCT_CUR="", ACCT_MIN=0;
-async function loadCountries(){
-  if(COUNTRIES.length) return;
-  try{ COUNTRIES=(await api("/api/countries")).countries||[]; }catch(e){}
-}
-async function loadAccountMeta(){
-  try{ const m=await api("/api/account-meta?account="+encodeURIComponent(ACCT));
-       ACCT_CUR=m.currency||""; ACCT_MIN=m.min_daily_budget||0; }catch(e){}
-}
-function cSearch(){
-  const q=($("dCountries").value||"").toLowerCase().trim();
-  const hits=(q?COUNTRIES.filter(c=>c.n.toLowerCase().includes(q)||c.c.toLowerCase()===q)
-               :COUNTRIES).slice(0,60);
-  $("cList").innerHTML=hits.map(c=>
-    `<div onclick="cPick('${c.c}')" class="${PICKED.includes(c.c)?'on':''}">${esc(c.n)}
-      <span class="code">${c.c}</span></div>`).join("") ||
-    `<div class="sub" style="padding:9px 11px">No country matches that</div>`;
-  $("cList").classList.remove("hide");
-}
-function cPick(code){
-  if(!PICKED.includes(code)) PICKED.push(code);
-  $("dCountries").value=""; cRender(); cSearch();
-}
-function cRender(){
-  const byCode=Object.fromEntries(COUNTRIES.map(c=>[c.c,c.n]));
-  $("cPicked").innerHTML=PICKED.map(c=>
-    `<span class="chip" onclick="cDrop('${c}')">${esc(byCode[c]||c)} · ${c} ✕</span>`).join("");
-}
-function cDrop(code){ PICKED=PICKED.filter(x=>x!==code); cRender(); }
-function budgetHint(){
-  const v=parseFloat(($("dBudget").value||"").replace(",","."));
-  if(isNaN(v)){ $("dBudgetHint").textContent=""; return; }
-  const minor=Math.round(v*100);
-  let msg=`${v.toFixed(2)} ${ACCT_CUR} per day`;
-  if(ACCT_MIN && minor<ACCT_MIN)
-    msg+=` — below this account's minimum of ${(ACCT_MIN/100).toFixed(2)} ${ACCT_CUR}`;
-  $("dBudgetHint").textContent=msg;
-}
-document.addEventListener("click",e=>{
-  if(!e.target.closest(".picker")) { const l=$("cList"); if(l) l.classList.add("hide"); }
-});
-
-function done(target, title, lines, extra){
-  $(target).innerHTML = `<div class="done"><b>✓ ${esc(title)}</b>` +
-    (lines && lines.length ? `<ul>${lines.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>` : "") +
-    (extra || "") + `</div>`;
-}
-
-function dupAdset(id,name){
-  $("dupbox").innerHTML=`<div class="card" style="background:var(--panel2);margin:14px 0">
-    <h3 style="margin:0 0 4px;font-size:15px">Duplicate "${esc(name)}"</h3>
-    <p class="sub">Everything is copied as-is. Change only what should differ.
-      The original is not touched, and the copy is created PAUSED.</p>
-    <label>New ad set name</label>
-    <input id="dName" value="${esc(name)} — copy">
-    <div style="height:8px"></div>
-    <div class="row" style="align-items:flex-start">
-      <div style="flex:1;min-width:240px" class="picker">
-        <label>Countries <span class="sub">(leave empty to keep the same)</span></label>
-        <input id="dCountries" placeholder="Type a country name…" autocomplete="off"
-               oninput="cSearch()" onfocus="cSearch()">
-        <div id="cList" class="plist hide"></div>
-        <div id="cPicked" class="picked"></div>
-        <div class="hint">Click a chip to remove it. Codes are filled in for you.</div>
-      </div>
-      <div style="flex:1;min-width:200px">
-        <label>Daily budget <span id="dCur" class="sub">(blank = keep the current one)</span></label>
-        <div class="row" style="gap:0;align-items:stretch">
-          <span id="dCurSym" style="display:flex;align-items:center;padding:0 12px;
-            border:1px solid var(--line);border-right:0;border-radius:7px 0 0 7px;
-            background:var(--bg);color:var(--dim);font-size:14px">—</span>
-          <input id="dBudget" placeholder="20.00" oninput="budgetHint()"
-                 style="border-radius:0 7px 7px 0;flex:1">
-        </div>
-        <div class="hint" id="dBudgetHint">Type a normal amount, e.g. 20 for twenty.</div>
-      </div>
-    </div>
-    <label style="margin-top:10px"><input type="checkbox" id="dAds" checked style="width:auto">
-      Copy its ads too</label>
-    <div class="row" style="margin-top:12px">
-      <button onclick="dupGo('${id}')">Create the duplicate</button>
-      <button class="ghost" onclick="$('dupbox').innerHTML=''">Cancel</button>
-    </div><div id="dOut"></div></div>`;
-  PICKED=[];
-  loadCountries().then(cRender);
-  loadAccountMeta().then(()=>{
-    if(ACCT_CUR){ $("dCur").textContent=`in ${ACCT_CUR} (blank = keep the current one)`;
-                  $("dCurSym").textContent=ACCT_CUR; }
-    if(ACCT_MIN) $("dBudget").placeholder=(ACCT_MIN/100).toFixed(2);
-    budgetHint();
-  });
-  $("dupbox").scrollIntoView({behavior:"smooth",block:"center"});
-}
-async function dupGo(id){
-  $("dOut").innerHTML='<p class="spin">Copying…</p>';
-  try{
-    const d=await api("/api/duplicate-adset",{method:"POST",body:JSON.stringify({
-      adset:id, name:$("dName").value, countries:PICKED.join(","),
-      daily_budget_minor:(()=>{const v=parseFloat(($("dBudget").value||"").replace(",","."));
-        return isNaN(v)?"":Math.round(v*100);})(),
-      with_ads:$("dAds").checked})});
-    done("dOut", `Created "${d.name}" — PAUSED, not spending`,
-         (d.changed||[]).concat(d.warnings||[]),
-         `<div class="sub" style="margin-top:8px">Ad set ID ${d.id}. It will appear in the
-          list in a moment.</div>`);
-    setTimeout(()=>{ $("dupbox").innerHTML=""; pickCamp(CAMP,CAMP_NAME,true); }, 2200);
-  }catch(e){ $("dOut").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
-}
-
-let FILESQ=[];
-const CTAS=["LEARN_MORE","SHOP_NOW","SIGN_UP","SUBSCRIBE","GET_OFFER","BUY_NOW",
-            "ORDER_NOW","GET_STARTED","DOWNLOAD","APPLY_NOW","CONTACT_US","BOOK_TRAVEL"];
-
-function addField(boxId, label, value){
-  const box=$(boxId);
-  if(box.children.length>=5) return;
-  const row=document.createElement("div");
-  row.className="row"; row.style.marginTop = box.children.length?"6px":"0";
-  const inp=document.createElement("input");
-  inp.type="text"; inp.value=value||"";
-  inp.placeholder=`${label} ${box.children.length+1}`;
-  inp.style.flex="1";
-  row.appendChild(inp);
-  if(box.children.length){          // the first one is never removable
-    const x=document.createElement("button");
-    x.className="ghost"; x.textContent="✕";
-    x.style.padding="8px 12px";
-    x.onclick=()=>{ row.remove(); };
-    row.appendChild(x);
+/* ============================ file handling ============================ */
+function addFiles(list){
+  const ok = /\.(jpe?g|png|webp|gif|mp4|mov|m4v)$/i;
+  let skipped=0;
+  for(const f of list){
+    if(!ok.test(f.name)){ skipped++; continue; }
+    if(isVideo(f.name) ? f.size>4*1024**3 : f.size>30*1024**2){ skipped++; continue; }
+    if(S.files.some(x=>x.name===f.name && x.size===f.size)) continue;
+    S.files.push({id:uid(),name:f.name,size:f.size,file:f,type:isVideo(f.name)?"video":"image",
+                  url:URL.createObjectURL(f)});
   }
-  box.appendChild(row);
-  return inp;
+  if(skipped) toast(`${skipped} file(s) skipped — unsupported type or over the size limit.`);
+  renderFiles(); renderPreview();
 }
-function fieldValues(boxId){
-  return [...$(boxId).querySelectorAll("input")].map(i=>i.value.trim()).filter(Boolean);
-}
-function nameHint(){
-  const pre=($("qPrefix").value||"ad").trim()||"ad";
-  const names=FILESQ.slice(0,3).map((f,i)=>
-    `${pre} ${String(i+1).padStart(2,"0")} ${f.name.replace(/\.[^.]+$/,"")}`);
-  $("qNameHint").textContent = names.length
-    ? "Will be named: " + names.join(", ") + (FILESQ.length>3?" …":"")
-    : "Drop images above and the names appear here.";
-}
-
-function wireQuick(){
-  const dz=$("dzq"), fi=$("fiq"); if(!dz) return;
-  FILESQ=[];
-  dz.onclick=()=>fi.click();
-  fi.onchange=e=>addQ(e.target.files);
-  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{
-    e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
-  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
-    e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
-  dz.addEventListener("drop",e=>takeDrop(e,addQ));
-
-  // The dropdown is built here, not in a nested template literal — that is
-  // what left it rendering empty.
-  const sel=$("qCta");
-  sel.innerHTML="";
-  CTAS.forEach(x=>{ const o=document.createElement("option"); o.value=o.textContent=x;
-                    sel.appendChild(o); });
-
-  $("qBodies").innerHTML=""; $("qHeads").innerHTML="";
-  addField("qBodies","Primary text"); addField("qHeads","Headline");
-  nameHint();
-
-  // Pre-fill from an ad already in this ad set: one field per variant.
-  api("/api/ad-defaults?adset="+encodeURIComponent(CUR_ADSET)).then(d=>{
-    if(!d.from_ad) return;
-    const bodies=(d.body||"").split("|").map(x=>x.trim()).filter(Boolean);
-    const heads =(d.headline||"").split("|").map(x=>x.trim()).filter(Boolean);
-    $("qBodies").innerHTML=""; $("qHeads").innerHTML="";
-    (bodies.length?bodies:[""]).forEach(v=>addField("qBodies","Primary text",v));
-    (heads.length?heads:[""]).forEach(v=>addField("qHeads","Headline",v));
-    $("qLink").value=d.link||"";
-    if(d.cta && CTAS.includes(d.cta)) sel.value=d.cta;
-    $("qFrom").textContent=`Copy pre-filled from "${d.from_ad}". Edit it or leave as is.`;
-  }).catch(()=>{});
-}
-function addQ(list){
-  for(const f of list){ if(/^image\//.test(f.type) && !FILESQ.some(x=>x.name===f.name)) FILESQ.push(f); }
-  $("chipsq").innerHTML=FILESQ.map(f=>`<span class="chip">${esc(f.name)}</span>`).join("");
-  $("goq").disabled = !FILESQ.length;
-  nameHint();
-}
-function fdq(mode){
-  const fd=new FormData();
-  FILESQ.forEach(f=>fd.append("f",f,f.name));
-  fd.append("adset",CUR_ADSET); fd.append("account",ACCT);
-  fd.append("body",fieldValues("qBodies").join(" | "));
-  fd.append("headline",fieldValues("qHeads").join(" | "));
-  fd.append("link",$("qLink").value); fd.append("cta",$("qCta").value);
-  fd.append("prefix",$("qPrefix").value); if(mode) fd.append("mode",mode);
-  return fd;
-}
-async function quickPreview(){
-  $("goq").disabled=true; $("outq").innerHTML='<p class="spin">Checking…</p>';
-  try{
-    const r=await fetch("/api/quick-add",{method:"POST",body:fdq()});
-    const d=await r.json();
-    if(!r.ok||!d.ok){ $("outq").innerHTML=`<div class="err">${esc(d.error||"failed")}</div>`;
-      $("goq").disabled=false; return; }
-    $("outq").innerHTML=`<div class="note"><b>${d.count} ad(s) will be created, PAUSED:</b><br>
-      ${d.ads.map(esc).join("<br>")}
-      <div class="row" style="margin-top:10px">
-        <button onclick="quickCreate()">Create ${d.count} ad(s)</button></div></div>`;
-  }catch(e){ $("outq").innerHTML=`<div class="err">${esc(e.message)}</div>`; $("goq").disabled=false; }
-}
-async function quickCreate(){
-  $("outq").innerHTML='<p class="spin">Uploading and creating…</p>';
-  try{
-    const r=await fetch("/api/quick-add",{method:"POST",body:fdq("create")});
-    const d=await r.json();
-    if(!d.ok){ $("outq").innerHTML=`<div class="err">`+(d.problems||[d.error]).map(esc).join("\n")+`</div>`; return; }
-    FILESQ=[];
-    done("outq", `Created ${d.created.length} ad(s) — PAUSED, not spending`,
-         d.created.map(a=>a.name).concat(
-           d.skipped.length?[`Skipped (already here): ${d.skipped.join(", ")}`]:[]));
-    setTimeout(()=>pickAdset(CUR_ADSET,CUR_ADSET_NAME,true), 2200);
-  }catch(e){ $("outq").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
-}
-
-let FILES3=[];
-function wireDrop3(){
-  const dz=$("dz3"), fi=$("fi3"); if(!dz) return;
-  FILES3=[];
-  dz.onclick=()=>fi.click();
-  fi.onchange=e=>add3(e.target.files);
-  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{
-    e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
-  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
-    e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
-  dz.addEventListener("drop",e=>takeDrop(e,add3));
-}
-function add3(list){
-  for(const f of list){ if(!FILES3.some(x=>x.name===f.name)) FILES3.push(f); }
-  const sheet=FILES3.filter(f=>/\.(xlsx|xlsm|zip)$/i.test(f.name));
-  $("chips3").innerHTML=FILES3.map(f=>`<span class="chip ${/\.(xlsx|xlsm|zip)$/i.test(f.name)?"book":""}">${esc(f.name)}</span>`).join("");
-  $("go3").disabled = sheet.length!==1;
-}
-function fd3(){ const fd=new FormData();
-  FILES3.forEach(f=>fd.append("f",f,f.name)); fd.append("campaign",CAMP); return fd; }
-async function setsPreview(){
-  $("go3").disabled=true; $("out3").innerHTML='<p class="spin">Checking…</p>';
-  try{
-    const r=await fetch("/api/adsets-preview",{method:"POST",body:fd3()});
-    const d=await r.json();
-    if(!r.ok||!d.ok){
-      $("out3").innerHTML=`<div class="err">`+(d.problems||[d.error]).map(esc).join("\n")+`</div>`;
-      $("go3").disabled=false; return; }
-    if(!d.counts.adsets){
-      $("out3").innerHTML=`<div class="note">Nothing new — every ad set in that workbook is
-        already in this campaign.</div>`; $("go3").disabled=false; return; }
-    $("out3").innerHTML=`<div class="note"><b>Will ADD to "${esc(d.campaign)}":</b><br>
-      ${d.adsets.map(a=>`• ${esc(a.name)} — ${(a.countries||[]).join(", ")} — ${a.ads.length} ad(s)`).join("<br>")}
-      ${d.skipped.length?`<br><br>Skipped (already there): ${d.skipped.map(esc).join(", ")}`:""}
-      <br><br>Everything already in this campaign stays untouched.
-      New objects are created <b>PAUSED</b>.
-      <div class="row" style="margin-top:10px">
-        <button onclick="setsCreate()">Add ${d.counts.adsets} ad set(s), ${d.counts.ads} ad(s)</button>
-      </div></div>`;
-  }catch(e){ $("out3").innerHTML=`<div class="err">${esc(e.message)}</div>`; $("go3").disabled=false; }
-}
-async function setsCreate(){
-  $("out3").innerHTML='<p class="spin">Creating the new ad sets…</p>';
-  try{
-    const r=await fetch("/api/adsets-create",{method:"POST",body:fd3()});
-    const d=await r.json();
-    if(!d.ok){ $("out3").innerHTML=`<div class="err">`+(d.problems||[d.error]).map(esc).join("\n")+`</div>`; return; }
-    FILES3=[];
-    done("out3", `Added ${d.result.adsets.length} ad set(s) and ${d.result.ads.length} ad(s) `+
-                 `— PAUSED, not spending`,
-         d.result.adsets.map(a=>a.name));
-    setTimeout(()=>pickCamp(CAMP,CAMP_NAME,true), 2200);
-  }catch(e){ $("out3").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
-}
-
-let FILES2=[];
-function wireDrop2(){
-  const dz=$("dz2"), fi=$("fi2"); if(!dz) return;
-  dz.onclick=()=>fi.click();
-  fi.onchange=e=>add2(e.target.files);
-  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{
-    e.preventDefault();e.stopPropagation();dz.classList.add("over");}));
-  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{
-    e.preventDefault();e.stopPropagation();dz.classList.remove("over");}));
-  dz.addEventListener("drop",e=>takeDrop(e,add2));
-}
-function add2(list){
-  for(const f of list){ if(!FILES2.some(x=>x.name===f.name)) FILES2.push(f); }
-  const sheet=FILES2.filter(f=>/\.(xlsx|xlsm|csv)$/i.test(f.name));
-  $("chips2").innerHTML=FILES2.map(f=>{
-    const isSheet=/\.(xlsx|xlsm|csv)$/i.test(f.name);
-    return `<span class="chip ${isSheet?"book":""}">${esc(f.name)} · ${(f.size/1024).toFixed(0)}kB</span>`;
+function renderFiles(){
+  const box=$("#fileBox"), list=$("#fileList"); if(!box) return;
+  box.hidden = !S.files.length;
+  const roles = new Map(S.files.map(f=>[f.id,partsOf(f.name).role]));
+  list.innerHTML = S.files.map(f=>{
+    const r = roles.get(f.id);
+    return `<div class="frow" data-id="${f.id}">
+      <span class="fic ${f.type==="video"?"vid":"img"}"><svg style="width:19px;height:19px"><use href="#i-${f.type==="video"?"vid":"img"}"/></svg></span>
+      <span style="flex:1;min-width:0">
+        <span class="fn">${esc(f.name)}</span>
+        ${r!=="main"?`<span class="pill" style="margin-left:8px">${esc(r)}</span>`:""}
+        <div class="fm">${f.type==="video"?"Video":"Image"} &bull; ${esc(f.name.split(".").pop().toUpperCase())} &bull; ${mb(f.size)}</div>
+      </span>
+      <button class="x" data-rm="${f.id}"><svg style="width:17px;height:17px"><use href="#i-x"/></svg></button>
+    </div>`;
   }).join("");
-  $("go2").disabled = sheet.length!==1;
-  $("out2").innerHTML = sheet.length!==1
-    ? `<div class="note">Add exactly one .csv or .xlsx listing the ads.</div>` : "";
-}
-function fd2(){ const fd=new FormData();
-  FILES2.forEach(f=>fd.append("f",f,f.name));
-  fd.append("adset",CUR_ADSET); fd.append("account",ACCT); return fd; }
-async function addPreview(){
-  $("go2").disabled=true; $("out2").innerHTML='<p class="spin">Checking…</p>';
-  try{
-    const r=await fetch("/api/add-preview",{method:"POST",body:fd2()});
-    const d=await r.json();
-    if(!r.ok||!d.ok){
-      $("out2").innerHTML=`<div class="err">`+
-        (d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`;
-      $("go2").disabled=false; return; }
-    $("out2").innerHTML=`<div class="note"><b>${d.count} ad(s) ready:</b><br>
-      ${d.ads.map(esc).join(" · ")}<br><br>They will be created <b>PAUSED</b> in this ad set.
-      <div class="row" style="margin-top:10px">
-        <button onclick="addCreate()">Create these ${d.count} ad(s), paused</button>
-      </div></div>`;
-  }catch(e){ $("out2").innerHTML=`<div class="err">${esc(e.message)}</div>`; $("go2").disabled=false; }
-}
-async function addCreate(){
-  $("out2").innerHTML='<p class="spin">Uploading images and creating ads…</p>';
-  try{
-    const r=await fetch("/api/add-create",{method:"POST",body:fd2()});
-    const d=await r.json();
-    if(!d.ok){ $("out2").innerHTML=`<div class="err">`+
-      (d.problems||[d.error||"failed"]).map(esc).join("\n")+`</div>`; return; }
-    FILES2=[];
-    done("out2", `Created ${d.created.length} ad(s) — PAUSED, not spending`,
-         d.created.map(a=>a.name).concat(
-           d.skipped.length?[`Skipped: ${d.skipped.join(", ")}`]:[]));
-    setTimeout(()=>pickAdset(CUR_ADSET,CUR_ADSET_NAME,true), 2200);
-  }catch(e){ $("out2").innerHTML=`<div class="err">${esc(e.message)}</div>`; }
-}
-
-function tickAll(box){
-  document.querySelectorAll("#tAd tbody tr").forEach(tr=>{
-    if(tr.style.display!=="none") tr.querySelector(".pk").checked=box.checked; });
-  refreshBulk();
-}
-function picked(){ return [...document.querySelectorAll(".pk:checked")].map(x=>x.value); }
-function refreshBulk(){
-  const n=picked().length;
-  $("bulk").innerHTML = n? `<div class="bulk">
-      <b>${n} ad(s) selected</b><span class="sp"></span>
-      <button onclick="bulk('PAUSED')">Turn off</button>
-      <button class="ghost" onclick="bulk('ACTIVE')">Turn on…</button>
-    </div>` : "";
-}
-async function bulk(status){
-  const ids=picked(); if(!ids.length) return;
-  if(status==="ACTIVE" && !confirm(
-      `Turn ON ${ids.length} ad(s)?\n\nThey will start delivering and SPENDING MONEY `+
-      `immediately, using their ad set's budget.\n\nThis is the only action here that costs anything.`))
-    return;
-  $("bulk").innerHTML='<div class="bulk">Applying…</div>';
-  try{
-    const d=await api("/api/status",{method:"POST",body:JSON.stringify(
-      {ids,status,confirm_spend:status==="ACTIVE"})});
-    if(d.failed.length) err(`${d.failed.length} failed: `+d.failed.map(f=>f.error).join("; "));
-    pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
-  }catch(e){ err(e.message); refreshBulk(); }
-}
-async function toggleOne(id,box){
-  const want = box.checked ? "ACTIVE" : "PAUSED";
-  if(want==="ACTIVE" && !confirm(
-      "Turn this ad ON?\n\nIt will start delivering and SPENDING MONEY immediately.")){
-    box.checked=false; return; }
-  try{
-    await api("/api/status",{method:"POST",body:JSON.stringify(
-      {ids:[id],status:want,confirm_spend:want==="ACTIVE"})});
-  }catch(e){ err(e.message); box.checked=!box.checked; }
-}
-async function renameAd(id,current){
-  const name=prompt("New name for this ad:",current); if(!name||name===current) return;
-  try{ await api("/api/rename",{method:"POST",body:JSON.stringify({id,name})});
-       pickAdset(CUR_ADSET,CUR_ADSET_NAME,true);
-  }catch(e){ err(e.message); }
-}
-
-/* ---------- 3: audit ---------- */
-async function q3(replay){
-  if(!replay) return nav("audit");
-  show("pane"); $("pane").innerHTML=crumb()+"<h2>Audit</h2><p class='spin'>Scanning every ad in the account…</p>";
-  try{
-    const d=await api("/api/audit",{method:"POST",body:JSON.stringify({account:ACCT})});
-    const bad=d.ads.filter(a=>a.on.length);
-    $("pane").innerHTML = crumb()+`<h2>Enhancement audit</h2>
-      <p class="sub">${d.flagged} of ${d.total} ad(s) have at least one creative enhancement switched on.</p>`+
-      (bad.length?`<table><tr><th>Ad</th><th>Campaign</th><th>Status</th><th>Enhancements ON</th></tr>`+
-        bad.map(a=>`<tr><td>${esc(a.name)}<div class="mono">${a.id}</div></td>
-          <td>${esc(a.campaign)}<div class="mono">${esc(a.adset)}</div></td>
-          <td><span class="tag ${/ACTIVE/.test(a.status)?"ok":"warn"}">${esc(a.status)}</span></td>
-          <td><span class="tag bad">${a.on.length}</span> <span class="mono">${esc(a.on.join(", "))}</span></td>
-        </tr>`).join("")+`</table>`
-       :`<p class="sub">Nothing flagged. Every ad has enhancements off.</p>`)+
-      `<div class="note">This report changes nothing. Switching enhancements off on a <b>live</b>
-        ad means a new creative, which restarts review, resets the learning phase and loses
-        likes and comments — a per-ad decision, not a bulk fix.<br><br>
-        <b>Not included:</b> multi-advertiser ads. Meta does not return that setting through the
-        API, so it cannot be audited. Check it in Ads Manager.</div>`;
-  }catch(e){ err(e.message); }
-}
-
-
-/* ---------- search / sort helpers ----------
-   Marketing teams run hundreds of accounts and thousands of ads, so every
-   list is filterable and every numeric column is sortable. Filtering is
-   client-side over the already-fetched rows: instant, no extra API calls. */
-function filterRows(inputId, tableId){
-  const q=($(inputId).value||"").toLowerCase().trim();
-  document.querySelectorAll("#"+tableId+" tbody tr").forEach(tr=>{
-    tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? "" : "none";
+  $$("[data-rm]",list).forEach(b=>b.onclick=()=>{
+    const f=S.files.find(x=>x.id===b.dataset.rm); if(f) URL.revokeObjectURL(f.url);
+    S.files=S.files.filter(x=>x.id!==b.dataset.rm);
+    S.customSets.forEach(s=>s.items=s.items.filter(i=>i!==b.dataset.rm));
+    renderFiles(); renderPreview();
   });
-  const shown=[...document.querySelectorAll("#"+tableId+" tbody tr")]
-    .filter(tr=>tr.style.display!=="none").length;
-  const c=$(tableId+"-count"); if(c) c.textContent=shown;
+  const n=S.files.length, g=groupCreatives(S.files).length;
+  $("#btnUpload").textContent = `Upload ${n} file${n===1?"":"s"}` + (g!==n?`  (${g} ad${g===1?"":"s"})`:"");
+  $("#btnUpload").disabled = !n || S.busy;
 }
-function searchBox(inputId, tableId, placeholder, countLabel){
-  return `<div class="bar">
-    <input class="search" id="${inputId}" placeholder="${placeholder}"
-           oninput="filterRows('${inputId}','${tableId}')" autocomplete="off">
-    <span class="sub" style="margin:0"><b id="${tableId}-count">0</b> ${countLabel}</span>
-    <span class="sp"></span></div>`;
+</script>
+<script>
+/* ========================= float progress panel ======================== */
+const FL = {
+  open(title,note,cancelLabel){
+    const f=$("#float"); f.hidden=false; f.classList.remove("mini");
+    $("#flTitle").textContent=title; $("#flNote").textContent=note||"";
+    $("#flTerm").innerHTML=""; $("#flStats").innerHTML=""; $("#flBar").style.width="0%";
+    $("#flFoot").hidden = !cancelLabel; $("#flCancel").textContent = cancelLabel||"Cancel";
+    FL.cancelled=false;
+  },
+  close(){ $("#float").hidden=true; },
+  progress(done,total,label){ $("#flBar").style.width = total?(done/total*100)+"%":"0%";
+    $("#flCount").textContent = label || `${done} of ${total} completed`; },
+  stats(pairs){ $("#flStats").innerHTML = pairs.map(([k,v,s])=>
+    `<div><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>${s?`<div class="s">${esc(s)}</div>`:""}</div>`).join(""); },
+  log(text,kind){
+    const t=$("#flTerm"), ts=new Date().toTimeString().slice(0,8);
+    /* Drop the whole previous prompt line, not just its caret — otherwise a
+       dead "$" is left behind after every single entry. */
+    $$(".cur",t).forEach(c=>c.closest(".ln")?.remove());
+    const d=document.createElement("div"); d.className="ln";
+    d.innerHTML = `<span class="ts">${ts}</span> <span class="${kind||""}">${kind==="ok"?"&#10003;":"&rarr;"} ${esc(text)}</span>`;
+    t.appendChild(d);
+    const c=document.createElement("div"); c.className="ln";
+    c.innerHTML=`<span class="ts">     $</span> <span class="cur"></span>`; t.appendChild(c);
+    t.scrollTop = t.scrollHeight;
+  },
+};
+$("#flMin").onclick = ()=>$("#float").classList.toggle("mini");
+$("#flCancel").onclick = ()=>{ FL.cancelled=true; FL.log("Cancelled by user.","er"); };
+
+/* ============================== uploading ============================== */
+async function doUpload(){
+  if(!S.files.length || S.busy) return;
+  S.busy=true; renderFiles();
+  const total=S.files.length, totalBytes=S.files.reduce((a,f)=>a+f.size,0);
+  const t0=Date.now(); let done=0, sent=0;
+  FL.open("Uploading Media Files","You can minimize this and continue working","Cancel Upload");
+  $("#btnUpload").innerHTML = `Uploading... (0/${total} files)`;
+  FL.log("$ Starting media upload...");
+  FL.log(`Processing ${total} upload tasks...`);
+
+  const turbo = $("#turbo").checked;
+  const stat = ()=>{
+    const secs=(Date.now()-t0)/1000, sp=sent/Math.max(secs,.001);
+    const left=sp>0?Math.round((totalBytes-sent)/sp):0;
+    FL.stats([
+      ["Data Transferred", `${mb(sent)} / ${mb(totalBytes)}`, `${Math.round(sent/totalBytes*100)||0}% complete`],
+      ["Speed", `${(sp/1048576).toFixed(1)} MB/s`, left>90?`~${Math.ceil(left/60)} min remaining`:`~${left||0}s remaining`],
+    ]);
+  };
+
+  const one = async f=>{
+    if(FL.cancelled) return null;
+    FL.log(`Uploading ${f.name}...`);
+    let res=null;
+    if(S.demo){
+      const steps=6; for(let i=0;i<steps;i++){ if(FL.cancelled) return null;
+        await sleep(90+Math.random()*140); sent+=f.size/steps; stat(); }
+      res = {id:f.id,name:f.name,type:f.type,url:f.url,hash:"demo_"+f.id};
+    }else{
+      const fd=new FormData(); fd.append("account",S.acct.id); fd.append("file",f.file,f.name);
+      try{
+        const r = await api("/api/media-upload",{method:"POST",body:fd});
+        res = {id:f.id,name:f.name,type:f.type,url:f.url,hash:r.hash,videoId:r.video_id};
+        sent+=f.size; stat();
+      }catch(e){ FL.log(`${f.name}: ${e.message}`,"er"); sent+=f.size; stat(); return null; }
+    }
+    done++; FL.progress(done,total,`${done} of ${total} files completed`);
+    $("#btnUpload").innerHTML = `Uploading... (${done}/${total} files)`;
+    FL.log(`Completed: ${f.name} (${done}/${total})`,"ok");
+    return res;
+  };
+
+  stat();
+  let out=[];
+  if(turbo){
+    const CONC=4, queue=[...S.files];
+    await Promise.all(Array.from({length:Math.min(CONC,queue.length)},async()=>{
+      while(queue.length && !FL.cancelled) out.push(await one(queue.shift()));
+    }));
+  }else{ for(const f of S.files){ if(FL.cancelled) break; out.push(await one(f)); } }
+
+  S.uploaded = out.filter(Boolean);
+  S.busy=false; renderFiles(); renderPreview();
+  if(FL.cancelled){ FL.log("Upload stopped. Nothing further was sent.","er"); $("#btnUpload").textContent=`Upload ${S.files.length} files`; }
+  else{
+    FL.log(`All ${S.uploaded.length} file(s) uploaded.`,"ok");
+    $("#flFoot").hidden=true; $("#btnUpload").textContent=`Re-upload ${S.files.length} files`;
+    setTimeout(FL.close,2200);
+    toast(`${S.uploaded.length} file(s) ready.`);
+  }
 }
-let SORT={};
-function sortBy(tableId, idx, numeric){
-  const tb=document.querySelector("#"+tableId+" tbody");
-  const dir = SORT[tableId+idx] = -(SORT[tableId+idx]||1);
-  [...tb.rows].sort((a,b)=>{
-    const x=a.cells[idx]?.dataset.v ?? a.cells[idx]?.textContent ?? "";
-    const y=b.cells[idx]?.dataset.v ?? b.cells[idx]?.textContent ?? "";
-    return numeric ? dir*((parseFloat(x)||0)-(parseFloat(y)||0))
-                   : dir*String(x).localeCompare(String(y));
-  }).forEach(r=>tb.appendChild(r));
+
+/* ============================= API picker ============================== */
+function resetApiPicker(){
+  S.api = {campaigns:S.api.campaigns,adsets:[],ads:[],c:null,a:null,d:null,loading:false};
+  $("#qAdset").disabled=$("#qAd").disabled=true;
+  $("#onlyActiveA").disabled=$("#onlyActiveD").disabled=true;
+  $$("#apiCols .check").forEach((c,i)=>{ if(i) c.classList.add("dis"); });
+  $("#cfgSource").hidden=true; drawApiLists();
 }
-function crumb(extra){
-  let h=`<div class="crumb"><a onclick="nav('accounts')">← accounts</a> · `+
-        `<a onclick="nav('menu')">${esc(ACCT_NAME)}</a>`;
-  if(extra) h+=` · <a onclick="nav('campaigns')">campaigns</a>`;
-  if(extra && extra.camp) h+=` · <a onclick="nav('adsets',{camp:CAMP,campName:CAMP_NAME})">${esc(CAMP_NAME)}</a>`;
-  return h+`</div>`;
+async function loadCampaigns(force){
+  if(S.api.loading) return;
+  S.api.loading=true; drawApiLists();
+  try{
+    if(S.demo){ await sleep(force?420:200); S.api.campaigns = DEMO.campaigns; }
+    else{
+      const r = await api(`/api/campaigns?account=${encodeURIComponent(S.acct.id)}`);
+      S.api.campaigns = r.campaigns||r.data||[];
+    }
+  }catch(e){ toast("Could not load campaigns: "+e.message); S.api.campaigns=[]; }
+  S.api.loading=false; drawApiLists();
 }
-window.BUILD="0822-1620";
-boot().catch(e=>err(e.message));
-</script></body></html>
+async function loadAdsets(cid){
+  S.api.adsets=[]; S.api.ads=[]; S.api.a=S.api.d=null; drawApiLists();
+  try{
+    if(S.demo){ await sleep(220); S.api.adsets = DEMO.adsetsFor(cid); }
+    else{ const r=await api(`/api/adsets?campaign=${encodeURIComponent(cid)}`); S.api.adsets=r.adsets||r.data||[]; }
+  }catch(e){ toast("Could not load ad sets: "+e.message); }
+  $("#qAdset").disabled=false; $("#onlyActiveA").disabled=false;
+  $$("#apiCols .check")[1]?.classList.remove("dis");
+  drawApiLists();
+}
+async function loadAds(aid){
+  S.api.ads=[]; S.api.d=null; drawApiLists();
+  try{
+    if(S.demo){ await sleep(220); S.api.ads = DEMO.adsFor(aid); }
+    else{ const r=await api(`/api/ads?adset=${encodeURIComponent(aid)}`); S.api.ads=r.ads||r.data||[]; }
+  }catch(e){ toast("Could not load ads: "+e.message); }
+  $("#qAd").disabled=false; $("#onlyActiveD").disabled=false;
+  $$("#apiCols .check")[2]?.classList.remove("dis");
+  drawApiLists();
+}
+function filt(list,q,onlyActive){
+  const s=(q||"").trim().toLowerCase();
+  return list.filter(x=>(!s||String(x.name||"").toLowerCase().includes(s)) &&
+                        (!onlyActive || String(x.status||"").toUpperCase()==="ACTIVE"));
+}
+function drawList(el,items,selId,onPick,emptyMsg){
+  if(S.api.loading && el.id==="listCampaigns"){ el.innerHTML=`<div class="empty">Loading…</div>`; return; }
+  if(!items.length){ el.innerHTML=`<div class="empty">${esc(emptyMsg)}</div>`; return; }
+  const fs = $("#fontSeg .on")?.dataset.fs || "14.5";
+  el.innerHTML = items.map(i=>`<div class="it${i.id===selId?" on":""}" data-id="${esc(i.id)}" style="font-size:${fs}px">
+    <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.name)}</span>
+    ${i.id===selId?`<svg class="tick" style="width:16px;height:16px"><use href="#i-tick"/></svg>`:""}</div>`).join("");
+  $$(".it",el).forEach(d=>d.onclick=()=>onPick(items.find(x=>x.id===d.dataset.id)));
+}
+function drawApiLists(){
+  if(!$("#listCampaigns")) return;
+  drawList($("#listCampaigns"), filt(S.api.campaigns,$("#qCampaign").value,$("#onlyActiveC").checked),
+    S.api.c?.id, c=>{ S.api.c=c; loadAdsets(c.id); drawApiLists(); renderPreview(); }, "No campaigns found");
+  drawList($("#listAdsets"), filt(S.api.adsets,$("#qAdset").value,$("#onlyActiveA").checked),
+    S.api.a?.id, a=>{ S.api.a=a; loadAds(a.id); drawApiLists(); renderPreview(); },
+    S.api.c?"No ad sets found":"Select a campaign first");
+  drawList($("#listAds"), filt(S.api.ads,$("#qAd").value,$("#onlyActiveD").checked),
+    S.api.d?.id, d=>{ S.api.d=d; drawApiLists(); pickedTemplate(); renderPreview(); },
+    S.api.a?"No ads found":"Select an ad set first");
+  const on = S.api.c && S.api.a && S.api.d;
+  $("#cfgSource").hidden = !on;
+  if(on) $("#cfgCrumb").innerHTML =
+    `<div>${esc(S.api.c.name)}</div><div class="l2">&rsaquo; ${esc(S.api.a.name)}</div><div class="l3">&rsaquo; ${esc(S.api.d.name)}</div>`;
+}
+async function pickedTemplate(){
+  /* Pull the chosen ad's copy so the text fields start from something real. */
+  let d = null;
+  if(S.demo){ d = demoDefaults; }
+  else{
+    try{ const r = await api(`/api/ad-defaults?ad=${encodeURIComponent(S.api.d.id)}`); d = r.defaults||r; }
+    catch(e){ toast("Loaded the ad, but could not read its copy: "+e.message); return; }
+  }
+  if(!d) return;
+  if(d.page_id) S.text.page_id=d.page_id;
+  if(d.headline) S.text.headlines=[d.headline];
+  if(d.body)     S.text.bodies=[d.body];
+  S.text.desc = d.desc||d.description||S.text.desc;
+  S.text.cta  = d.cta||S.text.cta;
+  S.text.link = d.link||S.text.link;
+  S.text.display = d.display||d.display_link||S.text.display;
+  renderTextFields();
+  toast("Copied settings and copy from “"+S.api.d.name+"”.");
+}
+</script>
+<script>
+/* ============================== the plan =============================== */
+/* Every ad that would be created, with the ad set it lands in. This is the
+   single source of truth for the preview table, the per-ad text modal and
+   the create call — so what you review is exactly what gets built. */
+function buildPlan(){
+  const src = S.uploaded.length ? S.uploaded : S.files;
+  const groups = groupCreatives(src);
+  if(!groups.length) return {ads:[],sets:[],warnings:[]};
+
+  const warnings=[];
+  const camp = S.struct.newCampaign
+    ? {id:"(new)", name:$("#ncName")?.value.trim()||"(unnamed campaign)"}
+    : (S.api.c || {id:"—", name:"—"});
+  if(!S.struct.newCampaign && !S.api.c) warnings.push("No campaign chosen yet.");
+
+  /* --- decide the ad sets --- */
+  let sets=[];
+  if(S.struct.custom && S.customSets.length){
+    sets = S.customSets.map((s,i)=>({id:"(new)",name:s.name||`Ad Set ${i+1}`,
+      items:groups.filter(g=>s.items.includes(g.main.id))}));
+    const assigned=new Set(S.customSets.flatMap(s=>s.items));
+    const left=groups.filter(g=>!assigned.has(g.main.id));
+    if(left.length) warnings.push(`${left.length} ad(s) are not assigned to any ad set.`);
+  }else if(S.struct.autoDivide){
+    const n=Math.max(1,Math.min(50,S.struct.perSet));
+    for(let i=0;i<groups.length;i+=n)
+      sets.push({id:"(new)",name:`${camp.name} | Set ${Math.floor(i/n)+1}`,items:groups.slice(i,i+n)});
+  }else if(S.struct.perGroup){
+    const by=new Map();
+    for(const g of groups){ const k=groupPrefix(g.base); if(!by.has(k)) by.set(k,[]); by.get(k).push(g); }
+    sets=[...by.entries()].map(([k,items])=>({id:"(new)",name:`${camp.name} | ${k.toUpperCase()}`,items}));
+  }else if(S.struct.newAdset){
+    sets=[{id:"(new)",name:$("#naName")?.value.trim()||"(unnamed ad set)",items:groups}];
+  }else{
+    if(!S.api.a) warnings.push("No ad set chosen yet — pick one, or tick an ad-set option.");
+    sets=[{id:S.api.a?.id||"—",name:S.api.a?.name||"—",items:groups}];
+  }
+  sets.forEach(s=>{ if(s.items.length>50) warnings.push(`"${s.name}" has ${s.items.length} ads — Meta's limit is 50.`); });
+  /* Identity and destination are never inferred — refuse rather than guess. */
+  if(!S.text.link.trim()) warnings.push("No destination URL — set Website URL under Ad Text Options.");
+  if(!S.demo && !S.text.page_id) warnings.push("No Facebook Page — pick a template ad via the API, which is where the Page comes from.");
+  if(!(S.text.bodies||[]).some(b=>b&&b.trim())) warnings.push("No primary text — every ad needs at least one.");
+
+  /* --- name the ads --- */
+  const today=new Date().toISOString().slice(0,10);
+  const ads=[];
+  sets.forEach(set=>set.items.forEach((g,i)=>{
+    /* The main file carries no role — only the suffixed extras do. */
+    const ratio = g.extras.length
+      ? [g.main,...g.extras].map(e=>e.role&&e.role!=="main"?e.role:"square").join("+") : "single";
+    const name = S.struct.namePattern
+      ? (S.struct.pattern||"{filename}")
+          .replace(/\{filename\}/g,g.base).replace(/\{index\}/g,String(ads.length+1))
+          .replace(/\{adset\}/g,set.name).replace(/\{campaign\}/g,camp.name)
+          .replace(/\{date\}/g,today).replace(/\{ratio\}/g,ratio)
+      : g.base;
+    ads.push({key:g.main.id, campaign:camp, set, name:name.slice(0,120), group:g});
+  }));
+  return {ads,sets,warnings,camp};
+}
+
+function renderPreview(){
+  const body=$("#previewBody"); if(!body) return;
+  const {ads,sets,warnings} = buildPlan();
+  $("#previewCount").textContent = ads.length
+    ? `${ads.length} ad${ads.length===1?"":"s"} in ${sets.length} ad set${sets.length===1?"":"s"} will be created`
+    : "Nothing to preview yet — add creatives above.";
+  body.innerHTML = ads.length ? ads.map(a=>`<tr>
+      <td class="mono">${esc(a.campaign.id)}</td><td>${esc(a.campaign.name)}</td>
+      <td class="mono">${esc(a.set.id)}</td><td>${esc(a.set.name)}</td><td>${esc(a.name)}</td></tr>`).join("")
+    : `<tr><td colspan="5" style="text-align:center;color:var(--faint);padding:34px">
+         Drop creatives above and choose where they go.</td></tr>`;
+  const w=$("#previewWarn"); if(w) w.remove();
+  if(warnings.length){
+    const d=document.createElement("div"); d.id="previewWarn"; d.className="banner warn"; d.style.margin="14px 0 0";
+    d.innerHTML=`<div><b>${warnings.length} thing(s) to sort out first</b>${warnings.map(x=>`<div>&bull; ${esc(x)}</div>`).join("")}</div>`;
+    $("#previewCount").closest(".card").appendChild(d);
+  }
+  const btn=$("#btnCreate");
+  if(btn){ btn.disabled = !ads.length || !!warnings.length || S.busy;
+    btn.textContent = ads.length ? `Create ${ads.length} Ad${ads.length===1?"":"s"}` : "Create Ads"; }
+}
+
+/* ============================ enhancements ============================= */
+function renderEnh(){
+  const wrap=$("#enhGrid"); if(!wrap) return;
+  const defaults = $("#enhDefaults").checked;
+  wrap.innerHTML = Object.entries(ENH).map(([grp,rows])=>{
+    const soon = grp==="Carousel";
+    return `<div><h4>${grp}${soon?` <span class="badge soon">Coming Soon!</span>`:""}</h4>
+      ${rows.map(([k,label,tip])=>{
+        const dis = soon||defaults;
+        return `<label class="check${dis?" dis":""}">
+          <input type="checkbox" data-g="${grp}" data-k="${k}" ${S.enh[grp][k]?"checked":""} ${dis?"disabled":""}>
+          ${esc(label)} ${tip?`<svg class="i" title="${esc(tip)}"><use href="#i-info"/></svg>`:""}</label>`;
+      }).join("")}</div>`;
+  }).join("");
+  $$("#enhGrid input").forEach(i=>i.onchange=()=>{
+    S.enh[i.dataset.g][i.dataset.k] = i.checked?1:0;
+    $("#enhAll").checked = Object.entries(ENH).every(([g,rows])=>rows.every(([k])=>S.enh[g][k]));
+    updateEnhNote();
+  });
+  updateEnhNote();
+}
+function updateEnhNote(){
+  const n=$("#enhNote"); if(!n) return;
+  if($("#enhDefaults").checked){
+    n.hidden=false;
+    n.innerHTML=`<div><b>Meta decides.</b> With defaults on, this tool sends no opt-out at all —
+      Meta enables most enhancements itself, including ones that rewrite your copy. Untick to control them.</div>`;
+    return;
+  }
+  const off = Object.entries(ENH).filter(([g])=>g!=="Carousel")
+    .flatMap(([g,rows])=>rows.filter(([k])=>!S.enh[g][k]).map(([k])=>k));
+  const uniq=[...new Set(off)];
+  n.hidden=false;
+  n.innerHTML = `<div><b>${uniq.length} enhancement(s) will be explicitly opted out.</b>
+    Meta does not report <code>contextual_multi_ads</code> back on read, so that one cannot be verified after creation —
+    it is the single setting this tool cannot prove either way.</div>`;
+}
+
+/* ============================== text fields ============================ */
+function textRow(kind,i,val){
+  const many = S.text[kind].length>1;
+  return `<div class="row" style="align-items:flex-start;margin-bottom:9px">
+    <textarea class="inp" data-kind="${kind}" data-i="${i}" rows="${kind==="bodies"?4:2}"
+      placeholder="${kind==="bodies"?"Primary text…":"Headline…"}">${esc(val)}</textarea>
+    ${many?`<button class="btn redline sm" data-del="${kind}:${i}" title="Remove"
+      style="padding:9px 11px"><svg style="width:15px;height:15px"><use href="#i-x"/></svg></button>`:""}
+  </div>`;
+}
+function renderTextFields(){
+  const h=$("#headlines"), b=$("#bodies"); if(!h) return;
+  h.innerHTML = S.text.headlines.map((v,i)=>textRow("headlines",i,v)).join("");
+  b.innerHTML = S.text.bodies.map((v,i)=>textRow("bodies",i,v)).join("");
+  $$("[data-kind]").forEach(t=>t.oninput=e=>{ S.text[e.target.dataset.kind][+e.target.dataset.i]=e.target.value; });
+  $$("[data-del]").forEach(x=>x.onclick=()=>{
+    const [k,i]=x.dataset.del.split(":"); S.text[k].splice(+i,1); renderTextFields(); });
+  ["fDesc","fCta","fLink","fDisplay","fUtm"].forEach(id=>{
+    const k={fDesc:"desc",fCta:"cta",fLink:"link",fDisplay:"display",fUtm:"utm"}[id];
+    if($("#"+id)) $("#"+id).value = S.text[k];
+  });
+}
+function renderPerAdsetText(){
+  const wrap=$("#perAdsetText"); const {sets}=buildPlan();
+  if(!sets.length){ wrap.innerHTML=`<p class="hint">Add creatives first — then each ad set gets its own copy here.</p>`; return; }
+  wrap.innerHTML = sets.map((s,i)=>{
+    const v=S.text.perAdset[s.name]||{};
+    return `<div class="card card-p" style="box-shadow:none;margin-bottom:13px">
+      <h4 style="font-size:15.5px;margin-bottom:10px">${esc(s.name)} <span class="tiny muted">(${s.items.length} ad(s))</span></h4>
+      <label class="f">Headline</label><textarea class="inp" rows="2" data-as="${esc(s.name)}" data-f="headline">${esc(v.headline||"")}</textarea>
+      <label class="f" style="margin-top:11px">Primary text</label><textarea class="inp" rows="3" data-as="${esc(s.name)}" data-f="body">${esc(v.body||"")}</textarea>
+      <p class="hint">Blank falls back to the common text above.</p></div>`;
+  }).join("");
+  $$("[data-as]",wrap).forEach(t=>t.oninput=e=>{
+    const n=e.target.dataset.as, f=e.target.dataset.f;
+    (S.text.perAdset[n] = S.text.perAdset[n]||{})[f]=e.target.value;
+  });
+}
+</script>
+<script>
+/* ====================== build custom ad sets modal ===================== */
+const B = {q:"",type:"all",usage:"unused",cols:4,sel:0};
+function openBuilder(){
+  if(!S.files.length && !S.uploaded.length){
+    toast("Add creatives first — there is nothing to group yet.");
+    $("#optCustomSets").checked=false; S.struct.custom=false; return;
+  }
+  if(!S.customSets.length) S.customSets=[{name:"Ad Set 1",items:[]}];
+  B.sel=0; $("#mBuilder").hidden=false; drawBuilder();
+}
+function builderPool(){
+  const src = S.uploaded.length ? S.uploaded : S.files;
+  return groupCreatives(src).map(g=>({id:g.main.id,name:g.main.name,type:g.main.type,
+    url:g.main.url,extras:g.extras.length}));
+}
+function drawBuilder(){
+  const pool = builderPool();
+  const used = new Set(S.customSets.flatMap(s=>s.items));
+  const q=B.q.trim().toLowerCase();
+  const shown = pool.filter(m =>
+    (!q||m.name.toLowerCase().includes(q)) &&
+    (B.type==="all"||m.type===B.type) &&
+    (B.usage==="all" || (B.usage==="used" ? used.has(m.id) : !used.has(m.id))));
+
+  const grid=$("#bGridWrap");
+  grid.style.gridTemplateColumns=`repeat(${B.cols},1fr)`;
+  grid.innerHTML = shown.length ? shown.map(m=>`
+    <div class="mcell">
+      <div class="thumb${used.has(m.id)?" used":""}" data-add="${m.id}">
+        ${m.type==="image"&&m.url?`<img src="${m.url}" alt="">`:`<svg style="width:34px;height:34px;color:var(--faint)"><use href="#i-${m.type==="video"?"vid":"img"}"/></svg>`}
+        <button class="zoom" data-zoom="${m.id}"><svg style="width:14px;height:14px"><use href="#i-zoom"/></svg></button>
+      </div>
+      <div class="nm">${esc(m.name)}</div>
+      <span class="badge tag">${m.type}${m.extras?` +${m.extras}`:""}</span>
+    </div>`).join("")
+    : `<div class="empty" style="grid-column:1/-1;padding:44px;text-align:center;color:var(--faint)">Nothing matches these filters.</div>`;
+
+  $$("[data-add]",grid).forEach(t=>t.onclick=e=>{
+    if(e.target.closest("[data-zoom]")) return;
+    const set=S.customSets[B.sel]; if(!set) return;
+    if(set.items.includes(t.dataset.add)) return toast("Already in this ad set.");
+    if(set.items.length>=50) return toast("50 ads is Meta's limit for one ad set.");
+    set.items.push(t.dataset.add); drawBuilder();
+  });
+  $$("[data-zoom]",grid).forEach(z=>z.onclick=e=>{ e.stopPropagation();
+    const m=pool.find(x=>x.id===z.dataset.zoom); if(m) zoom(m); });
+
+  $("#bSets").innerHTML = S.customSets.map((s,i)=>`
+    <div class="aset${i===B.sel?" on":""}" data-sel="${i}">
+      <div class="top">
+        <input class="inp" data-nm="${i}" value="${esc(s.name)}">
+        <span class="badge count">${s.items.length}/50</span>
+        <button class="btn ghost sm" data-clear="${i}">Clear All</button>
+        <button class="btn redline sm" data-rmset="${i}">Remove</button>
+      </div>
+      ${s.items.length?`<div class="strip">${s.items.map(id=>{
+        const m=pool.find(x=>x.id===id)||{name:id,type:"image"};
+        return `<div class="t" title="${esc(m.name)}">
+          ${m.url&&m.type==="image"?`<img src="${m.url}" alt="">`:`<div style="display:grid;place-items:center;height:100%"><svg style="width:19px;height:19px;color:var(--faint)"><use href="#i-${m.type==="video"?"vid":"img"}"/></svg></div>`}
+          <button data-pull="${i}:${esc(id)}">&times;</button></div>`;}).join("")}</div>`
+        : `<div class="none">No media yet — click a thumbnail on the left.</div>`}
+    </div>`).join("");
+
+  $$("[data-sel]").forEach(d=>d.onclick=e=>{ if(e.target.closest("input,button")) return;
+    B.sel=+d.dataset.sel; drawBuilder(); });
+  $$("[data-nm]").forEach(i=>i.oninput=e=>{ S.customSets[+e.target.dataset.nm].name=e.target.value; });
+  $$("[data-clear]").forEach(b=>b.onclick=()=>{ S.customSets[+b.dataset.clear].items=[]; drawBuilder(); });
+  $$("[data-rmset]").forEach(b=>b.onclick=()=>{
+    S.customSets.splice(+b.dataset.rmset,1);
+    if(!S.customSets.length) S.customSets=[{name:"Ad Set 1",items:[]}];
+    B.sel=Math.min(B.sel,S.customSets.length-1); drawBuilder(); });
+  $$("[data-pull]").forEach(b=>b.onclick=e=>{ e.stopPropagation();
+    const [i,id]=b.dataset.pull.split(":");
+    S.customSets[+i].items=S.customSets[+i].items.filter(x=>x!==id); drawBuilder(); });
+
+  const unassigned = pool.filter(m=>!used.has(m.id)).length;
+  $("#bUnassigned").textContent = unassigned ? `${unassigned} ad${unassigned===1?"":"s"} not assigned` : "";
+  $("#bAddAll").innerHTML = `Add All to Selected Ad Set (${shown.filter(m=>!used.has(m.id)).length})
+    <span class="tiny muted" style="margin-left:5px">&#8984;E</span>`;
+  $("#bApply").disabled = !S.customSets.some(s=>s.items.length);
+}
+function bAddAll(){
+  const pool=builderPool(), used=new Set(S.customSets.flatMap(s=>s.items));
+  const set=S.customSets[B.sel]; if(!set) return;
+  const q=B.q.trim().toLowerCase();
+  for(const m of pool){
+    if(used.has(m.id)) continue;
+    if(q && !m.name.toLowerCase().includes(q)) continue;
+    if(B.type!=="all" && m.type!==B.type) continue;
+    if(set.items.length>=50){ toast("Stopped at 50 — that is Meta's per-ad-set limit."); break; }
+    set.items.push(m.id);
+  }
+  drawBuilder();
+}
+$("#bQ").oninput = e=>{ B.q=e.target.value; drawBuilder(); };
+$("#bType").onclick  = e=>{ const b=e.target.closest("button"); if(!b)return;
+  B.type=b.dataset.t; $$("#bType button").forEach(x=>x.classList.toggle("on",x===b)); drawBuilder(); };
+$("#bUsage").onclick = e=>{ const b=e.target.closest("button"); if(!b)return;
+  B.usage=b.dataset.u; $$("#bUsage button").forEach(x=>x.classList.toggle("on",x===b)); drawBuilder(); };
+$("#bGrid").onclick  = e=>{ const b=e.target.closest("button"); if(!b)return;
+  B.cols=+b.dataset.g; $$("#bGrid button").forEach(x=>x.classList.toggle("on",x===b)); drawBuilder(); };
+$("#bNew").onclick   = ()=>{ S.customSets.push({name:`Ad Set ${S.customSets.length+1}`,items:[]});
+  B.sel=S.customSets.length-1; drawBuilder(); };
+$("#bAddAll").onclick = bAddAll;
+addEventListener("keydown",e=>{ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="e" && !$("#mBuilder").hidden){
+  e.preventDefault(); bAddAll(); }});
+$("#bAuto").onclick = ()=>{
+  /* Group by the shared prefix in the filename — the same rule the CLI scanner uses. */
+  const pool=builderPool(), by=new Map();
+  for(const m of pool){ const k=groupPrefix(partsOf(m.name).base); if(!by.has(k)) by.set(k,[]); by.get(k).push(m.id); }
+  S.customSets=[...by.entries()].map(([k,items])=>({name:k.toUpperCase(),items:items.slice(0,50)}));
+  B.sel=0; drawBuilder();
+  toast(`Auto-grouped into ${S.customSets.length} ad set(s) by filename prefix.`);
+};
+$("#bApply").onclick = ()=>{
+  S.customSets = S.customSets.filter(s=>s.items.length);
+  $("#mBuilder").hidden=true; renderPreview();
+  toast(`${S.customSets.length} custom ad set(s) applied.`);
+};
+function zoom(m){
+  $("#zoomName").textContent=m.name;
+  $("#zoomBody").innerHTML = m.url
+    ? (m.type==="video" ? `<video src="${m.url}" controls style="max-width:100%;max-height:60vh;border-radius:8px"></video>`
+                        : `<img src="${m.url}" style="max-width:100%;max-height:60vh;border-radius:8px" alt="">`)
+    : `<p class="muted">No local preview — this asset lives in the ad account.</p>`;
+  $("#mZoom").hidden=false;
+}
+</script>
+<script>
+/* ========================= per-ad text modal =========================== */
+const PER_COLS = [
+  ["headline","Headline","textarea"],["body","Primary Text","textarea"],
+  ["desc","Link Description","textarea"],["cta","Call to Action","select"],
+  ["link","Website URL","text"],["display","Display URL","text"],
+];
+const CTAS = ["SIGN_UP","LEARN_MORE","SHOP_NOW","DOWNLOAD","GET_OFFER","GET_QUOTE","SUBSCRIBE","CONTACT_US","APPLY_NOW","BOOK_TRAVEL","SEE_MENU","ORDER_NOW"];
+function openPerAd(){
+  const {ads}=buildPlan();
+  if(!ads.length) return toast("Nothing to edit yet — add creatives and pick a destination.");
+  $("#mPerAd").hidden=false; drawPerAd();
+}
+function drawPerAd(){
+  const {ads}=buildPlan();
+  const n=+$("#pCols").value, cols=PER_COLS.slice(0,n);
+  const fs=$("#pFont .on")?.dataset.fs||"13.5";
+  const fall = {headline:S.text.headlines[0]||"",body:S.text.bodies[0]||"",desc:S.text.desc,
+                cta:S.text.cta,link:S.text.link,display:S.text.display};
+  $("#perTbl").innerHTML =
+    `<thead><tr><th>Ad</th>${cols.map(([k,label])=>
+      `<th>${esc(label)}<button class="cp" data-fill="${k}" title="Copy the first row down"><svg style="width:14px;height:14px"><use href="#i-copy"/></svg></button></th>`).join("")}</tr></thead>
+     <tbody>${ads.map((a,i)=>{
+       const v=S.text.perAd[a.key]||{};
+       return `<tr><td class="adcell">
+         ${a.group.main.url&&a.group.main.type==="image"?`<img src="${a.group.main.url}" alt="">`
+           :`<div style="width:56px;height:56px;border-radius:6px;background:var(--page);display:grid;place-items:center;margin:0 auto"><svg style="width:21px;height:21px;color:var(--faint)"><use href="#i-${a.group.main.type==="video"?"vid":"img"}"/></svg></div>`}
+         <div class="n">${i+1}</div></td>
+         ${cols.map(([k,,kind])=>{
+           const val = v[k] ?? "";
+           if(kind==="select") return `<td><select class="inp" data-ad="${a.key}" data-k="${k}" style="font-size:${fs}px">
+             ${CTAS.map(c=>`<option${(val||fall.cta)===c?" selected":""}>${c}</option>`).join("")}</select></td>`;
+           if(kind==="text") return `<td><input class="inp" data-ad="${a.key}" data-k="${k}"
+             style="font-size:${fs}px" value="${esc(val)}" placeholder="${esc(fall[k]||"")}"></td>`;
+           return `<td><textarea data-ad="${a.key}" data-k="${k}" rows="${k==="body"?5:3}"
+             style="font-size:${fs}px" placeholder="${esc(fall[k]||"")}">${esc(val)}</textarea>
+             ${k==="headline"||k==="body"?`<button class="addbtn" data-more="${a.key}:${k}" title="Add a variant Meta will rotate"><svg style="width:14px;height:14px"><use href="#i-plus"/></svg></button>`:""}</td>`;
+         }).join("")}</tr>`;
+     }).join("")}</tbody>`;
+  $$("[data-ad]").forEach(el=>el.oninput=el.onchange=e=>{
+    const {ad,k}=e.target.dataset; (S.text.perAd[ad]=S.text.perAd[ad]||{})[k]=e.target.value; });
+  $$("[data-fill]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.fill, first=S.text.perAd[ads[0].key]?.[k];
+    if(!first) return toast("Fill the first row first, then copy it down.");
+    ads.forEach(a=>(S.text.perAd[a.key]=S.text.perAd[a.key]||{})[k]=first);
+    drawPerAd(); toast(`Copied down to ${ads.length} ad(s).`);
+  });
+  $$("[data-more]").forEach(b=>b.onclick=()=>{
+    const [key,k]=b.dataset.more.split(":");
+    const box=S.text.perAd[key]=S.text.perAd[key]||{};
+    box[k]=(box[k]||"")+"\n---\n"; drawPerAd();
+    toast("Separate variants with a --- line. Meta rotates them inside the ad.");
+  });
+}
+$("#pCols").onchange=drawPerAd;
+$("#pFont").onclick=e=>{ const b=e.target.closest("button"); if(!b)return;
+  $$("#pFont button").forEach(x=>x.classList.toggle("on",x===b)); drawPerAd(); };
+$("#pReset").onclick=()=>{ S.text.perAd={}; drawPerAd(); toast("Per-ad text cleared — everything falls back to the common text."); };
+$("#pApply").onclick=()=>{ $("#mPerAd").hidden=true; renderPreview();
+  toast(`Saved text for ${Object.keys(S.text.perAd).length} ad(s).`); };
+
+/* ============================ create flow ============================== */
+function confirmCreate(){
+  const {ads,sets,camp}=buildPlan();
+  if(!ads.length) return;
+  const paused=$("#pubPaused").checked, sched=$("#pubSchedule").checked;
+  const enhOn = $("#enhDefaults").checked ? "Meta defaults (this tool sends no opt-out)"
+    : Object.entries(ENH).filter(([g])=>g!=="Carousel")
+        .flatMap(([g,r])=>r.filter(([k])=>S.enh[g][k]).map(([,l])=>l))
+        .filter((v,i,a)=>a.indexOf(v)===i).join(", ") || "none";
+  $("#cfTitle").textContent = paused ? "Create these ads, paused?" : "Create these ads LIVE?";
+  $("#cfSub").textContent = "Read this before confirming — it is the last stop.";
+  $("#cfBody").innerHTML = `
+    ${paused?"":`<div class="banner bad"><div><b>These ads will start spending as soon as Meta approves them.</b>
+       Nothing below re-checks your budget.</div></div>`}
+    ${S.demo?`<div class="banner warn"><div><b>Demo mode.</b> This will simulate the whole run and send nothing to Meta.</div></div>`:""}
+    <table class="tbl" style="border:1px solid var(--line);border-radius:var(--r)">
+      <tbody>
+      <tr><td style="width:190px;font-weight:600;color:var(--ink)">Ad account</td><td>${esc(S.acct.name||"")} <span class="mono">${esc(S.acct.id)}</span></td></tr>
+      <tr><td style="font-weight:600;color:var(--ink)">Campaign</td><td>${esc(camp.name)} <span class="mono">${esc(camp.id)}</span></td></tr>
+      <tr><td style="font-weight:600;color:var(--ink)">Ad sets</td><td>${sets.length} &mdash; ${esc(sets.map(s=>s.name).join(", ").slice(0,180))}</td></tr>
+      <tr><td style="font-weight:600;color:var(--ink)">Ads</td><td>${ads.length}</td></tr>
+      <tr><td style="font-weight:600;color:var(--ink)">Status on creation</td>
+          <td><b style="color:${paused?"var(--green)":"var(--red)"}">${paused?"PAUSED":"ACTIVE — will spend"}</b></td></tr>
+      ${sched?`<tr><td style="font-weight:600;color:var(--ink)">Scheduled start</td><td>${esc($("#schedDate").value)} ${esc($("#schedTime").value)} (${esc(S.acct.timezone||"account timezone")})</td></tr>`:""}
+      <tr><td style="font-weight:600;color:var(--ink)">Destination</td><td>${esc(S.text.link||"— not set —")}</td></tr>
+      <tr><td style="font-weight:600;color:var(--ink)">Enhancements ON</td><td>${esc(enhOn)}</td></tr>
+      </tbody></table>`;
+  $("#cfGo").className = paused ? "btn" : "btn red";
+  $("#cfGo").textContent = paused ? `Create ${ads.length} paused ad(s)` : `Create ${ads.length} LIVE ad(s)`;
+  $("#cfGo").onclick = ()=>{ $("#mConfirm").hidden=true; runCreate(); };
+  $("#mConfirm").hidden=false;
+}
+
+async function runCreate(){
+  const {ads,sets}=buildPlan();
+  const paused=$("#pubPaused").checked;
+  S.busy=true; renderPreview();
+  FL.open("Creating Ads","",null);
+  const t0=Date.now(); let done=0;
+  const tick=()=>{
+    const el=Math.round((Date.now()-t0)/1000);
+    const rate=done?(Date.now()-t0)/done:5200;
+    const left=Math.max(0,Math.round((ads.length-done)*rate/1000));
+    FL.stats([["Estimated time", left>90?`~${Math.ceil(left/60)} minutes`:`~${left}s`,""],
+              ["Elapsed", `${Math.floor(el/60)}:${String(el%60).padStart(2,"0")}`,""]]);
+  };
+  FL.progress(0,ads.length,`0 of ${ads.length} ads completed`); tick();
+  FL.log("Initializing configuration...");
+
+  const created={campaign:null,adsets:[],ads:[],failed:[]};
+  try{
+    for(const set of sets){
+      if(FL.cancelled) break;
+      let setId=set.id;
+      if(setId==="(new)"){
+        FL.log(`Creating ad set: ${set.name}`);
+        if(S.demo){ await sleep(700); setId="120227"+Math.floor(Math.random()*1e12); }
+        else{
+          const r=await api("/api/adsets-create",{method:"POST",headers:{"content-type":"application/json"},
+            body:JSON.stringify({account:S.acct.id,campaign:S.api.c?.id,name:set.name})});
+          setId=r.id;
+        }
+        created.adsets.push({id:setId,name:set.name});
+        FL.log(`Ad set created: ${set.name}`,"ok");
+      }
+      const mine=ads.filter(a=>a.set===set);
+      for(const a of mine){
+        if(FL.cancelled) break;
+        FL.log(`Creating ad ${done+1} of ${ads.length} (${$("#turbo").checked?"turbo":"sequential"} mode)`);
+        try{
+          let id;
+          if(S.demo){ await sleep(430+Math.random()*380); id="120227"+Math.floor(Math.random()*1e12); }
+          else{
+            const r=await api("/api/ads-create",{method:"POST",headers:{"content-type":"application/json"},
+              body:JSON.stringify({account:S.acct.id,adset:setId,name:a.name,page_id:S.text.page_id,
+                creative:a.group.main.hash||a.group.main.videoId,
+                extras:a.group.extras.map(e=>({role:e.role,hash:e.hash,video_id:e.videoId})),
+                text:{...S.text, per:S.text.perAd[a.key]||{}},
+                enhancements:$("#enhDefaults").checked?null:S.enh,
+                status: paused?"PAUSED":"ACTIVE",
+                schedule: $("#pubSchedule").checked?{date:$("#schedDate").value,time:$("#schedTime").value}:null})});
+            id=r.id;
+          }
+          created.ads.push({id,name:a.name}); done++;
+          FL.progress(done,ads.length,`${done} of ${ads.length} ads completed`); tick();
+          FL.log(`Completed ad: ${a.name} (${done}/${ads.length})`,"ok");
+        }catch(e){
+          created.failed.push({name:a.name,error:e.message});
+          FL.log(`FAILED ${a.name}: ${e.message}`,"er");
+        }
+      }
+    }
+  }catch(e){ FL.log("Stopped: "+e.message,"er"); }
+
+  S.busy=false; renderPreview();
+  FL.log(`Finished. ${created.ads.length} ad(s) created${created.failed.length?`, ${created.failed.length} failed`:""}.`,
+         created.failed.length?"er":"ok");
+  if(created.failed.length) FL.log("Nothing was retried automatically — re-run only the failed names.","er");
+  showResult(created,paused);
+}
+
+function showResult(c,paused){
+  $("#cfTitle").textContent = c.failed.length ? "Finished with errors" : "Done";
+  $("#cfSub").textContent = paused ? "Everything was created paused." : "These ads are live.";
+  $("#cfBody").innerHTML = `
+    ${S.demo?`<div class="banner warn"><div><b>Demo run.</b> These IDs are fabricated — nothing reached Meta.</div></div>`:""}
+    <p><b style="color:var(--ink)">${c.ads.length}</b> ad(s) created${c.adsets.length?`, <b style="color:var(--ink)">${c.adsets.length}</b> new ad set(s)`:""}.</p>
+    ${c.failed.length?`<div class="banner bad"><div><b>${c.failed.length} failed</b>
+      ${c.failed.map(f=>`<div>&bull; ${esc(f.name)} — ${esc(f.error)}</div>`).join("")}</div></div>`:""}
+    <div class="tbl-wrap" style="margin-top:12px"><table class="tbl">
+      <thead><tr><th>Ad name</th><th>Ad ID</th></tr></thead>
+      <tbody>${c.ads.map(a=>`<tr><td>${esc(a.name)}</td><td class="mono">${esc(a.id)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="hint">Verify before trusting: run <code>python3 scripts/verify.py</code> against these IDs, or open them in Ads Manager.</p>`;
+  $("#cfGo").textContent="Close"; $("#cfGo").className="btn";
+  $("#cfGo").onclick=()=>{ $("#mConfirm").hidden=true; FL.close(); };
+  $("#mConfirm").hidden=false;
+}
+</script>
+<script>
+/* ============================== duplicator ============================= */
+function mountDuplicator(){
+  const D=S.dup;
+  fillAccounts($("#dupAcct"), ()=>{ D.campaigns=[]; loadDup(); });
+  loadDup();
+  ["dQCampaign","dQAdset","dQAd","dQDestC","dQDestA"].forEach(id=>$("#"+id).oninput=drawDup);
+  $("#dupRename").onchange=e=>{ $("#dupRenamePane").hidden=!e.target.checked; };
+  $("#btnDuplicate").onclick=runDuplicate;
+
+  async function loadDup(){
+    try{
+      D.campaigns = S.demo ? (await sleep(180), DEMO.campaigns)
+        : ((await api(`/api/campaigns?account=${encodeURIComponent(S.acct.id)}`)).campaigns||[]);
+    }catch(e){ toast("Could not load campaigns: "+e.message); D.campaigns=[]; }
+    drawDup();
+  }
+  async function adsetsFor(cid){
+    if(S.demo){ await sleep(160); return DEMO.adsetsFor(cid); }
+    try{ return (await api(`/api/adsets?campaign=${encodeURIComponent(cid)}`)).adsets||[]; }
+    catch{ return []; }
+  }
+  async function adsFor(aid){
+    if(S.demo){ await sleep(160); return DEMO.adsFor(aid); }
+    try{ return (await api(`/api/ads?adset=${encodeURIComponent(aid)}`)).ads||[]; }
+    catch{ return []; }
+  }
+
+  /* Declared, not assigned to window — the handlers above reference it
+     before this line runs, and a bare read of an unset global throws. */
+  function drawDup(){
+    if(!$("#dListCampaigns")) return;
+    const f=(l,q)=>l.filter(x=>!q.trim()||String(x.name).toLowerCase().includes(q.trim().toLowerCase()));
+    drawList($("#dListCampaigns"), f(D.campaigns,$("#dQCampaign").value), D.c?.id,
+      async c=>{ D.c=c; D.a=null; D.picked.clear(); D.adsets=await adsetsFor(c.id); D.ads=[];
+        $("#dQAdset").disabled=false; drawDup(); }, "No campaigns found");
+    drawList($("#dListAdsets"), f(D.adsets,$("#dQAdset").value), D.a?.id,
+      async a=>{ D.a=a; D.picked.clear(); D.ads=await adsFor(a.id); $("#dQAd").disabled=false; drawDup(); },
+      D.c?"No ad sets found":"Select a campaign first");
+
+    const ads=f(D.ads,$("#dQAd").value);
+    const el=$("#dListAds");
+    el.innerHTML = ads.length ? ads.map(a=>`<label class="it" style="cursor:pointer">
+        <input type="checkbox" data-pick="${esc(a.id)}" ${D.picked.has(a.id)?"checked":""}
+          style="width:17px;height:17px;accent-color:var(--brand)">
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</span></label>`).join("")
+      : `<div class="empty">${D.a?"No ads found":"Select an ad set first"}</div>`;
+    $$("[data-pick]",el).forEach(c=>c.onchange=()=>{
+      c.checked ? D.picked.add(c.dataset.pick) : D.picked.delete(c.dataset.pick); drawDup(); });
+    $("#dPickCount").textContent = D.picked.size?`(${D.picked.size} selected)`:"";
+
+    drawList($("#dListDestC"), f(D.campaigns,$("#dQDestC").value), D.destC?.id,
+      async c=>{ D.destC=c; D.destA=null; D.destAdsets=await adsetsFor(c.id);
+        $("#dQDestA").disabled=false; drawDup(); }, "No campaigns found");
+    drawList($("#dListDestA"), f(D.destAdsets,$("#dQDestA").value), D.destA?.id,
+      a=>{ D.destA=a; drawDup(); }, D.destC?"No ad sets found":"Select a campaign first");
+
+    const ready = D.picked.size && D.destA;
+    $("#dupSummary").innerHTML = ready
+      ? `<b style="color:var(--ink)">${D.picked.size}</b> ad(s)<br>from <b>${esc(D.a.name)}</b>
+         <br>into <b>${esc(D.destA.name)}</b><br><span class="tiny">(${esc(D.destC.name)})</span>
+         <br><br><span class="badge count">post ID preserved</span>`
+      : "Pick the ads on the left and a destination ad set above.";
+    $("#btnDuplicate").disabled = !ready;
+    $("#btnDuplicate").textContent = `Duplicate ${D.picked.size} ad${D.picked.size===1?"":"s"} (paused)`;
+  }
+
+  async function runDuplicate(){
+    const D=S.dup, ids=[...D.picked];
+    FL.open("Duplicating Ads","Copies keep the original post ID",null);
+    FL.progress(0,ids.length,`0 of ${ids.length} copied`);
+    FL.log(`Copying ${ids.length} ad(s) into "${D.destA.name}"...`);
+    let n=0, fails=0;
+    for(const id of ids){
+      const src=D.ads.find(a=>a.id===id)||{name:id};
+      const name = $("#dupRename").checked
+        ? ($("#dupPattern").value||"{name}").replace(/\{name\}/g,src.name)
+            .replace(/\{index\}/g,String(n+1)).replace(/\{date\}/g,new Date().toISOString().slice(0,10))
+        : src.name;
+      FL.log(`Copying ${src.name}...`);
+      try{
+        if(S.demo) await sleep(420);
+        else await api("/api/duplicate-adset",{method:"POST",headers:{"content-type":"application/json"},
+          body:JSON.stringify({ad:id,adset:D.destA.id,name,status:"PAUSED"})});
+        n++; FL.progress(n,ids.length,`${n} of ${ids.length} copied`);
+        FL.log(`Copied: ${name}`,"ok");
+      }catch(e){ fails++; FL.log(`FAILED ${src.name}: ${e.message}`,"er"); }
+    }
+    FL.log(`Done. ${n} copied${fails?`, ${fails} failed`:""}. All paused.`, fails?"er":"ok");
+    toast(`${n} ad(s) duplicated, paused.`);
+  }
+}
+
+/* ============================ media library ============================ */
+function mountMedia(){
+  fillAccounts($("#mediaAcct"), loadMedia);
+  $("#btnMediaRefresh").onclick=()=>loadMedia(true);
+  $("#mQ").oninput=e=>{ S.media.q=e.target.value; drawMedia(); };
+  $("#mType").onclick=e=>{ const b=e.target.closest("button"); if(!b)return;
+    S.media.type=b.dataset.t; $$("#mType button").forEach(x=>x.classList.toggle("on",x===b)); drawMedia(); };
+  loadMedia();
+}
+async function loadMedia(force){
+  const grid=$("#mediaGrid"); if(!grid) return;
+  grid.innerHTML=`<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--faint)">Loading…</div>`;
+  if(S.demo){
+    await sleep(force?400:200);
+    S.media.items = [...S.uploaded, ...Array.from({length:8},(_,i)=>({
+      id:"demo"+i, name:`creative-${String(i+1).padStart(2,"0")}.${i%3===2?"mp4":"png"}`,
+      type:i%3===2?"video":"image", url:null, size:(0.3+i*0.21)*1048576}))];
+  }else{
+    try{ const r=await api(`/api/account-meta?account=${encodeURIComponent(S.acct.id)}`);
+      S.media.items = [...(r.images||[]).map(x=>({id:x.hash,name:x.name,type:"image",url:x.url,size:x.size||0})),
+                       ...(r.videos||[]).map(x=>({id:x.id,name:x.title||x.name,type:"video",url:null,size:0}))];
+    }catch(e){ S.media.items=[]; toast("Could not load media: "+e.message); }
+  }
+  drawMedia();
+}
+function drawMedia(){
+  const grid=$("#mediaGrid"); if(!grid) return;
+  const q=S.media.q.trim().toLowerCase();
+  const items=S.media.items.filter(m=>(!q||String(m.name).toLowerCase().includes(q)) &&
+    (S.media.type==="all"||m.type===S.media.type));
+  $("#mCount").textContent=`${items.length} of ${S.media.items.length} asset(s)`;
+  grid.style.gridTemplateColumns="repeat(auto-fill,minmax(168px,1fr))";
+  grid.innerHTML = items.length ? items.map(m=>`<div class="mcell">
+      <div class="thumb" data-zoom="${esc(m.id)}">
+        ${m.url&&m.type==="image"?`<img src="${m.url}" alt="">`
+          :`<svg style="width:34px;height:34px;color:var(--faint)"><use href="#i-${m.type==="video"?"vid":"img"}"/></svg>`}
+        <button class="zoom"><svg style="width:14px;height:14px"><use href="#i-zoom"/></svg></button></div>
+      <div class="nm">${esc(m.name)}</div>
+      <span class="badge tag">${m.type}${m.size?` &bull; ${mb(m.size)}`:""}</span></div>`).join("")
+    : `<div style="grid-column:1/-1;padding:44px;text-align:center;color:var(--faint)">
+         Nothing here yet. Upload creatives from the Uploader page.</div>`;
+  $$("[data-zoom]",grid).forEach(t=>t.onclick=()=>zoom(items.find(x=>String(x.id)===t.dataset.zoom)));
+}
+
+boot();
+</script>
+</body></html>

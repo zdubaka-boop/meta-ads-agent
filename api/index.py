@@ -388,6 +388,16 @@ class handler(BaseHTTPRequestHandler):
                                         "has_stats": bool(stats),
                                         "stats_error": stats_error})
 
+            if p.path == "/api/media-upload":
+                if not self._need_auth():
+                    return
+                return self._media_upload()
+
+            if p.path == "/api/ads-create":
+                if not self._need_auth():
+                    return
+                return self._ads_create()
+
             return self._send(404, {"error": "no such endpoint"})
         except meta.MetaError as e:
             return self._send(400, {"error": str(e)})
@@ -1006,6 +1016,98 @@ class handler(BaseHTTPRequestHandler):
                                 "log": log_lines, "counts": counts})
 
     # ----------------------------------------------------------------- POST
+    def _media_upload(self):
+        """One creative in, one Meta reference out.
+
+        The browser sends files one at a time so a 200-file batch is not one
+        enormous request that dies at the platform body limit. Nothing about
+        an ad is created here — this only puts the asset in the account.
+        """
+        import multipart
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 4_300_000:
+            return self._send(413, {"error": "That file is over the ~4.5MB request cap for "
+                                             "this deployment. Upload it once with "
+                                             "scripts/upload_creatives.py, then reference it "
+                                             "by name."})
+        fields, files = multipart.parse(self.rfile.read(n), self.headers.get("Content-Type"))
+        acct = (fields.get("account") or "").strip()
+        if not acct:
+            return self._send(400, {"error": "missing account"})
+        if not files:
+            return self._send(400, {"error": "no file in the request"})
+        name, data = next(iter(files.items()))
+        if str(name).lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=Path(name).suffix, delete=False) as fh:
+                fh.write(data)
+                tmp = fh.name
+            try:
+                vid = meta.upload_video(acct, tmp, name=Path(name).stem)
+            finally:
+                os.unlink(tmp)
+            return self._send(200, {"name": name, "video_id": vid})
+        h = meta.upload_image_bytes(acct, data, name)
+        return self._send(200, {"name": name, "hash": h})
+
+    def _ads_create(self):
+        """Create ONE ad from a creative already in the account.
+
+        Deliberately one ad per call: a partial failure then costs one ad, and
+        the caller keeps every id it already has. Always PAUSED unless the
+        caller explicitly says otherwise — and ACTIVE is refused outright,
+        because activation is a separate decision from creation.
+        """
+        b = self._body()
+        acct = (b.get("account") or "").strip()
+        adset = (b.get("adset") or "").strip()
+        name = (b.get("name") or "").strip()
+        cre = (b.get("creative") or "").strip()
+        if not (acct and adset and name and cre):
+            return self._send(400, {"error": "account, adset, name and creative are all required"})
+        if str(b.get("status") or "PAUSED").upper() != "PAUSED":
+            return self._send(400, {"error": "This endpoint only creates PAUSED ads. "
+                                             "Activate deliberately, in Ads Manager or "
+                                             "with scripts/set_status.py --launch."})
+        t = b.get("text") or {}
+        per = t.get("per") or {}
+        pick = lambda k, many: ([per[k]] if per.get(k) else
+                                [x for x in (t.get(many) or []) if x])
+        bodies = pick("body", "bodies")
+        heads = pick("headline", "headlines")
+        link = (per.get("link") or t.get("link") or "").strip()
+        page = (b.get("page_id") or t.get("page_id") or "").strip()
+        if not (bodies and link and page):
+            return self._send(400, {"error": "primary text, link and Page are required — "
+                                             "none of them is ever guessed."})
+        enh = b.get("enhancements")
+        dof = None
+        if enh is not None:
+            on = {k for group in enh.values() for k, v in group.items() if v}
+            dof = {"degrees_of_freedom_type": "USER_ENROLLED",
+                   "creative_features_spec": {f: {"enroll_status": "OPT_IN" if f in on else "OPT_OUT"}
+                                              for f in meta.ENHANCEMENTS_OFF}}
+        # enhancements_off=False in both calls: the caller's own opt-in/opt-out
+        # map is applied below. Letting the helper stamp its blanket DOF_OFF
+        # first would silently overrule what the user actually picked.
+        common = dict(link=link, body=bodies[0], headline=(heads or [""])[0],
+                      description=per.get("desc") or t.get("desc") or None,
+                      cta=(per.get("cta") or t.get("cta") or "LEARN_MORE"),
+                      url_tags=(t.get("utm") or None),
+                      enhancements_off=False)
+        if str(cre).isdigit():
+            # video_creative takes no bodies/headlines — variants are image-only.
+            creative = meta.video_creative(page, cre, None, **common)
+        else:
+            creative = meta.image_creative(
+                page, cre, bodies=bodies if len(bodies) > 1 else None,
+                headlines=heads if len(heads) > 1 else None, **common)
+        if dof:
+            creative["degrees_of_freedom_spec"] = dof
+        ad = meta.create_ad(acct, adset, name, creative)
+        return self._send(200, {"id": ad.get("id") if isinstance(ad, dict) else ad,
+                                "name": name, "status": "PAUSED"})
+
     def do_POST(self):
         p = urlparse(self.path)
         try:
