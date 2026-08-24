@@ -9,17 +9,34 @@ Meta puts every app on an **access tier**. Ours is on `development_access`,
 which gets a small fraction of the normal allowance. Everything below is
 working around that; this is the fix.
 
-**Ask Meta for Advanced Access:**
+The published hourly allowance for `ads_management`:
 
-1. developers.facebook.com → the app your token came from → **App Review** →
-   **Permissions and Features**
-2. Find `ads_management` → **Request Advanced Access**
-3. It requires **Business Verification** on the business that owns the app.
-   If that is not done, it is the first step, and the slow one — Meta wants
-   documents and takes days.
+| Tier | Calls per hour |
+|---|---|
+| Development (where we are) | **300** + 40 × active ads |
+| Full Access | **100,000** + 40 × active ads |
 
-Check the requirements on the app's own dashboard rather than trusting this
-page. Meta changes them.
+The account-level score cap also goes 60 → 9000, and a block drops from **300
+seconds to 60**. That second number is most of what a slow build feels like.
+
+**Getting to Full Access.** Meta relaxed this on 4 May 2026 — the screen
+recording and written use-case are gone. Two gates remain:
+
+1. **500+ Marketing API calls in the past 15 days**, with an **error rate under
+   15%** over the last 500 calls. This happens by using the tool: one 144-ad
+   build is roughly 300 calls. Live progress is shown at developers.facebook.com
+   → the app → **App Review** → **Permissions and Features**.
+2. **Business Verification** on the business that owns the app. Business
+   Manager → **Security Centre** → **Start Verification**. One document from:
+   Certificate/Articles of Incorporation, business registration or licence,
+   government business tax document, business bank statement, or a utility bill
+   under 12 months old. The legal name and the address must appear **on the same
+   page** — that is what fails most submissions. Takes 1–5 working days.
+
+The 15% error ceiling is why retrying a throttled build is worse than waiting:
+the failures count against the thing you are trying to qualify for.
+
+Check the app's own dashboard rather than trusting this page. Meta changes them.
 
 **Shortcut worth trying first:** if any *other* app in the business already has
 Advanced Access, issue the token from that app instead. The tier follows the
