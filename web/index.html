@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ads Uploader</title>
+<title>PMC Ads Hub</title>
 <style>
 /* ============================ design tokens ============================ */
 :root{
@@ -375,13 +375,12 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
 </svg>
 
 <nav class="nav">
-  <a class="brand" href="#/dashboard"><svg><use href="#i-logo"/></svg>Ads Uploader</a>
+  <a class="brand" href="#/dashboard"><svg><use href="#i-logo"/></svg>PMC Ads Hub</a>
   <div class="nav-links" id="navLinks">
     <a href="#/dashboard" data-r="dashboard">Dashboard</a>
     <a href="#/uploader"  data-r="uploader">Uploader</a>
     <a href="#/duplicator" data-r="duplicator">Duplicator</a>
     <a href="#/media"     data-r="media">Media Library</a>
-    <a href="https://adsuploader.com" target="_blank" rel="noopener">Docs <svg class="ext"><use href="#i-ext"/></svg></a>
   </div>
   <div class="acct">
     <button id="acctBtn" aria-haspopup="true" aria-expanded="false">Account <svg style="width:14px;height:14px"><use href="#i-chev"/></svg></button>
@@ -391,7 +390,6 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
       <button data-signin>Connect a Meta account</button>
       <button data-act="accounts">Switch ad account</button>
       <button data-act="presets">Manage presets</button>
-      <a href="https://adsuploader.com" target="_blank" rel="noopener">Documentation</a>
       <div class="sep"></div>
       <button data-act="logout">Sign out</button>
     </div>
@@ -403,14 +401,6 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
 <!-- =============================== templates =============================== -->
 <template id="tpl-dashboard">
   <div class="stack">
-    <div class="card hello">
-      <div class="ph" id="dashAvatar"></div>
-      <div>
-        <h2 id="dashName">Welcome</h2>
-        <p id="dashSub">Logged in with Facebook</p>
-      </div>
-    </div>
-
     <div class="tiles">
       <button class="tile" data-go="uploader">
         <span class="ic b"><svg style="width:23px;height:23px"><use href="#i-img"/></svg></span>
@@ -426,38 +416,13 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
       </button>
     </div>
 
-    <div class="card card-p">
-      <h2 style="font-size:23px">Power Features</h2>
-      <div class="feats">
-        <div class="feat b">
-          <h4>Automatic Thumbnail Attachment</h4>
-          <p>Simply add <b>_thumbnail</b> to your image filename and it automatically pairs with your video. No manual linking needed &mdash; the system handles everything.</p>
-          <a href="#/uploader">View docs &rarr;</a>
-        </div>
-        <div class="feat y">
-          <h4>Aspect Ratio Variations</h4>
-          <p>Upload additional 9:16 and 16:9 ads with <b>_vertical</b> and <b>_horizontal</b> suffixes, and let us take care of the rest. We'll build it all into one multi-placement ad.</p>
-          <a href="#/uploader">View docs &rarr;</a>
-        </div>
-        <div class="feat g">
-          <h4>Presets &mdash; Launch Campaigns in Seconds</h4>
-          <p>Save your go-to campaign structures as presets. Access your most-used configurations instantly and create new ads without the setup hassle.</p>
-          <a href="#/uploader">View docs &rarr;</a>
-        </div>
-        <div class="feat p">
-          <h4>Duplicator &mdash; Keep Your Social Proof</h4>
-          <p>Copy winning ads to new campaigns while preserving all engagement. Uses the existing post ID so your likes, comments, and shares carry over.</p>
-          <a href="#/duplicator">View docs &rarr;</a>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 <template id="tpl-uploader">
  <div class="stack">
   <div class="row" style="margin-bottom:2px">
     <div>
-      <h1 style="font-size:31px">Meta Ads Uploader</h1>
+      <h1 style="font-size:31px">Upload Ads</h1>
       <p class="muted" style="margin:5px 0 0;font-size:15px">Upload media files and configure campaigns for Meta Ads</p>
     </div>
     <div class="spacer"></div>
@@ -1047,7 +1012,7 @@ const ENH_DEFAULT = {
 S.enh = JSON.parse(JSON.stringify(ENH_DEFAULT));
 
 /* ============================= demo data =============================== */
-const DEMO_ACCOUNTS = [{id:"act_000000000000000",name:"Ads Uploader",currency:"USD",timezone:"America/Los_Angeles"}];
+const DEMO_ACCOUNTS = [{id:"act_000000000000000",name:"Demo Ad Account",currency:"USD",timezone:"America/Los_Angeles"}];
 const DEMO = {
   campaigns:[
     {id:"120227021670410001",name:"WW - Start Trial",status:"ACTIVE"},
@@ -1076,11 +1041,11 @@ DEMO.adsetsFor = cid => DEMO.adsets[cid] || [
 DEMO.adsFor = aid => DEMO.ads[aid] || Array.from({length:4},(_,i)=>(
   {id:aid+"-ad"+i,name:`ad-${i+1}`,status:i%2?"ACTIVE":"PAUSED"}));
 const demoDefaults = {
-  page_id:"1042049511453137", link:"https://adsuploader.com/", cta:"SIGN_UP",
-  display:"adsuploader.com",
-  headline:"Ads Uploader: Bulk Upload 100+ Ads in Minutes",
-  body:"Stop spending hours manually uploading ads. Ads Uploader automates the entire process - bulk upload videos and images, auto-match aspect ratios, thumbnails, and launch ads in minutes instead of hours.\n\nUsed by agencies, entrepreneurs, and media buyers who need to scale creative testing without the operational nightmare.",
-  desc:"Used by agencies, entrepreneurs, and media buyers to scale creative testing without the operational nightmare.",
+  page_id:"000000000000000", link:"https://example.com/", cta:"SIGN_UP",
+  display:"example.com",
+  headline:"Sample headline for the demo",
+  body:"Sample primary text. This is placeholder copy so the demo has something to show — it is replaced the moment you pick a real ad to copy settings from.",
+  desc:"Sample link description for the demo.",
 };
 
 /* =============================== router ================================ */
@@ -1120,8 +1085,6 @@ async function boot(){
 
 /* ============================== dashboard ============================== */
 function mountDashboard(){
-  $("#dashName").textContent = "Welcome, " + ((S.me&&(S.me.name||S.me.user))||"there");
-  $("#dashSub").textContent  = S.demo ? "Demo mode — no Meta token connected" : "Logged in with Facebook";
   $$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
 }
 
