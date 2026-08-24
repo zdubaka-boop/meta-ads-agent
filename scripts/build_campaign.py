@@ -120,6 +120,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--spec", required=True)
     ap.add_argument("--ads", help="bulk ads CSV (overrides spec.ads_csv)")
+    ap.add_argument("--lanes", type=int, default=4,
+                    help="creatives uploaded at once (default 4; 1 = one at a time)")
     ap.add_argument("--execute", action="store_true",
                     help="perform API writes. Without this, nothing is created.")
     ap.add_argument("--state", help="state file path (default outputs/<campaign>-state.json)")
@@ -204,6 +206,22 @@ def main():
         save()
     print(f"\ncampaign  {state['campaign_id']}")
 
+    # Upload every creative first, concurrently. Doing it inside the ad loop
+    # meant each byte transfer blocked the next ad; and anything uploaded on a
+    # previous run is reused instead of sent again.
+    wanted = []
+    for a in spec["adsets"]:
+        for ad in a["ads"]:
+            if ad["name"] in state["ads"]:
+                continue
+            q = Path(ad["creative"])
+            wanted.append(q if q.exists() else ROOT / ad["creative"])
+    todo = [q for q in wanted if meta.file_key(q) not in state["media"]] if wanted else []
+    if todo:
+        print(f"\nmedia ({len(set(map(str, todo)))} distinct file(s))")
+        state["media"].update(meta.upload_many(acct, todo, lanes=args.lanes))
+        save()
+
     for a in spec["adsets"]:
         if a["name"] not in state["adsets"]:
             state["adsets"][a["name"]] = meta.create_adset(
@@ -224,7 +242,7 @@ def main():
                 continue
             path = ad["creative"]
             p = Path(path) if Path(path).exists() else ROOT / path
-            key = hashlib.sha256(p.read_bytes()).hexdigest()[:16]
+            key = meta.file_key(p)
             is_video = p.suffix.lower() in (".mp4", ".mov", ".m4v", ".avi")
 
             if key not in state["media"]:
@@ -254,6 +272,8 @@ def main():
 
     print(f"\nCreated {len(state['ads'])} ad(s) across {len(state['adsets'])} ad set(s). "
           f"ALL PAUSED.\nState: {state_path}")
+    # Say where the wall clock went, so nobody has to guess why it felt slow.
+    print(meta.timing_report())
     print(f"Now verify:  python3 scripts/verify.py --state {state_path} --spec {args.spec}")
 
 

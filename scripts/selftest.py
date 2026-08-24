@@ -288,6 +288,63 @@ uses = inspect.getsource(add_to_campaign).count("list_adsets(campaign_id, with_c
 check("the duplicate-name check skips ad counts",
       "with_counts" in src and uses >= 1, f"with_counts in signature={('with_counts' in src)}")
 
+# 20. Turbo Mode printed "turbo mode" while creating ads strictly one at a
+#     time. The label was the only thing it changed.
+_ui = (ROOT / "web" / "index.html").read_text()
+_loop = _ui[_ui.index("const makeAd"):_ui.index("const mine=ads.filter")+4000] \
+        if "const makeAd" in _ui else ""
+check("turbo actually overlaps ad creation",
+      "const lanes = $(\"#turbo\").checked ? 4 : 1" in _ui
+      and "await Promise.all(Array.from({length:Math.min(lanes" in _ui,
+      "the create loop is sequential again")
+
+# 21. web/ and public/ are served from different places; a fix in one only is
+#     a fix nobody sees.
+check("the deployed copy matches the source copy",
+      _ui == (ROOT / "public" / "index.html").read_text(),
+      "web/index.html and public/index.html have diverged")
+
+# --- bulk media upload -------------------------------------------------------
+# A 24-ad build spent its time uploading one creative at a time, inside the ad
+# loop, re-sending files it had already sent on an earlier run.
+import os as _os, time as _time, meta as _m
+
+_d = Path(tempfile.mkdtemp())
+(_d / "a.png").write_bytes(b"AAA")
+(_d / "b.png").write_bytes(b"BBB")
+(_d / "same-bytes.png").write_bytes(b"AAA")
+_os.environ["META_MEDIA_CACHE"] = str(_d / "cache.json")
+_files = [_d / "a.png", _d / "b.png", _d / "same-bytes.png", _d / "a.png"]
+
+_calls = []
+_real_upload, _real_account = _m.upload_image, _m.account
+_m.upload_image = lambda acct, path, name=None: (
+    _calls.append(Path(path).name), _time.sleep(0.4), "h_" + Path(path).stem)[-1]
+_m.account = lambda a=None: "act_test"
+
+_t0 = _time.time(); _got = _m.upload_many("act_test", _files, lanes=4, log=lambda m: None)
+_elapsed = _time.time() - _t0
+
+# 20. The same bytes under two names is one upload, not two.
+check("identical creatives upload once", len(_calls) == 2 and len(_got) == 2,
+      f"{len(_calls)} call(s): {sorted(_calls)}")
+
+# 21. Uploads overlap. Serially this is 0.8s; concurrently about 0.4s.
+check("creatives upload concurrently", _elapsed < 0.7, f"{_elapsed:.2f}s — ran serially")
+
+# 22. A creative uploaded on an earlier run is not sent again. This is the only
+#     change here that reduces the rate-limit budget rather than just latency.
+_calls.clear()
+_again = _m.upload_many("act_test", _files, lanes=4, log=lambda m: None)
+check("a second run re-uploads nothing", _calls == [] and _again == _got, str(_calls))
+
+# 23. The build loop and the uploader must agree on how a file is keyed, or
+#     every creative uploads twice and neither notices.
+import build_campaign as _bc
+check("build and upload key creatives the same way",
+      "meta.file_key(p)" in inspect.getsource(_bc), "build_campaign hashes differently")
+_m.upload_image, _m.account = _real_upload, _real_account
+
 print("=" * 66)
 bad = results.count(False)
 print(f"  {len(results)-bad}/{len(results)} passed" + ("" if not bad else f"   {bad} FAILING"))

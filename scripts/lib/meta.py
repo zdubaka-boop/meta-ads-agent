@@ -11,7 +11,9 @@ Hard guarantees (not conventions — these are unconditional):
 Credentials come from .env (never from chat, never from argv).
 """
 
-import base64, json, os, time, urllib.error, urllib.parse, urllib.request
+import base64
+import threading
+import hashlib, json, os, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 
 API_VERSION = os.getenv("META_API_VERSION", "v23.0")
@@ -74,7 +76,8 @@ def account(acct=None):
 # when blocked — exactly how many minutes until it clears. Reading it is the
 # difference between pacing under the ceiling and slamming into it and then
 # guessing how long to sit out.
-USAGE = {"pct": 0, "tier": None, "regain_at": 0.0, "waited": 0.0, "warned": False}
+USAGE = {"pct": 0, "tier": None, "regain_at": 0.0, "waited": 0.0, "warned": False,
+         "calls": 0, "request_sec": 0.0, "started": None, "by_op": {}}
 
 # Sleep a little once the account is this deep into its window. Cheap insurance:
 # a few seconds here avoids a block that costs minutes. META_PACE=0 turns it off.
@@ -146,8 +149,18 @@ def _request(path, params, post, op, retries=5):
                 req = urllib.request.Request(f"{BASE}/{path}", data=body)
             else:
                 req = urllib.request.Request(f"{BASE}/{path}?{body.decode()}")
+            if USAGE["started"] is None:
+                USAGE["started"] = time.time()
+            _t0 = time.time()
             resp = urllib.request.urlopen(req, timeout=300)
             out = json.loads(resp.read())
+            USAGE["calls"] += 1
+            _took = time.time() - _t0
+            USAGE["request_sec"] += _took
+            # Bucket by operation so a slow build can name its own hot spot
+            # instead of everyone guessing which calls dominated.
+            _b = USAGE["by_op"].setdefault(op, [0, 0.0])
+            _b[0] += 1; _b[1] += _took
             _read_usage(resp.headers)
             return out
         except urllib.error.HTTPError as e:
@@ -188,6 +201,32 @@ def usage_line():
     tier = USAGE["tier"] or "unknown"
     return (f"Meta rate budget: {USAGE['pct']}% used, access tier {tier}"
             + (f", {USAGE['waited']/60:.1f} min spent waiting" if USAGE["waited"] else ""))
+
+
+def timing_report():
+    """Where the wall clock actually went. Stops anyone having to guess.
+
+    Separates the three things that look identical from outside: talking to
+    Meta, sleeping off Meta's rate limit, and everything we did ourselves.
+    """
+    if not USAGE["calls"]:
+        return "No Meta calls made."
+    total = time.time() - (USAGE["started"] or time.time())
+    req, wait = USAGE["request_sec"], USAGE["waited"]
+    ours = max(0.0, total - req - wait)
+    pct = lambda x: f"{(x / total * 100):.0f}%" if total else "—"
+    m = lambda x: f"{x/60:.1f} min" if x >= 90 else f"{x:.0f}s"
+    return "\n".join([
+        f"  Took {m(total)} for {USAGE['calls']} Meta call(s)"
+        f" — {m(req/max(USAGE['calls'],1))} each on average.",
+        f"    waiting out Meta's rate limit   {m(wait):>10}  {pct(wait)}",
+        f"    waiting for Meta to respond     {m(req):>10}  {pct(req)}",
+        f"    everything else (us)            {m(ours):>10}  {pct(ours)}",
+        f"  {usage_line()}",
+        "  Slowest operations:",
+    ] + [f"    {op:<34} {n:>4} call(s)  {m(sec):>9}"
+         for op, (n, sec) in sorted(USAGE["by_op"].items(),
+                                    key=lambda kv: -kv[1][1])[:6]])
 
 
 def get(path, fields=None, **extra):
@@ -501,6 +540,114 @@ def upload_image_bytes(acct, data, filename, name=None):
         raise MetaError("upload_image", {"message": json.dumps(r)[:300]})
     return list(r["images"].values())[0]["hash"]
 
+
+
+# ---------------------------------------------------------- bulk media upload
+# Uploading inside the per-ad loop means every byte transfer blocks the next
+# ad. Doing all of them first, concurrently, overlaps the slow part — and a
+# creative uploaded on a previous run is not uploaded again at all.
+
+_MEDIA_LOCK = threading.Lock()
+
+
+def _cache_path():
+    return Path(os.getenv("META_MEDIA_CACHE")
+                or Path(__file__).resolve().parents[2] / "outputs" / "media-cache.json")
+
+
+def _cache_load():
+    try:
+        return json.loads(_cache_path().read_text())
+    except Exception:
+        return {}
+
+
+def _cache_save(cache):
+    p = _cache_path()
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(cache, indent=1))
+    except OSError:
+        pass          # a cache that cannot be written is a slower run, not a failure
+
+
+def file_key(path):
+    """Content hash. Two identical files are one upload, whatever they're called."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:32]
+
+
+def upload_many(acct, paths, lanes=4, log=print):
+    """Upload every distinct file once, concurrently. -> {key: {...}}
+
+    Returns a dict keyed by content hash: {"hash": ...} for images,
+    {"video_id":..., "thumb":...} for videos. Anything already uploaded from
+    this machine for this account is reused without a call.
+    """
+    acct = account(acct)
+    uniq = {}
+    for p in paths:
+        p = Path(p)
+        if p.exists():
+            uniq.setdefault(file_key(p), p)
+
+    cache = _cache_load()
+    out, todo = {}, []
+    for key, p in uniq.items():
+        hit = cache.get(f"{acct}:{key}")
+        if hit:
+            out[key] = hit
+        else:
+            todo.append((key, p))
+
+    if out:
+        log(f"  {len(out)} creative(s) already in this ad account — not re-uploaded.")
+    if not todo:
+        return out
+
+    log(f"  uploading {len(todo)} creative(s), {min(lanes, len(todo))} at a time…")
+    errors = []
+
+    def work(item):
+        key, p = item
+        try:
+            if p.suffix.lower() in (".mp4", ".mov", ".m4v", ".avi", ".webm"):
+                vid, thumb = upload_video(acct, p, p.stem)
+                rec = {"video_id": vid, "thumb": thumb}
+            else:
+                rec = {"hash": upload_image(acct, p, p.stem)}
+        except Exception as e:
+            errors.append((p.name, str(e)))
+            return
+        with _MEDIA_LOCK:
+            out[key] = rec
+            cache[f"{acct}:{key}"] = rec
+            log(f"    uploaded {p.name}")
+
+    threads = []
+    queue = list(todo)
+
+    def runner():
+        while True:
+            with _MEDIA_LOCK:
+                if not queue:
+                    return
+                item = queue.pop()
+            work(item)
+
+    for _ in range(max(1, min(lanes, len(todo)))):
+        t = threading.Thread(target=runner, daemon=True)
+        t.start(); threads.append(t)
+    for t in threads:
+        t.join()
+
+    _cache_save(cache)
+    if errors:
+        for name, msg in errors:
+            log(f"    FAILED {name}: {msg}")
+        raise MetaError("upload_many",
+                        {"message": f"{len(errors)} creative(s) failed to upload; "
+                                    f"the rest are cached and will not re-upload"})
+    return out
 
 # ---------------------------------------------- existing account creatives
 # Meta keeps every image and video ever uploaded to an ad account. Referencing

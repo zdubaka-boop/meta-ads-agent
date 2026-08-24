@@ -2120,9 +2120,9 @@ async function runCreate(){
         FL.log(`Ad set created: ${label}`,"ok");
       }
       const mine=ads.filter(a=>a.set===set);
-      for(const a of mine){
-        if(FL.cancelled) break;
-        FL.log(`Creating ad ${done+1} of ${ads.length} (${$("#turbo").checked?"turbo":"sequential"} mode)`);
+
+      const makeAd = async a=>{
+        if(FL.cancelled) return;
         try{
           let id;
           if(S.demo){ await sleep(430+Math.random()*380); id="120227"+Math.floor(Math.random()*1e12); }
@@ -2144,11 +2144,30 @@ async function runCreate(){
           created.failed.push({name:a.name,error:e.message});
           FL.log(`FAILED ${a.name}: ${e.message}`,"er");
         }
-      }
+      };
+
+      /* Turbo used to print "turbo mode" and then create ads strictly one at a
+         time — the label was the only thing that changed. Overlapping the
+         round trips is the whole point; Meta's limit counts calls per window,
+         not calls at once, so this does not burn budget faster, it just stops
+         waiting for one reply before sending the next. */
+      const lanes = $("#turbo").checked ? 4 : 1;
+      FL.log(`Creating ${mine.length} ad(s) in "${set.label||set.name}"`
+             + (lanes>1?` — ${lanes} at a time`:" — one at a time"));
+      const queue=[...mine];
+      await Promise.all(Array.from({length:Math.min(lanes,queue.length)},async()=>{
+        while(queue.length && !FL.cancelled) await makeAd(queue.shift());
+      }));
     }
   }catch(e){ FL.log("Stopped: "+e.message,"er"); }
 
   S.busy=false; renderPreview();
+  const secs=(Date.now()-t0)/1000;
+  created.timing = `Took ${secs<90?Math.round(secs)+"s":(secs/60).toFixed(1)+" min"} for `
+    + `${created.ads.length+created.adsets.length} Meta object(s) — about `
+    + `${(secs/Math.max(1,created.ads.length)).toFixed(1)}s per ad. If that feels slow, it is `
+    + `almost always the ad account's rate window, not the tool. See reference/rate-limits.md.`;
+  FL.log(created.timing);
   FL.log(`Finished. ${created.ads.length} ad(s) created${created.failed.length?`, ${created.failed.length} failed`:""}.`,
          created.failed.length?"er":"ok");
   if(created.failed.length) FL.log("Nothing was retried automatically — re-run only the failed names.","er");
@@ -2167,6 +2186,7 @@ function showResult(c,paused){
       <thead><tr><th>Ad name</th><th>Ad ID</th></tr></thead>
       <tbody>${c.ads.map(a=>`<tr><td>${esc(a.name)}</td><td class="mono">${esc(a.id)}</td></tr>`).join("")}</tbody>
     </table></div>
+    ${c.timing?`<p class="hint" style="margin-top:12px">${esc(c.timing)}</p>`:""}
     <p class="hint">Verify before trusting: run <code>python3 scripts/verify.py</code> against these IDs, or open them in Ads Manager.</p>`;
   $("#cfGo").textContent="Close"; $("#cfGo").className="btn";
   $("#cfGo").onclick=()=>{ $("#mConfirm").hidden=true; FL.close(); };
