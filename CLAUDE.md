@@ -30,6 +30,17 @@ that already exists, or see what is running. Never open with "how can I help".
 
 See `reference/gotchas.md` for why the last row is a hard limit.
 
+## When a build crawls
+
+It is Meta throttling the ad account, not the tool. `scripts/lib/meta.py` reads
+Meta's usage header, paces under the ceiling, and waits the exact time Meta
+states when blocked. Say so plainly rather than letting someone watch a stalled
+terminal: name the percentage used and the access tier (`meta.usage_line()`).
+
+If the tier is `development_access`, that is the ceiling, and no code change
+raises it — point them at `reference/rate-limits.md`. Never suggest a build
+failed or the tool is broken when it is the account's rate window.
+
 ## Non-negotiable
 
 1. **Read-only first.** Begin any new account with `discover.py`. Never write

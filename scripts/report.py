@@ -95,5 +95,14 @@ def main():
     print(f"\n  Nothing was modified. To act on this, see set_status.py / set_budget.py")
 
 
+
+def _print_usage():
+    """Where the account stands on its Meta rate budget."""
+    try:
+        print("\n  " + meta.usage_line())
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     main()
+    _print_usage()

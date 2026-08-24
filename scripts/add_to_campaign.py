@@ -43,17 +43,25 @@ def list_campaigns(acct):
     return camps
 
 
-def list_adsets(campaign_id):
+def list_adsets(campaign_id, with_counts=True):
+    """Ad sets in a campaign.
+
+    with_counts=False skips one /ads request PER ad set. Those requests
+    paginate over every existing ad, so on a campaign holding 100+ ads they
+    are the most expensive thing here — and the duplicate-name check below
+    only ever wanted the names.
+    """
     sets_ = meta.get_all(f"{campaign_id}/adsets",
         "id,name,status,effective_status,daily_budget,lifetime_budget,optimization_goal,targeting")
     for a in sets_:
         geo = (a.get("targeting") or {}).get("geo_locations", {}) or {}
         a["countries"] = geo.get("countries") or []
         a.pop("targeting", None)
-        try:
-            a["ad_count"] = len(meta.get_all(f"{a['id']}/ads", "id", cap=500))
-        except Exception:
-            a["ad_count"] = None
+        if with_counts:
+            try:
+                a["ad_count"] = len(meta.get_all(f"{a['id']}/ads", "id", cap=500))
+            except Exception:
+                a["ad_count"] = None
     return sets_
 
 
@@ -198,7 +206,7 @@ def add_adsets(acct, campaign_id, spec_path, execute):
     camp = meta.get(campaign_id, "id,name,daily_budget,lifetime_budget,objective")
     cbo = bool(camp.get("daily_budget") or camp.get("lifetime_budget"))
     defaults = spec.get("defaults", {})
-    existing = {a["name"] for a in list_adsets(campaign_id)}
+    existing = {a["name"] for a in list_adsets(campaign_id, with_counts=False)}
 
     print("=" * 72)
     print(f"ADD AD SETS  ->  campaign  {camp.get('name')}  ({campaign_id})")

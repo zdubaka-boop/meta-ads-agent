@@ -6,7 +6,7 @@ after changing anything in the reading/parsing path:
 
   python3 scripts/selftest.py
 """
-import csv, io, json, sys, tempfile
+import csv, io, json, sys, tempfile, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -238,6 +238,55 @@ first = fill(BIG, _out)
 second = fill({**BIG, "ads": BIG["ads"][:3]}, _out)
 check("re-filling a workbook drops the old rows",
       first == 500 and second == 3, f"{first} then {second}")
+
+# --- Meta rate limiting ------------------------------------------------------
+# A whole night was lost to blind backoff on an account whose own response
+# headers said exactly how long to wait, and what the real problem was.
+import meta as _meta
+
+# 15. The usage header must be read, and pct is the WORST of the three numbers.
+_meta.USAGE.update(pct=0, tier=None, regain_at=0.0, waited=0.0, warned=True)
+_meta._read_usage({"x-business-use-case-usage":
+    '{"221":[{"type":"ads_management","call_count":1,"total_cputime":8,'
+    '"total_time":51,"estimated_time_to_regain_access":0,'
+    '"ads_api_access_tier":"development_access"}]}'})
+check("the rate-limit header is read, worst of the three wins",
+      _meta.USAGE["pct"] == 51 and _meta.USAGE["tier"] == "development_access",
+      f"pct={_meta.USAGE['pct']} tier={_meta.USAGE['tier']}")
+
+# 16. When Meta says how many minutes, use that instead of guessing.
+_meta.USAGE.update(pct=0, regain_at=0.0)
+_meta._read_usage({"x-business-use-case-usage":
+    '{"a":[{"call_count":100,"total_cputime":100,"total_time":100,'
+    '"estimated_time_to_regain_access":3}]}'})
+left = _meta.USAGE["regain_at"] - time.time()
+check("a stated wait is honoured to the minute", 175 < left < 185, f"{left:.0f}s")
+
+# 17. Pace before the wall, not after hitting it.
+import os as _os
+_os.environ["META_PACE"] = "1"
+_meta.USAGE.update(regain_at=0.0, waited=0.0)
+naps = {}
+for pct in (10, 75, 85):
+    _meta.USAGE["pct"] = pct
+    t0 = time.time(); _meta._pace(); naps[pct] = round(time.time() - t0, 1)
+check("pacing kicks in as the budget fills",
+      naps[10] == 0.0 and 1.3 < naps[75] < 1.8 and 3.7 < naps[85] < 4.4, str(naps))
+
+# 18. It must be possible to turn off.
+_os.environ["META_PACE"] = "0"
+_meta.USAGE["pct"] = 99
+t0 = time.time(); _meta._pace(); off = time.time() - t0
+_os.environ["META_PACE"] = "1"
+check("META_PACE=0 disables pacing", off < 0.2, f"{off:.2f}s")
+
+# 19. Listing ad sets must not fetch ad counts nobody asked for — that was one
+#     paginated /ads call per ad set before a single ad got created.
+import inspect, add_to_campaign
+src = inspect.getsource(add_to_campaign.list_adsets)
+uses = inspect.getsource(add_to_campaign).count("list_adsets(campaign_id, with_counts=False)")
+check("the duplicate-name check skips ad counts",
+      "with_counts" in src and uses >= 1, f"with_counts in signature={('with_counts' in src)}")
 
 print("=" * 66)
 bad = results.count(False)

@@ -388,6 +388,17 @@ python3 scripts/selftest.py     # offline, no API, no cost
 Every test in there exists because that exact bug shipped once. Add a new one
 whenever you fix a new one.
 
+## When it looks stuck
+
+A build printing waiting messages is Meta throttling the ad account. Tell them
+what is happening — `meta.usage_line()` gives the percentage used and the access
+tier — and how long it is likely to take. Do not restart it, do not "try again",
+and never call it a failure. Re-running costs more calls and makes it worse.
+
+If the tier is `development_access`, that is the real ceiling. Walk them through
+`reference/rate-limits.md`: Advanced Access for `ads_management`, or issue the
+token from an app in the business that already has it.
+
 ## Rules that do not bend
 
 - **Everything is created PAUSED.** There is no path that creates a live ad.

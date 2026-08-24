@@ -66,18 +66,90 @@ def account(acct=None):
     return a if str(a).startswith("act_") else f"act_{a}"
 
 
+# --- what Meta tells us about our own rate budget -------------------------
+# Every response carries x-business-use-case-usage: how much of this account's
+# allowance is spent (as percentages), which access tier the app is on, and —
+# when blocked — exactly how many minutes until it clears. Reading it is the
+# difference between pacing under the ceiling and slamming into it and then
+# guessing how long to sit out.
+USAGE = {"pct": 0, "tier": None, "regain_at": 0.0, "waited": 0.0, "warned": False}
+
+# Sleep a little once the account is this deep into its window. Cheap insurance:
+# a few seconds here avoids a block that costs minutes. META_PACE=0 turns it off.
+_PACE = [(95, 20.0), (90, 10.0), (80, 4.0), (70, 1.5)]
+
+
+def _read_usage(headers):
+    """Record usage percentages and the access tier from a response."""
+    raw = None
+    for h in ("x-business-use-case-usage", "X-Business-Use-Case-Usage"):
+        raw = headers.get(h) if headers else None
+        if raw:
+            break
+    if not raw:
+        return
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return
+    for entries in data.values():
+        for e in entries or []:
+            pct = max(int(e.get(k) or 0) for k in
+                      ("call_count", "total_cputime", "total_time"))
+            USAGE["pct"] = pct
+            if e.get("ads_api_access_tier"):
+                USAGE["tier"] = e["ads_api_access_tier"]
+            mins = int(e.get("estimated_time_to_regain_access") or 0)
+            if mins:
+                USAGE["regain_at"] = max(USAGE["regain_at"], time.time() + mins * 60)
+    if (USAGE["tier"] == "development_access" and not USAGE["warned"]
+            and os.getenv("META_TIER_WARNING", "1") != "0"):
+        USAGE["warned"] = True
+        print("  NOTE: this app is on Meta's development_access tier — a small "
+              "fraction of the normal rate allowance.\n"
+              "        Large builds will crawl until it is granted Advanced Access "
+              "for ads_management.\n"
+              "        See reference/rate-limits.md.")
+
+
+def _pace():
+    """Wait out a known block, or ease off before causing one."""
+    if os.getenv("META_PACE", "1") == "0":
+        return
+    now = time.time()
+    if USAGE["regain_at"] > now:
+        wait = USAGE["regain_at"] - now
+        print(f"  Meta says this account is rate limited for another "
+              f"{wait/60:.1f} min. Waiting exactly that long…")
+        time.sleep(wait)
+        USAGE["waited"] += wait
+        USAGE["regain_at"] = 0.0
+        USAGE["pct"] = 0
+        return
+    for threshold, nap in _PACE:
+        if USAGE["pct"] >= threshold:
+            time.sleep(nap)
+            USAGE["waited"] += nap
+            return
+
+
 def _request(path, params, post, op, retries=5):
     params = dict(params)
     params["access_token"] = token()
     body = urllib.parse.urlencode(params).encode()
     for attempt in range(1, retries + 1):
+        _pace()
         try:
             if post:
                 req = urllib.request.Request(f"{BASE}/{path}", data=body)
             else:
                 req = urllib.request.Request(f"{BASE}/{path}?{body.decode()}")
-            return json.loads(urllib.request.urlopen(req, timeout=300).read())
+            resp = urllib.request.urlopen(req, timeout=300)
+            out = json.loads(resp.read())
+            _read_usage(resp.headers)
+            return out
         except urllib.error.HTTPError as e:
+            _read_usage(getattr(e, "headers", None))
             try:
                 err = json.loads(e.read()).get("error", {})
             except Exception:
@@ -89,12 +161,16 @@ def _request(path, params, post, op, retries=5):
             transient = (err.get("is_transient") or rate_limited
                          or e.code in (429, 500, 502, 503, 504))
             if transient and attempt < retries:
+                if rate_limited and USAGE["regain_at"] > time.time():
+                    # Meta told us the real number; the ladder below is a guess.
+                    continue
                 wait = (min(300, 45 * 2 ** (attempt - 1)) if rate_limited
                         else min(60, 5 * 2 ** (attempt - 1)))
                 if rate_limited:
-                    print(f"  Meta rate limit on this ad account. Waiting {wait}s "
-                          f"(attempt {attempt}/{retries})…")
+                    print(f"  Meta rate limit on this ad account, and it did not say "
+                          f"for how long. Waiting {wait}s (attempt {attempt}/{retries})…")
                 time.sleep(wait)
+                USAGE["waited"] += wait
                 continue
             raise MetaError(op, err)
         except urllib.error.URLError:
@@ -103,6 +179,13 @@ def _request(path, params, post, op, retries=5):
                 continue
             raise
     raise MetaError(op, {"message": "retries exhausted"})
+
+
+def usage_line():
+    """One-line summary of where this account stands. Safe to print anywhere."""
+    tier = USAGE["tier"] or "unknown"
+    return (f"Meta rate budget: {USAGE['pct']}% used, access tier {tier}"
+            + (f", {USAGE['waited']/60:.1f} min spent waiting" if USAGE["waited"] else ""))
 
 
 def get(path, fields=None, **extra):
