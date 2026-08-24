@@ -388,6 +388,7 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
     <div class="acct-menu" id="acctMenu" hidden>
       <div class="who" id="acctWho">Not connected</div>
       <div class="sep"></div>
+      <button data-signin>Connect a Meta account</button>
       <button data-act="accounts">Switch ad account</button>
       <button data-act="presets">Manage presets</button>
       <a href="https://adsuploader.com" target="_blank" rel="noopener">Documentation</a>
@@ -872,6 +873,35 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
  </div>
 </div>
 
+<!-- ============================ sign in ================================== -->
+<div class="scrim" id="mSignIn" hidden>
+ <div class="modal" style="max-width:560px">
+  <header><div><h3>Connect your Meta account</h3>
+    <p>Your token stays on the server for your session. It is never typed into a chat.</p></div>
+    <button class="x" data-close="mSignIn"><svg style="width:22px;height:22px"><use href="#i-x"/></svg></button></header>
+  <div class="body">
+    <div class="seg pill" id="siTab" style="margin-bottom:18px">
+      <button data-t="code" class="on">I have a code</button><button data-t="token">First time</button></div>
+
+    <div id="siCode">
+      <label class="f">Your login code</label>
+      <input class="inp" id="siCodeInput" placeholder="e.g. amber-fox-71" autocomplete="off">
+      <p class="hint">The code you were given the first time you connected.</p>
+      <button class="btn" id="siLogin" style="margin-top:14px">Sign in</button>
+    </div>
+
+    <div id="siToken" hidden>
+      <label class="f">Meta access token</label>
+      <input class="inp" id="siTokenInput" type="password" placeholder="EAA…" autocomplete="off">
+      <p class="hint">Needs ads_read, ads_management, business_management, pages_show_list and
+        pages_read_engagement. It is checked with Meta before anything is stored.</p>
+      <button class="btn" id="siRegister" style="margin-top:14px">Check and store</button>
+    </div>
+    <div id="siOut" style="margin-top:16px"></div>
+  </div>
+ </div>
+</div>
+
 <!-- ========================== float progress ============================= -->
 <div class="float" id="float" hidden>
   <header>
@@ -1206,7 +1236,8 @@ function renderModeBanner(){
   b.innerHTML = S.demo
     ? `<div class="banner warn"><div><b>Demo data — nothing here touches Meta.</b>
         No access token is configured, so campaigns, ad sets and ads below are samples.
-        Every button works; nothing is sent. Set a token to go live.</div></div>`
+        Every button works; nothing is sent.
+        <button class="linkbtn" data-signin style="margin-top:6px">Connect a Meta account &rarr;</button></div></div>`
     : `<div class="banner info"><div><b>Connected to ${esc(S.acct.name||S.acct.id)}.</b>
         Ads are created paused by default — activation is a separate, explicit step.</div></div>`;
 }
@@ -2043,5 +2074,40 @@ function drawMedia(){
 }
 
 boot();
+</script>
+<script>
+/* ============================== sign in ================================ */
+function openSignIn(){ $("#siOut").innerHTML=""; $("#mSignIn").hidden=false; setTimeout(()=>$("#siCodeInput").focus(),60); }
+$("#siTab").onclick = e=>{ const b=e.target.closest("button"); if(!b) return;
+  $$("#siTab button").forEach(x=>x.classList.toggle("on",x===b));
+  $("#siCode").hidden = b.dataset.t!=="code"; $("#siToken").hidden = b.dataset.t!=="token"; $("#siOut").innerHTML=""; };
+$("#siLogin").onclick = async ()=>{
+  const code=$("#siCodeInput").value.trim(); if(!code) return;
+  $("#siOut").innerHTML=`<p class="muted small">Checking…</p>`;
+  try{
+    const d=await api("/api/login",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({code})});
+    $("#siOut").innerHTML=`<div class="banner info"><div><b>Signed in as ${esc(d.who||"you")}.</b> Reloading…</div></div>`;
+    setTimeout(()=>location.reload(),700);
+  }catch(e){ $("#siOut").innerHTML=`<div class="banner bad"><div>${esc(e.message)}</div></div>`; }
+};
+$("#siRegister").onclick = async ()=>{
+  const token=$("#siTokenInput").value.trim(); if(!token) return;
+  $("#siOut").innerHTML=`<p class="muted small">Checking the token with Meta…</p>`;
+  try{
+    const d=await api("/api/register",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({token})});
+    $("#siTokenInput").value="";
+    $("#siOut").innerHTML=`<div class="banner info"><div><b>Your login code is</b>
+      <div style="font-size:25px;letter-spacing:2px;margin:9px 0;font-family:var(--mono)">${esc(d.code)}</div>
+      Write it down now — it is the only key to your token and cannot be recovered.
+      Next time, sign in with this code.</div></div>`;
+  }catch(e){ $("#siOut").innerHTML=`<div class="banner bad"><div>${esc(e.message)}</div></div>`; }
+};
+/* Capture phase: the account menu calls stopPropagation() on its own clicks,
+   which would otherwise swallow the sign-in button that lives inside it. */
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-signin]")){ $("#acctMenu").hidden=true; openSignIn(); }
+},true);
 </script>
 </body></html>
