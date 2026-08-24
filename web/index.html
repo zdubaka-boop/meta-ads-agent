@@ -165,6 +165,14 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xm
 .sect-t{font-size:19px;font-weight:700;color:var(--ink);margin:0 0 4px}
 .sect-h{padding:22px 30px 0}
 hr.sep{border:0;border-top:1px solid var(--line-2);margin:22px 0}
+.nrows{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;max-height:430px;overflow-y:auto}
+.nrow{display:flex;align-items:center;gap:12px;padding:9px 13px;border-bottom:1px solid var(--line-2)}
+.nrow:last-child{border-bottom:0}
+.nrow .n{width:26px;text-align:right;font-size:12.5px;color:var(--faint);flex:none;font-variant-numeric:tabular-nums}
+.nrow .tb{width:38px;height:38px;border-radius:7px;border:1px solid var(--line);overflow:hidden;flex:none;background:var(--page);display:grid;place-items:center}
+.nrow .tb img{width:100%;height:100%;object-fit:cover}
+.nrow .fn{font-size:11.5px;color:var(--faint);width:150px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nrow .inp{padding:8px 11px;font-size:14px}
 </style>
 <style>
 /* ============================== dashboard ============================== */
@@ -605,13 +613,13 @@ table.tbl td.mono{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
 
     <hr class="sep">
     <h3 style="font-size:16px;margin-bottom:4px">3. What to call the ads</h3>
-    <label class="radio"><input type="radio" name="anam" value="file" checked> Name them after the image file</label>
-    <label class="radio"><input type="radio" name="anam" value="pattern"> Build the name myself</label>
-    <div id="namePatternPane" hidden style="padding:4px 0 4px 30px">
-      <div class="row" style="flex-wrap:wrap;gap:7px;margin-bottom:9px" id="tokenBtns"></div>
-      <input class="inp" id="namePattern" value="{filename}" style="max-width:520px">
-      <p class="hint">Your first ad would be called: <b id="namePreview" style="color:var(--ink)">—</b></p>
+    <p class="muted small" style="margin:0 0 12px">Type a name for each one. Leave a row alone to keep the file name.</p>
+    <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
+      <input class="inp" id="nameAll" placeholder="Name them all at once, e.g. Spring 2026" style="max-width:330px">
+      <button class="btn ghost" id="btnNameAll">Apply to all</button>
+      <span class="hint" style="margin:0">Adds 1, 2, 3&hellip; to the end of each.</span>
     </div>
+    <div id="adNameList"></div>
 
     <hr class="sep">
     <h2 style="font-size:20px;margin-bottom:9px">Preview</h2>
@@ -966,8 +974,8 @@ const S = {
   api:{campaigns:[],adsets:[],ads:[],c:null,a:null,d:null,aSel:[],dSel:[],loading:false},
   dup:{campaigns:[],adsets:[],ads:[],c:null,a:null,aSel:[],picked:new Set(),destC:null,destA:null,destAdsets:[]},
   media:{items:[],type:"all",q:""},
-  struct:{camp:"existing", bmode:"CBO", aset:"existing", perSet:5,
-          anam:"file", pattern:"{filename}"},
+  struct:{camp:"existing", bmode:"CBO", aset:"existing", perSet:5},
+  adNames:{},                       // creative id -> the name the user typed
   text:{mode:"common",headMode:"flexible",headlines:[""],bodies:[""],desc:"",cta:"SIGN_UP",link:"",display:"",
         utm:"utm_medium={{campaign.id}}&utm_campaign={{campaign.name}}&utm_term={{adset.id}}&utm_content={{ad.id}}&utm_source=facebook", page_id:"",
         perAd:{}, perAdset:{}},
@@ -1192,19 +1200,17 @@ function mountUploader(){
   group("camp","camp");
   group("bmode","bmode");
   group("aset","aset", v=>{ if(v==="custom") openBuilder(); else S.customSets=[]; });
-  group("anam","anam");
   $("#btnOpenBuilder").onclick = openBuilder;
   $("#perSet").oninput = e=>{ S.struct.perSet=Math.max(1,Math.min(50,+e.target.value||1)); renderPreview(); };
-  $("#namePattern").oninput = e=>{ S.struct.pattern=e.target.value; renderPreview(); };
   ["ncName","ncObjective","ncBudget","naName"].forEach(id=>$("#"+id).oninput=renderPreview);
-  /* Name tokens as buttons — nobody should have to learn brace syntax. */
-  $("#tokenBtns").innerHTML = [["{filename}","image file name"],["{index}","1, 2, 3…"],
-      ["{adset}","ad set name"],["{campaign}","campaign name"],["{date}","today's date"],
-      ["{ratio}","which sizes"]]
-    .map(([t,l])=>`<button class="btn ghost sm" data-tok="${t}" title="Inserts the ${l}">${l}</button>`).join("");
-  $("#tokenBtns").onclick = e=>{ const b=e.target.closest("[data-tok]"); if(!b) return;
-    const f=$("#namePattern"); f.value += (f.value&&!f.value.endsWith(" ")?" ":"") + b.dataset.tok;
-    S.struct.pattern=f.value; renderPreview(); };
+  $("#btnNameAll").onclick = ()=>{
+    const base=$("#nameAll").value.trim();
+    if(!base) return toast("Type a name first, then Apply to all.");
+    groupCreatives(S.uploaded.length?S.uploaded:S.files)
+      .forEach((g,i)=>{ S.adNames[g.main.id] = `${base} ${i+1}`; });
+    renderAdNames(); renderPreview();
+  };
+  renderAdNames();
   syncStruct();
 
   /* ---------- ad text ---------- */
@@ -1270,7 +1276,6 @@ function syncStruct(){
   $("#newAdsetPane").hidden   = st.aset!=="one";
   $("#autoDividePane").hidden = st.aset!=="split";
   $("#customPane").hidden     = st.aset!=="custom";
-  $("#namePatternPane").hidden = st.anam!=="pattern";
 
   /* A brand-new campaign has no existing ad sets to put anything into. */
   const rex=$("#rExistingSet"), rexIn=rex.querySelector("input");
@@ -1296,6 +1301,31 @@ function syncStructHints(){
   $("#curLabel").textContent = cur; $("#curLabel2").textContent = cur;
 }
 
+/* One row per ad, name it, done. No pattern language to learn. */
+function renderAdNames(){
+  const box=$("#adNameList"); if(!box) return;
+  const groups = groupCreatives(S.uploaded.length?S.uploaded:S.files);
+  if(!groups.length){
+    box.innerHTML=`<p class="hint" style="margin:0">Add creatives above and they will be listed here to name.</p>`;
+    return;
+  }
+  box.innerHTML = `<div class="nrows">${groups.map((g,i)=>`
+    <div class="nrow">
+      <span class="n">${i+1}</span>
+      <span class="tb">${g.main.url&&g.main.type==="image"
+        ? `<img src="${g.main.url}" alt="">`
+        : `<svg style="width:17px;height:17px;color:var(--faint)"><use href="#i-${g.main.type==="video"?"vid":"img"}"/></svg>`}</span>
+      <span class="fn" title="${esc(g.main.name)}">${esc(g.main.name)}</span>
+      <input class="inp" data-nm="${esc(g.main.id)}" value="${esc(S.adNames[g.main.id]||"")}"
+             placeholder="${esc(g.base)}" maxlength="120">
+    </div>`).join("")}</div>`;
+  $$("[data-nm]",box).forEach(inp=>inp.oninput=e=>{
+    const v=e.target.value.trim();
+    if(v) S.adNames[e.target.dataset.nm]=v; else delete S.adNames[e.target.dataset.nm];
+    renderPreview();
+  });
+}
+
 function renderModeBanner(){
   const b=$("#modeBanner"); if(!b) return;
   b.innerHTML = S.demo
@@ -1319,7 +1349,7 @@ function addFiles(list){
                   url:URL.createObjectURL(f)});
   }
   if(skipped) toast(`${skipped} file(s) skipped — unsupported type or over the size limit.`);
-  renderFiles(); renderPreview();
+  renderFiles(); renderAdNames(); renderPreview();
 }
 function renderFiles(){
   const box=$("#fileBox"), list=$("#fileList"); if(!box) return;
@@ -1341,7 +1371,8 @@ function renderFiles(){
     const f=S.files.find(x=>x.id===b.dataset.rm); if(f) URL.revokeObjectURL(f.url);
     S.files=S.files.filter(x=>x.id!==b.dataset.rm);
     S.customSets.forEach(s=>s.items=s.items.filter(i=>i!==b.dataset.rm));
-    renderFiles(); renderPreview();
+    delete S.adNames[b.dataset.rm];
+    renderFiles(); renderAdNames(); renderPreview();
   });
   const n=S.files.length, g=groupCreatives(S.files).length;
   $("#btnUpload").textContent = `Upload ${n} file${n===1?"":"s"}` + (g!==n?`  (${g} ad${g===1?"":"s"})`:"");
@@ -1683,18 +1714,9 @@ function buildPlan(){
   if(!(S.text.bodies||[]).some(b=>b&&b.trim())) warnings.push("No primary text — every ad needs at least one.");
 
   /* --- name the ads --- */
-  const today=new Date().toISOString().slice(0,10);
   const ads=[];
   sets.forEach(set=>set.items.forEach((g,i)=>{
-    /* The main file carries no role — only the suffixed extras do. */
-    const ratio = g.extras.length
-      ? [g.main,...g.extras].map(e=>e.role&&e.role!=="main"?e.role:"square").join("+") : "single";
-    const name = st.anam==="pattern"
-      ? (st.pattern||"{filename}")
-          .replace(/\{filename\}/g,g.base).replace(/\{index\}/g,String(ads.length+1))
-          .replace(/\{adset\}/g,set.name).replace(/\{campaign\}/g,camp.name)
-          .replace(/\{date\}/g,today).replace(/\{ratio\}/g,ratio)
-      : g.base;
+    const name = S.adNames[g.main.id] || g.base;
     ads.push({key:g.main.id, campaign:camp, set, name:name.slice(0,120), group:g});
   }));
   return {ads,sets,warnings,camp};
@@ -1717,7 +1739,6 @@ function renderPreview(){
     d.innerHTML=`<div><b>${warnings.length} thing(s) to sort out first</b>${warnings.map(x=>`<div>&bull; ${esc(x)}</div>`).join("")}</div>`;
     $("#previewCount").closest(".card").appendChild(d);
   }
-  if($("#namePreview")) $("#namePreview").textContent = ads[0]?.name || "—";
   if($("#existingSetCount")) syncStructHints();
   const btn=$("#btnCreate");
   if(btn){ btn.disabled = !ads.length || !!warnings.length || S.busy;
