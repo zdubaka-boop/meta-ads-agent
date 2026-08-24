@@ -188,6 +188,57 @@ check("creatives outside the repo keep a resolvable path",
       paths and all(os.path.exists(x) for x in paths),
       f"{len(paths)} path(s), missing: {[x for x in paths if not os.path.exists(x)][:2]}")
 
+# 11. Copy keyed to a group that does not exist is copy the user thinks is
+#     live. It used to vanish without a word.
+spec, log = bulk(FILES, {"lt": {"bodies": ["L"], "headlines": ["H"]},
+                         "pl": {"bodies": ["P"], "headlines": ["H"]},
+                         "poland": {"bodies": ["LOST"], "headlines": ["H"]}})
+check("copy matching no group is reported", "poland" in log and "NOT used" in log,
+      log.strip()[-90:])
+
+# 12. Same for an angle key that matches no filename ('pricing' vs 'price').
+spec, log = bulk(FILES, {"lt": {"pricing": {"bodies": ["X"], "headlines": ["H"]},
+                                "_default": {"bodies": ["D"], "headlines": ["H"]}},
+                         "pl": {"bodies": ["P"], "headlines": ["H"]}})
+check("an angle matching no creative is reported",
+      "pricing" in log and "matched no creative" in log, log.strip()[-90:])
+
+# 13. fill_template joins long values with a pipe; the reader split only on
+#     commas, so any interest or language name over 12 chars came back mangled.
+from fill_template import joined
+_sep = lambda raw: "|" if "|" in raw else ","
+_split = lambda raw: [x.strip() for x in raw.split(_sep(raw)) if x.strip()]
+pairs = [["Physical fitness", "Running"], ["LT", "PL"], ["Portuguese (Brazil)", "Spanish"]]
+check("long list values survive the sheet's own separator",
+      all(_split(joined(v)) == v for v in pairs),
+      str([(_split(joined(v)), v) for v in pairs if _split(joined(v)) != v]))
+
+# 14. Re-filling a workbook must drop the previous tail. It cleared a fixed 400
+#     rows, so a 500-ad sheet re-filled with 3 kept 497 ads nobody asked for.
+def fill(brief, out):
+    import subprocess
+    Path("/tmp/_st_brief.json").write_text(json.dumps(brief))
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "fill_template.py"),
+                    "/tmp/_st_brief.json", "--out", out], capture_output=True)
+    from fill_template import _openpyxl
+    load_workbook, _ = _openpyxl()
+    wb = load_workbook(out)
+    sh = wb["Ads"]
+    return sum(1 for r in range(2, sh.max_row + 1) if sh.cell(r, 2).value)
+
+BIG = {"account_id": "act_1",
+       "campaign": {"name": "B", "objective": "OUTCOME_TRAFFIC",
+                    "budget_mode": "CBO", "daily_budget_minor": 1000},
+       "defaults": {"page_id": "1", "link": "https://example.org", "cta": "LEARN_MORE"},
+       "adsets": [{"name": "S", "countries": ["LT"]}],
+       "ads": [{"adset": "S", "name": f"ad{i}", "creative": "a.jpg",
+                "bodies": ["b"], "headlines": ["h"]} for i in range(500)]}
+_out = tempfile.mktemp(suffix=".xlsx")
+first = fill(BIG, _out)
+second = fill({**BIG, "ads": BIG["ads"][:3]}, _out)
+check("re-filling a workbook drops the old rows",
+      first == 500 and second == 3, f"{first} then {second}")
+
 print("=" * 66)
 bad = results.count(False)
 print(f"  {len(results)-bad}/{len(results)} passed" + ("" if not bad else f"   {bad} FAILING"))

@@ -107,7 +107,14 @@ def main():
     resolved_log = []
 
     def csv_list(v):
-        return [x.strip() for x in str(v or "").split(",") if x.strip()]
+        """Split a list cell. The sheet uses commas, but fill_template writes
+        a pipe when any item is long (see joined()) - and an interest called
+        'Physical fitness, Inc' must not split on its own comma. So: if a pipe
+        is present it is the separator, otherwise the comma is.
+        """
+        raw = str(v or "")
+        sep = "|" if "|" in raw else ","
+        return [x.strip() for x in raw.split(sep) if x.strip()]
 
     def variants(v):
         """Split a copy cell into its variants.

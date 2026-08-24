@@ -124,7 +124,9 @@ def main():
 
     # ---- Ad Sets ----
     a = wb["Ad Sets"]
-    for row in range(2, 40):
+    # Clear past the end of both the template's example rows AND whatever a
+    # previous fill left behind, or a smaller re-fill keeps the old tail.
+    for row in range(2, max(40, a.max_row + 1, len(brief.get("adsets", [])) + 2)):
         for col in range(1, 30):
             a.cell(row=row, column=col).value = None
     for i, s in enumerate(brief.get("adsets", []), start=2):
@@ -133,7 +135,7 @@ def main():
 
     # ---- Ads ----
     ads = wb["Ads"]
-    for row in range(2, 400):
+    for row in range(2, max(400, ads.max_row + 1, len(brief.get("ads", [])) + 2)):
         for col in range(1, 13):
             ads.cell(row=row, column=col).value = None
     for i, ad in enumerate(brief.get("ads", []), start=2):

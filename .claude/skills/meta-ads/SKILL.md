@@ -160,11 +160,26 @@ python3 scripts/bulk_build.py --creatives ~/path/to/folder --copy copy.json \
 ```
 
 `--like` reads objective, budget mode and amount, optimisation goal, billing
-event, age range, Page, link, CTA, URL tags and DSA beneficiary off a real
-campaign. It never copies its name or its ads.
+event, age range, Page, link, CTA, URL tags, DSA beneficiary, **and the
+audience** — interests, custom audiences, languages, gender and placements —
+off a real campaign. It never copies its name or its ads.
 
-Add `--dry-run` to show the pairing without writing anything — do that first
-when the folder is large.
+Anything on the source it could not carry is reported as a problem, not a
+footnote: **read those out loud to the user.** "Same settings as last month"
+that quietly drops a narrowed audience spends far more than last month did.
+
+**Always run it with `--show-pairing --dry-run` first** and show them the
+result. It prints each distinct primary text and the creatives it lands on:
+
+```
+  pl               20 ad(s)   -> PL
+        5 x  "Teraz taniej o 30%."
+             pl-price-01.png, pl-price-02.png, pl-price-03.png, +2 more
+```
+
+That table is the only check on whether the copy went where they meant it to —
+you inferred that pairing, so they have to confirm it. It also names any copy
+block that matched nothing, which is text they think is live and is not.
 
 **Step 4 — read what it printed.** It lists every field it could not fill and
 every creative it has no copy for. Those are blank on purpose. Take them back
