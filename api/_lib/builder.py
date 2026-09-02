@@ -282,7 +282,9 @@ def parse_workbook(xlsx_bytes, creatives, mode="campaign", inherit=None):
     lib = {"img": None, "vid": None}
 
     def resolve_creative(cf, problems, who):
-        """-> ('upload', filename) | ('hash', h) | ('video', id) | (None, None)"""
+        """-> ('upload'|'url'|'hash'|'video', reference) | (None, None)"""
+        if meta.is_remote_url(cf):
+            return "url", cf
         key = Path(cf).name.strip().lower()
         if key in have:
             if Path(key).suffix in VIDEO_EXT:
@@ -397,7 +399,9 @@ def build(spec, creatives, log):
     result["campaign"] = {"id": cid, "name": c["name"]}
     log(f"campaign {cid}  {c['name']}")
 
-    media = {}
+    remote = [ad["_ref"] for a in spec["adsets"] for ad in a["ads"]
+              if ad.get("_kind") == "url"]
+    media = meta.upload_many(acct, remote, lanes=4, log=log) if remote else {}
     for a in spec["adsets"]:
       try:
         aid = meta.create_adset(acct, cid, a["name"], a["targeting"],
@@ -427,8 +431,12 @@ def build(spec, creatives, log):
             kind = ad.get("_kind")
             if kind == "hash":
                 img_hash = ad["_ref"]
+            elif kind == "url":
+                m = media[meta.media_key(ad["_ref"])]
+                video_id, thumb = m["video_id"], m["thumb"]
             elif kind == "video":
-                result["skipped"].append(f"{ad['name']} (video ads not built yet)"); continue
+                video_id = ad["_ref"]
+                thumb = meta.wait_for_video(video_id)
             else:
                 blob = creatives.get(ad["creative"])
                 if blob is None:
@@ -438,12 +446,14 @@ def build(spec, creatives, log):
                     media[key] = meta.upload_image_bytes(acct, blob, ad["creative"], ad["name"])
                 img_hash = media[key]
             pick = lambda k, dv=None: ad.get(k) or d.get(k) or dv
-            creative = meta.image_creative(
-                pick("page_id"), img_hash, link=pick("link"), body=ad.get("body", ""),
-                headline=ad.get("headline", ""), description=ad.get("description"),
-                cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
-                url_tags=pick("url_tags"), bodies=ad.get("bodies"),
-                headlines=ad.get("headlines"), descriptions=ad.get("descriptions"))
+            common = dict(link=pick("link"), body=ad.get("body", ""),
+                          headline=ad.get("headline", ""), description=ad.get("description"),
+                          cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
+                          url_tags=pick("url_tags"), bodies=ad.get("bodies"),
+                          headlines=ad.get("headlines"), descriptions=ad.get("descriptions"))
+            creative = (meta.video_creative(pick("page_id"), video_id, thumb, **common)
+                        if kind in ("url", "video")
+                        else meta.image_creative(pick("page_id"), img_hash, **common))
             try:
                 ad_id = meta.create_ad(acct, aid, ad["name"], creative, pixel_id=d.get("pixel_id"))
             except Exception as e:
@@ -485,12 +495,14 @@ def parse_ads_only(file_bytes, filename, creatives, defaults):
             problems.append(f"Duplicate ad name '{name}' in the file")
         seen.add(name)
         key = Path(cf).name.lower()
-        if key not in have:
+        remote = meta.is_remote_url(cf)
+        if key not in have and not remote:
             problems.append(f"Ad '{name}': '{cf}' was not among the files you dropped in")
-        elif Path(key).suffix in VIDEO_EXT:
+        elif not remote and Path(key).suffix in VIDEO_EXT:
             problems.append(f"Ad '{name}': '{cf}' is a video — browser uploads cap at ~4.5MB, "
                             f"so videos go through the CLI.")
-        ad = {"name": name, "creative": have.get(key, cf)}
+        ad = {"name": name, "creative": have.get(key, cf),
+              "_kind": "url" if remote else "upload", "_ref": cf}
         for k in ("cta", "link", "url_tags", "page_id", "instagram_user_id"):
             if r.get(k):
                 ad[k] = r[k]
@@ -514,22 +526,32 @@ def add_ads_to_adset(acct, adset_id, ads, creatives, defaults, log):
     """Create ads inside an ad set that already exists. PAUSED, dedup by name."""
     existing = {a.get("name") for a in meta.get_all(f"{adset_id}/ads", "id,name", cap=1000)}
     created, skipped, media = [], [], {}
+    remote = [ad.get("_ref") or ad["creative"] for ad in ads
+              if ad.get("_kind") == "url" or meta.is_remote_url(ad["creative"])]
+    if remote:
+        media.update(meta.upload_many(acct, remote, lanes=4, log=log))
     for ad in ads:
         if ad["name"] in existing:
             skipped.append(ad["name"]); continue
-        blob = creatives.get(ad["creative"])
-        if blob is None:
-            skipped.append(f"{ad['name']} (creative missing)"); continue
-        key = hashlib.sha256(blob).hexdigest()[:16]
-        if key not in media:
-            media[key] = meta.upload_image_bytes(acct, blob, ad["creative"], ad["name"])
+        is_video = ad.get("_kind") == "url" or meta.is_remote_url(ad["creative"])
+        if is_video:
+            key = meta.media_key(ad.get("_ref") or ad["creative"])
+        else:
+            blob = creatives.get(ad["creative"])
+            if blob is None:
+                skipped.append(f"{ad['name']} (creative missing)"); continue
+            key = hashlib.sha256(blob).hexdigest()[:16]
+            if key not in media:
+                media[key] = meta.upload_image_bytes(acct, blob, ad["creative"], ad["name"])
         pick = lambda k, dv=None: ad.get(k) or defaults.get(k) or dv
-        creative = meta.image_creative(
-            pick("page_id"), media[key], link=pick("link"), body=ad.get("body", ""),
-            headline=ad.get("headline", ""), description=ad.get("description"),
-            cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
-            url_tags=pick("url_tags"), bodies=ad.get("bodies"),
-            headlines=ad.get("headlines"), descriptions=ad.get("descriptions"))
+        common = dict(link=pick("link"), body=ad.get("body", ""),
+                      headline=ad.get("headline", ""), description=ad.get("description"),
+                      cta=pick("cta", "LEARN_MORE"), ig_user_id=pick("instagram_user_id"),
+                      url_tags=pick("url_tags"), bodies=ad.get("bodies"),
+                      headlines=ad.get("headlines"), descriptions=ad.get("descriptions"))
+        creative = (meta.video_creative(pick("page_id"), media[key]["video_id"],
+                                        media[key]["thumb"], **common)
+                    if is_video else meta.image_creative(pick("page_id"), media[key], **common))
         ad_id = meta.create_ad(acct, adset_id, ad["name"], creative,
                                pixel_id=defaults.get("pixel_id"))
         created.append({"id": ad_id, "name": ad["name"]})
@@ -540,16 +562,14 @@ def add_ads_to_adset(acct, adset_id, ads, creatives, defaults, log):
 def add_adsets_to_campaign(acct, campaign_id, spec, creatives, log):
     """Create ONLY new ad sets (and their ads) inside a campaign that exists.
 
-    Nothing about the campaign or its existing ad sets is touched. Ad sets
-    whose name is already in the campaign are skipped, so this is safe to
-    re-run and never duplicates. Existing ad sets keep delivering and keep
-    their learning — only the new ones start from zero, which is unavoidable
-    for anything genuinely new.
+    Nothing about the campaign or its existing ad sets is changed. If an ad
+    set name already exists, resume into it and add only ads whose names are
+    missing. This repairs partial runs without duplicating anything.
     """
     camp = meta.get(campaign_id, "id,name,daily_budget,lifetime_budget,objective")
     cbo = bool(camp.get("daily_budget") or camp.get("lifetime_budget"))
     d = spec.get("defaults", {})
-    existing = {a.get("name") for a in
+    existing = {a.get("name"): a.get("id") for a in
                 meta.get_all(f"{campaign_id}/adsets", "id,name", cap=500)}
 
     result = {"campaign": {"id": campaign_id, "name": camp.get("name")},
@@ -557,13 +577,11 @@ def add_adsets_to_campaign(acct, campaign_id, spec, creatives, log):
     problems = []
     todo = []
     for a in spec.get("adsets", []):
-        if a["name"] in existing:
-            result["skipped"].append(f"ad set '{a['name']}' (already in this campaign)")
-            continue
-        if cbo and a.get("daily_budget_minor"):
+        resumes = a["name"] in existing
+        if not resumes and cbo and a.get("daily_budget_minor"):
             problems.append(f"Ad set '{a['name']}': this campaign holds the budget (CBO), "
                             f"so the ad set must not have one — clear daily_budget_minor.")
-        if not cbo and not a.get("daily_budget_minor"):
+        if not resumes and not cbo and not a.get("daily_budget_minor"):
             problems.append(f"Ad set '{a['name']}': this campaign uses ad-set budgets (ABO), "
                             f"so a budget is required — it is never guessed.")
         todo.append(a)
@@ -573,8 +591,10 @@ def add_adsets_to_campaign(acct, campaign_id, spec, creatives, log):
         return result
 
     for a in todo:
+        aid = existing.get(a["name"])
         try:
-            aid = meta.create_adset(
+            if not aid:
+                aid = meta.create_adset(
                 acct, campaign_id, a["name"], a["targeting"],
                 budget_minor=a.get("daily_budget_minor"),
                 optimization_goal=a.get("optimization_goal", "LINK_CLICKS"),
@@ -585,8 +605,9 @@ def add_adsets_to_campaign(acct, campaign_id, spec, creatives, log):
                 start_time=a.get("start_time"), end_time=a.get("end_time"))
         except Exception as e:
             raise PartialBuild(f"Failed creating ad set '{a['name']}': {e}", result)
-        result["adsets"].append({"id": aid, "name": a["name"]})
-        log(f"ad set {aid}  {a['name']}")
+        result["adsets"].append({"id": aid, "name": a["name"],
+                                 "resumed": a["name"] in existing})
+        log(f"{'resumed' if a['name'] in existing else 'ad set'} {aid}  {a['name']}")
         res = add_ads_to_adset(acct, aid, a.get("ads", []), creatives, d, log)
         result["ads"].extend(res["created"])
         result["skipped"].extend(res["skipped"])

@@ -89,8 +89,11 @@ failed or the tool is broken when it is the account's rate window.
 
 Hundreds or thousands of ads are normal here. Author them as a CSV referenced by
 the spec — not as thousands of lines of JSON. One row per ad. The builder
-uploads each unique creative file once and reuses it, resumes from its state
-file, and retries transient errors with backoff.
+uploads each unique creative once and reuses it, resumes from its state file,
+and retries transient errors with backoff. Prefer a public direct HTTPS video
+URL in `creative`: Meta pulls it with `file_url` and the Mac uploads no bytes.
+For local media, keep the default four parallel upload lanes; videos over 40 MB
+automatically use resumable chunks.
 
 ## Tone
 

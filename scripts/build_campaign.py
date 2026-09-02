@@ -11,7 +11,7 @@ Bulk ads live in a CSV referenced by the spec, or passed with --ads.
 Re-running with --execute RESUMES from the state file; it never duplicates
 objects that already exist.
 """
-import argparse, csv, json, sys, hashlib
+import argparse, csv, json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import meta
@@ -104,8 +104,8 @@ def validate(spec):
                 errs.append(f"{atag}: page_id is required (no identity is ever inferred)")
             cre = ad.get("creative")
             if not cre:
-                errs.append(f"{atag}.creative (file path) is required")
-            elif not (ROOT / cre).exists() and not Path(cre).exists():
+                errs.append(f"{atag}.creative (file path or public HTTPS URL) is required")
+            elif not meta.is_remote_url(cre) and not (ROOT / cre).exists() and not Path(cre).exists():
                 errs.append(f"{atag}.creative file not found: {cre}")
             if not ad.get("body"):    warns.append(f"{atag} has no body text")
             if not ad.get("headline"): warns.append(f"{atag} has no headline")
@@ -152,7 +152,7 @@ def main():
         print(f"          geo={((a.get('targeting') or {}).get('geo_locations') or {}).get('countries')}"
               f"  opt={a.get('optimization_goal', 'LINK_CLICKS')}")
         for ad in a.get("ads", [])[:6]:
-            print(f"            - {ad.get('name'):<34} {Path(str(ad.get('creative',''))).name}")
+            print(f"            - {ad.get('name'):<34} {meta.media_name(ad.get('creative', ''))}")
         if len(a.get("ads", [])) > 6:
             print(f"            ... and {len(a['ads']) - 6} more")
 
@@ -214,8 +214,12 @@ def main():
         for ad in a["ads"]:
             if ad["name"] in state["ads"]:
                 continue
-            q = Path(ad["creative"])
-            wanted.append(q if q.exists() else ROOT / ad["creative"])
+            ref = ad["creative"]
+            if meta.is_remote_url(ref):
+                wanted.append(ref)
+            else:
+                q = Path(ref)
+                wanted.append(q if q.exists() else ROOT / ref)
     todo = [q for q in wanted if meta.file_key(q) not in state["media"]] if wanted else []
     if todo:
         print(f"\nmedia ({len(set(map(str, todo)))} distinct file(s))")
@@ -241,13 +245,17 @@ def main():
                 print(f"    ad    {state['ads'][ad['name']]}  {ad['name']}  (already created, skipped)")
                 continue
             path = ad["creative"]
-            p = Path(path) if Path(path).exists() else ROOT / path
+            p = path if meta.is_remote_url(path) else (
+                Path(path) if Path(path).exists() else ROOT / path)
             key = meta.file_key(p)
-            is_video = p.suffix.lower() in (".mp4", ".mov", ".m4v", ".avi")
+            is_video = meta.is_video_ref(p)
 
             if key not in state["media"]:
                 if is_video:
-                    vid, thumb = meta.upload_video(acct, p, ad["name"])
+                    if meta.is_remote_url(p):
+                        vid, thumb = meta.upload_video_url(acct, p, ad["name"])
+                    else:
+                        vid, thumb = meta.upload_video(acct, p, ad["name"])
                     state["media"][key] = {"video_id": vid, "thumb": thumb}
                 else:
                     state["media"][key] = {"hash": meta.upload_image(acct, p, ad["name"])}

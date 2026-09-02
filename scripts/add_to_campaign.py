@@ -24,7 +24,7 @@ Add --json to any command for machine-readable output (used by the web UI).
 Ads whose name already exists in the target ad set are SKIPPED, so re-running
 after a failure never duplicates.
 """
-import argparse, csv, hashlib, json, sys
+import argparse, csv, json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import meta, xlsx
@@ -112,6 +112,8 @@ def read_ads(path):
 
 
 def resolve_creative_path(name):
+    if meta.is_remote_url(name):
+        return name
     for cand in (Path(name), ROOT / name, ROOT / "creatives" / name):
         if cand.exists():
             return cand
@@ -120,7 +122,7 @@ def resolve_creative_path(name):
 
 # ───────────────────────────────────────────────────────────── adding
 
-def add_ads(acct, adset_id, ads, execute, defaults):
+def add_ads(acct, adset_id, ads, execute, defaults, lanes=4):
     aset = meta.get(adset_id, "id,name,status,campaign{id,name}")
     camp = aset.get("campaign") or {}
     already = existing_ad_names(adset_id)
@@ -143,7 +145,7 @@ def add_ads(acct, adset_id, ads, execute, defaults):
     print(f"          ad set currently has {len(already)} ad(s), status {aset.get('status')}")
     print("=" * 72)
     for ad in fresh:
-        print(f"  + {ad['name']:<34} {Path(ad['creative']).name}")
+        print(f"  + {ad['name']:<34} {meta.media_name(ad['creative'])}")
     for s in skipped:
         print(f"  = {s:<34} already exists, will be skipped")
     if problems:
@@ -163,7 +165,17 @@ def add_ads(acct, adset_id, ads, execute, defaults):
     slug = "".join(ch if ch.isalnum() else "-" for ch in aset.get("name", adset_id)).lower()[:40]
     state_path = ROOT / "outputs" / f"addto-{slug}-{adset_id}.json"
     state_path.parent.mkdir(parents=True, exist_ok=True)
-    state = json.loads(state_path.read_text()) if state_path.exists() else {"ads": {}, "media": {}}
+    state = json.loads(state_path.read_text()) if state_path.exists() else {}
+    state.setdefault("ads", {}); state.setdefault("media", {})
+
+    # Put all missing media in the account before creating the first ad. Local
+    # files use parallel lanes; public URLs are fetched by Meta's datacenter.
+    wanted = [resolve_creative_path(ad["creative"]) for ad in fresh
+              if ad["name"] not in state["ads"]]
+    todo = [ref for ref in wanted if meta.media_key(ref) not in state["media"]]
+    if todo:
+        state["media"].update(meta.upload_many(acct, todo, lanes=lanes))
+        state_path.write_text(json.dumps(state, indent=2))
 
     created = []
     for ad in fresh:
@@ -171,11 +183,14 @@ def add_ads(acct, adset_id, ads, execute, defaults):
             print(f"  = {ad['name']} already created in a previous run ({state['ads'][ad['name']]})")
             continue
         p = resolve_creative_path(ad["creative"])
-        key = hashlib.sha256(p.read_bytes()).hexdigest()[:16]
-        is_video = p.suffix.lower() in (".mp4", ".mov", ".m4v", ".avi")
+        key = meta.media_key(p)
+        is_video = meta.is_video_ref(p)
         if key not in state["media"]:
             if is_video:
-                vid, thumb = meta.upload_video(acct, p, ad["name"])
+                if meta.is_remote_url(p):
+                    vid, thumb = meta.upload_video_url(acct, p, ad["name"])
+                else:
+                    vid, thumb = meta.upload_video(acct, p, ad["name"])
                 state["media"][key] = {"video_id": vid, "thumb": thumb}
             else:
                 state["media"][key] = {"hash": meta.upload_image(acct, p, ad["name"])}
@@ -200,13 +215,13 @@ def add_ads(acct, adset_id, ads, execute, defaults):
     return {"adset_id": adset_id, "created": created, "skipped": skipped}
 
 
-def add_adsets(acct, campaign_id, spec_path, execute):
+def add_adsets(acct, campaign_id, spec_path, execute, lanes=4):
     """Add new ad set(s) + their ads into an existing campaign."""
     spec = json.loads(Path(spec_path).read_text())
     camp = meta.get(campaign_id, "id,name,daily_budget,lifetime_budget,objective")
     cbo = bool(camp.get("daily_budget") or camp.get("lifetime_budget"))
     defaults = spec.get("defaults", {})
-    existing = {a["name"] for a in list_adsets(campaign_id, with_counts=False)}
+    existing = {a["name"]: a["id"] for a in list_adsets(campaign_id, with_counts=False)}
 
     print("=" * 72)
     print(f"ADD AD SETS  ->  campaign  {camp.get('name')}  ({campaign_id})")
@@ -216,15 +231,15 @@ def add_adsets(acct, campaign_id, spec_path, execute):
     problems = []
     todo = []
     for a in spec.get("adsets", []):
-        if a["name"] in existing:
-            print(f"  = {a['name']}  already exists in this campaign, skipping")
-            continue
-        if cbo and a.get("daily_budget_minor"):
+        resumes = a["name"] in existing
+        if not resumes and cbo and a.get("daily_budget_minor"):
             problems.append(f"{a['name']}: campaign is CBO — remove the ad set budget")
-        if not cbo and not a.get("daily_budget_minor"):
+        if not resumes and not cbo and not a.get("daily_budget_minor"):
             problems.append(f"{a['name']}: campaign is ABO — a budget is required, never defaulted")
         todo.append(a)
-        print(f"  + {a['name']:<34} {len(a.get('ads', []))} ad(s)")
+        marker = "=" if resumes else "+"
+        suffix = "resume existing set; add only missing ads" if resumes else "new ad set"
+        print(f"  {marker} {a['name']:<34} {len(a.get('ads', []))} ad(s)  ({suffix})")
     if problems:
         print(f"\n{len(problems)} problem(s) — nothing created:")
         for p in problems:
@@ -239,18 +254,22 @@ def add_adsets(acct, campaign_id, spec_path, execute):
 
     out = []
     for a in todo:
-        aid = meta.create_adset(
-            acct, campaign_id, a["name"], a["targeting"],
-            budget_minor=a.get("daily_budget_minor"),
-            lifetime_budget_minor=a.get("lifetime_budget_minor"),
-            optimization_goal=a.get("optimization_goal", "LINK_CLICKS"),
-            billing_event=a.get("billing_event", "IMPRESSIONS"),
-            promoted_object=a.get("promoted_object"),
-            dsa_beneficiary=a.get("dsa_beneficiary") or defaults.get("dsa_beneficiary"),
-            dsa_payor=a.get("dsa_payor") or defaults.get("dsa_payor"),
-            start_time=a.get("start_time"), end_time=a.get("end_time"))
-        print(f"  created ad set  {aid}  {a['name']}")
-        res = add_ads(acct, aid, a.get("ads", []), True, defaults)
+        aid = existing.get(a["name"])
+        if aid:
+            print(f"  resuming ad set  {aid}  {a['name']}")
+        else:
+            aid = meta.create_adset(
+                acct, campaign_id, a["name"], a["targeting"],
+                budget_minor=a.get("daily_budget_minor"),
+                lifetime_budget_minor=a.get("lifetime_budget_minor"),
+                optimization_goal=a.get("optimization_goal", "LINK_CLICKS"),
+                billing_event=a.get("billing_event", "IMPRESSIONS"),
+                promoted_object=a.get("promoted_object"),
+                dsa_beneficiary=a.get("dsa_beneficiary") or defaults.get("dsa_beneficiary"),
+                dsa_payor=a.get("dsa_payor") or defaults.get("dsa_payor"),
+                start_time=a.get("start_time"), end_time=a.get("end_time"))
+            print(f"  created ad set  {aid}  {a['name']}")
+        res = add_ads(acct, aid, a.get("ads", []), True, defaults, lanes=lanes)
         out.append({"adset": a["name"], "adset_id": aid, "ads": res["created"]})
     return {"campaign_id": campaign_id, "created": out}
 
@@ -266,6 +285,8 @@ def main():
     ap.add_argument("--new-adsets-from", help="spec JSON containing adsets[] to add")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--execute", action="store_true")
+    ap.add_argument("--lanes", type=int, default=4,
+                    help="local creatives uploaded at once (default 4)")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     acct = meta.account(args.account)
@@ -302,12 +323,14 @@ def main():
         ("cta", os.getenv("META_CTA")), ("url_tags", os.getenv("META_URL_TAGS"))) if v}
 
     if args.adset and args.ads:
-        res = add_ads(acct, args.adset, read_ads(args.ads), args.execute, defaults)
+        res = add_ads(acct, args.adset, read_ads(args.ads), args.execute, defaults,
+                      lanes=args.lanes)
         if args.json:
             print(json.dumps(res, indent=2))
         return
     if args.campaign and args.new_adsets_from:
-        res = add_adsets(acct, args.campaign, args.new_adsets_from, args.execute)
+        res = add_adsets(acct, args.campaign, args.new_adsets_from, args.execute,
+                         lanes=args.lanes)
         if args.json:
             print(json.dumps(res, indent=2))
         return

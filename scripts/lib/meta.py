@@ -18,6 +18,8 @@ from pathlib import Path
 
 API_VERSION = os.getenv("META_API_VERSION", "v23.0")
 BASE = f"https://graph.facebook.com/{API_VERSION}"
+RESUMABLE_OVER = int(os.getenv("META_RESUMABLE_OVER", 40 * 1024 * 1024))
+VIDEO_SUFFIXES = (".mp4", ".mov", ".m4v", ".avi", ".webm")
 
 # Every creative feature Meta currently exposes, all OPT_OUT. Meta expands this
 # to its full internal list (~82 features) on write; verified by read-back.
@@ -367,31 +369,117 @@ def upload_image(acct, path, name=None):
     return list(r["images"].values())[0]["hash"]
 
 
+def _multipart_post(path, fields, file_field, filename, data, op, retries=5):
+    """POST one multipart file part, retrying transport and transient failures."""
+    import mimetypes, uuid
+    boundary = uuid.uuid4().hex
+    body = b""
+    for k, v in {**fields, "access_token": token()}.items():
+        body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\""
+                 f"\r\n\r\n{v}\r\n").encode()
+    ctype = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{file_field}\"; "
+             f"filename=\"{Path(filename).name}\"\r\nContent-Type: {ctype}\r\n\r\n").encode()
+    body += data + f"\r\n--{boundary}--\r\n".encode()
+
+    for attempt in range(1, retries + 1):
+        _pace()
+        req = urllib.request.Request(f"{BASE}/{path}", data=body)
+        req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+        try:
+            if USAGE["started"] is None:
+                USAGE["started"] = time.time()
+            _t0 = time.time()
+            resp = urllib.request.urlopen(req, timeout=300)
+            _took = time.time() - _t0
+            USAGE["calls"] += 1
+            USAGE["request_sec"] += _took
+            _b = USAGE["by_op"].setdefault(op, [0, 0.0])
+            _b[0] += 1; _b[1] += _took
+            _read_usage(resp.headers)
+            return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            _read_usage(getattr(e, "headers", None))
+            try:
+                err = json.loads(e.read()).get("error", {})
+            except Exception:
+                err = {"message": f"HTTP {e.code}"}
+            rate_limited = err.get("code") in (4, 17, 32, 613)
+            transient = rate_limited or e.code in (429, 500, 502, 503, 504)
+            if transient and attempt < retries:
+                if rate_limited and USAGE["regain_at"] > time.time():
+                    continue
+                time.sleep(min(60, 5 * 2 ** (attempt - 1)))
+                continue
+            raise MetaError(op, err)
+        except (urllib.error.URLError, BrokenPipeError, ConnectionError, TimeoutError):
+            if attempt < retries:
+                time.sleep(5 * attempt)
+                continue
+            raise
+
+
+def _upload_video_single(acct, path, name):
+    r = _multipart_post(f"{account(acct)}/advideos", {"name": name}, "source",
+                        path.name, path.read_bytes(), "upload_video")
+    return r["id"]
+
+
+def _upload_video_resumable(acct, path, name):
+    """Use Meta's start -> transfer chunks -> finish upload protocol."""
+    started = post(f"{account(acct)}/advideos",
+                   {"upload_phase": "start", "file_size": path.stat().st_size,
+                    "name": name}, "upload_video_start")
+    session = started["upload_session_id"]
+    video_id = started["video_id"]
+    start, end = int(started["start_offset"]), int(started["end_offset"])
+    with path.open("rb") as fh:
+        while start < path.stat().st_size:
+            fh.seek(start)
+            chunk = fh.read(end - start)
+            if not chunk:
+                raise MetaError("upload_video_transfer",
+                                {"message": f"Meta requested an empty chunk at {start}:{end}"})
+            moved = _multipart_post(
+                f"{account(acct)}/advideos",
+                {"upload_phase": "transfer", "upload_session_id": session,
+                 "start_offset": start},
+                "video_file_chunk", path.name, chunk, "upload_video_transfer")
+            new_start, new_end = int(moved["start_offset"]), int(moved["end_offset"])
+            if new_start <= start:
+                raise MetaError("upload_video_transfer",
+                                {"message": f"upload made no progress at byte {start}"})
+            start, end = new_start, new_end
+    post(f"{account(acct)}/advideos",
+         {"upload_phase": "finish", "upload_session_id": session},
+         "upload_video_finish")
+    return video_id
+
+
+def upload_video_url(acct, url, name=None):
+    """Ask Meta to fetch a public direct HTTPS video URL itself."""
+    if not is_remote_url(url):
+        raise ValueError("video URL must start with https://")
+    filename = urllib.parse.unquote(Path(urllib.parse.urlsplit(url).path).name)
+    r = post(f"{account(acct)}/advideos",
+             {"file_url": url, "name": name or filename or "remote-video"},
+             "upload_video_url")
+    vid = r["id"]
+    return vid, wait_for_video(vid)
+
+
 def upload_video(acct, path, name=None):
     """Uploads a video and waits for Meta to finish processing.
 
     Returns (video_id, thumbnail_url). Meta rejects video ad creation until
     processing completes, so this blocks — minutes, for a large file.
     """
-    import mimetypes, uuid
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"video not found: {path}")
-    boundary = uuid.uuid4().hex
-    fields = {"access_token": token(), "name": name or path.name}
-    body = b""
-    for k, v in fields.items():
-        body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n").encode()
-    ctype = mimetypes.guess_type(str(path))[0] or "video/mp4"
-    body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"source\"; "
-             f"filename=\"{path.name}\"\r\nContent-Type: {ctype}\r\n\r\n").encode()
-    body += path.read_bytes() + f"\r\n--{boundary}--\r\n".encode()
-    req = urllib.request.Request(f"{BASE}/{account(acct)}/advideos", data=body)
-    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
-    try:
-        vid = json.loads(urllib.request.urlopen(req, timeout=1800).read())["id"]
-    except urllib.error.HTTPError as e:
-        raise MetaError("upload_video", json.loads(e.read()).get("error", {}))
+    vid = (_upload_video_resumable(acct, path, name or path.name)
+           if path.stat().st_size > RESUMABLE_OVER
+           else _upload_video_single(acct, path, name or path.name))
     return vid, wait_for_video(vid)
 
 
@@ -456,7 +544,8 @@ def image_creative(page_id, image_hash, link, body, headline, description=None,
 
 def video_creative(page_id, video_id, thumbnail_url, link, body, headline,
                    description=None, cta="LEARN_MORE", ig_user_id=None, url_tags=None,
-                   enhancements_off=True, multi_advertiser_off=True):
+                   enhancements_off=True, multi_advertiser_off=True,
+                   bodies=None, headlines=None, descriptions=None):
     vd = {"video_id": video_id, "image_url": thumbnail_url, "message": body,
           "title": headline, "call_to_action": {"type": cta, "value": {"link": link}}}
     if description:
@@ -465,6 +554,20 @@ def video_creative(page_id, video_id, thumbnail_url, link, body, headline,
     if ig_user_id:
         oss["instagram_user_id"] = ig_user_id
     c = {"object_story_spec": oss}
+    bodies = [b for b in (bodies or []) if b][:5]
+    headlines = [h for h in (headlines or []) if h][:5]
+    descriptions = [d for d in (descriptions or []) if d][:5]
+    if len(bodies) > 1 or len(headlines) > 1 or len(descriptions) > 1:
+        feed = {"optimization_type": "DEGREES_OF_FREEDOM",
+                "ad_formats": ["SINGLE_VIDEO"],
+                "videos": [{"video_id": video_id, "thumbnail_url": thumbnail_url}],
+                "bodies": [{"text": b} for b in (bodies or [body])],
+                "titles": [{"text": h} for h in (headlines or [headline])],
+                "call_to_action_types": [cta],
+                "link_urls": [{"website_url": link}]}
+        if descriptions:
+            feed["descriptions"] = [{"text": d} for d in descriptions]
+        c["asset_feed_spec"] = feed
     if enhancements_off:
         c["degrees_of_freedom_spec"] = DOF_OFF
     if multi_advertiser_off:
@@ -571,9 +674,32 @@ def _cache_save(cache):
         pass          # a cache that cannot be written is a slower run, not a failure
 
 
-def file_key(path):
-    """Content hash. Two identical files are one upload, whatever they're called."""
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:32]
+def is_remote_url(ref):
+    try:
+        p = urllib.parse.urlsplit(str(ref))
+        return p.scheme.lower() == "https" and bool(p.netloc)
+    except (TypeError, ValueError):
+        return False
+
+
+def media_key(ref):
+    """Content hash for files; stable URL hash for videos Meta fetches itself."""
+    if is_remote_url(ref):
+        return hashlib.sha256(("url:" + str(ref)).encode()).hexdigest()[:32]
+    return hashlib.sha256(Path(ref).read_bytes()).hexdigest()[:32]
+
+
+file_key = media_key  # backwards-compatible name used by existing state/build code
+
+
+def media_name(ref):
+    if is_remote_url(ref):
+        return urllib.parse.unquote(Path(urllib.parse.urlsplit(str(ref)).path).name) or "remote-video"
+    return Path(ref).name
+
+
+def is_video_ref(ref):
+    return is_remote_url(ref) or Path(ref).suffix.lower() in VIDEO_SUFFIXES
 
 
 def upload_many(acct, paths, lanes=4, log=print):
@@ -585,19 +711,22 @@ def upload_many(acct, paths, lanes=4, log=print):
     """
     acct = account(acct)
     uniq = {}
-    for p in paths:
-        p = Path(p)
-        if p.exists():
-            uniq.setdefault(file_key(p), p)
+    for ref in paths:
+        if is_remote_url(ref):
+            uniq.setdefault(media_key(ref), str(ref))
+        else:
+            p = Path(ref)
+            if p.exists():
+                uniq.setdefault(media_key(p), p)
 
     cache = _cache_load()
     out, todo = {}, []
-    for key, p in uniq.items():
+    for key, ref in uniq.items():
         hit = cache.get(f"{acct}:{key}")
         if hit:
             out[key] = hit
         else:
-            todo.append((key, p))
+            todo.append((key, ref))
 
     if out:
         log(f"  {len(out)} creative(s) already in this ad account — not re-uploaded.")
@@ -608,20 +737,25 @@ def upload_many(acct, paths, lanes=4, log=print):
     errors = []
 
     def work(item):
-        key, p = item
+        key, ref = item
         try:
-            if p.suffix.lower() in (".mp4", ".mov", ".m4v", ".avi", ".webm"):
+            if is_remote_url(ref):
+                vid, thumb = upload_video_url(acct, ref, Path(media_name(ref)).stem)
+                rec = {"video_id": vid, "thumb": thumb}
+            elif is_video_ref(ref):
+                p = Path(ref)
                 vid, thumb = upload_video(acct, p, p.stem)
                 rec = {"video_id": vid, "thumb": thumb}
             else:
+                p = Path(ref)
                 rec = {"hash": upload_image(acct, p, p.stem)}
         except Exception as e:
-            errors.append((p.name, str(e)))
+            errors.append((media_name(ref), str(e)))
             return
         with _MEDIA_LOCK:
             out[key] = rec
             cache[f"{acct}:{key}"] = rec
-            log(f"    uploaded {p.name}")
+            log(f"    uploaded {media_name(ref)}")
 
     threads = []
     queue = list(todo)

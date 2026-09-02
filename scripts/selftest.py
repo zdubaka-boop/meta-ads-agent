@@ -353,6 +353,70 @@ _per_adset = 'meta.get_all(\n            f"{aid}/ads"' in _v
 check("verification fetches ads per ad set, not per ad", _per_adset,
       "verify.py is back to one call per ad")
 
+# 25. Public video URLs must go through file_url, deduplicate by the exact URL,
+#     and never be interpreted as a local Path.
+_url_calls = []
+_real_url, _real_account = _m.upload_video_url, _m.account
+_m.account = lambda a=None: "act_test"
+_m.upload_video_url = lambda acct, url, name=None: (
+    _url_calls.append(url), ("vid_url", "https://thumb.test/v.jpg"))[-1]
+_url = "https://dropbox.test/video.mp4?dl=1"
+_remote = _m.upload_many("act_test", [_url, _url], lanes=4, log=lambda m: None)
+check("public video URL uses Meta-side fetch once",
+      _url_calls == [_url] and _remote[_m.media_key(_url)]["video_id"] == "vid_url",
+      str(_url_calls))
+_m.upload_video_url, _m.account = _real_url, _real_account
+
+# 26. Local videos switch to resumable upload above the configured threshold.
+_small, _large = _d / "small.mp4", _d / "large.mp4"
+_small.write_bytes(b"x"); _large.write_bytes(b"xyz")
+_selected = []
+_real_over = _m.RESUMABLE_OVER
+_real_single, _real_resumable, _real_wait = (
+    _m._upload_video_single, _m._upload_video_resumable, _m.wait_for_video)
+_m.RESUMABLE_OVER = 2
+_m._upload_video_single = lambda acct, path, name: (_selected.append("single"), "v1")[-1]
+_m._upload_video_resumable = lambda acct, path, name: (_selected.append("resumable"), "v2")[-1]
+_m.wait_for_video = lambda vid: "thumb"
+_m.upload_video("act_test", _small); _m.upload_video("act_test", _large)
+check("large videos select resumable chunks", _selected == ["single", "resumable"],
+      str(_selected))
+_m.RESUMABLE_OVER = _real_over
+_m._upload_video_single, _m._upload_video_resumable, _m.wait_for_video = (
+    _real_single, _real_resumable, _real_wait)
+
+# 27. Video creative accepts the same text variants the ad builder always
+#     passes for images and produces a flexible SINGLE_VIDEO feed.
+_vc = _m.video_creative("page", "video", "thumb", "https://landing.test", "B1", "H1",
+                        bodies=["B1", "B2"], headlines=["H1", "H2"],
+                        descriptions=["D1", "D2"])
+check("video creative accepts text variants",
+      _vc.get("asset_feed_spec", {}).get("ad_formats") == ["SINGLE_VIDEO"])
+
+# 28. A partial run may leave an empty existing ad set. Re-running must enter
+#     it and add its missing ads instead of skipping the whole set.
+_resume_spec = _d / "resume.json"
+_resume_spec.write_text(json.dumps({"defaults": {}, "adsets": [
+    {"name": "Existing", "targeting": {}, "ads": [{"name": "missing"}]}]}))
+_real_get = add_to_campaign.meta.get
+_real_list = add_to_campaign.list_adsets
+_real_create = add_to_campaign.meta.create_adset
+_real_add = add_to_campaign.add_ads
+_resumed = []
+add_to_campaign.meta.get = lambda *a, **k: {
+    "id": "camp", "name": "Campaign", "objective": "OUTCOME_TRAFFIC"}
+add_to_campaign.list_adsets = lambda *a, **k: [{"id": "set_123", "name": "Existing"}]
+add_to_campaign.meta.create_adset = lambda *a, **k: (_ for _ in ()).throw(
+    AssertionError("existing ad set was duplicated"))
+add_to_campaign.add_ads = lambda acct, aid, ads, execute, defaults, lanes=4: (
+    _resumed.append(aid), {"created": [], "skipped": []})[-1]
+add_to_campaign.add_adsets("act_test", "camp", _resume_spec, True)
+check("partial ad set resumes into existing ID", _resumed == ["set_123"], str(_resumed))
+add_to_campaign.meta.get = _real_get
+add_to_campaign.list_adsets = _real_list
+add_to_campaign.meta.create_adset = _real_create
+add_to_campaign.add_ads = _real_add
+
 print("=" * 66)
 bad = results.count(False)
 print(f"  {len(results)-bad}/{len(results)} passed" + ("" if not bad else f"   {bad} FAILING"))

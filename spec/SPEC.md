@@ -74,9 +74,16 @@ Q3 — UK — Broad 18-45,Q3-UK-01,creatives/a.jpg,"Body copy here.",Headline A,
 Q3 — UK — Broad 18-45,Q3-UK-02,creatives/b.mp4,"Different hook.",Headline B,,SHOP_NOW,https://example.com/lp
 ```
 
-`creative` may be an image (`.jpg .png`) or a video (`.mp4 .mov`) — the builder
-detects the type, uploads it, and waits for video processing. Identical files
-are uploaded **once** and reused across every ad that references them.
+`creative` may be an image (`.jpg .png`), a local video (`.mp4 .mov`), or a
+public direct HTTPS video URL. For a URL (for example a Dropbox link ending in
+`?dl=1`), Meta fetches the video itself with `file_url`, so no video bytes cross
+the machine running the builder. Google Drive share pages are not direct file
+links and are unsuitable for large videos.
+
+Local files are uploaded concurrently before ad creation (`--lanes 4` by
+default). Videos over 40 MB use Meta's resumable chunk protocol. Identical
+files—and repeated uses of the exact same URL—are uploaded **once** and reused
+across every ad that references them and later resumptions.
 
 ---
 
